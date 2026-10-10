@@ -113,6 +113,19 @@ if(ANDROID)
 		COPY ${EXTRAS_FILES} ${YAPB_FILES}
 		DESTINATION ${EXTRAS_OUTPUT}
 	)
+
+	# The standalone app extracts client resources into its own game directory.
+	# Keep bundles outside main/assets, which is regenerated above.
+	execute_process(
+		COMMAND ${Python_EXECUTABLE}
+		${CMAKE_CURRENT_SOURCE_DIR}/scripts/create_resource_pack.py
+		${CMAKE_CURRENT_SOURCE_DIR}/android/app/build/generated/bundle-assets/bundled/client-resources.zip
+		${EXTRAS_OUTPUT}
+		RESULT_VARIABLE RESOURCE_PACK_RESULT
+	)
+	if(NOT RESOURCE_PACK_RESULT EQUAL 0)
+		message(FATAL_ERROR "Could not create bundled client resources")
+	endif()
 else()
 	set(EXTRAS_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/extras.pk3")
 

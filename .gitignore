@@ -44,6 +44,8 @@
 *.autosave
 
 android/app/src/main/assets
+android/offline-assets/
+*.apk
 *-build
 *admob-id.xml
 

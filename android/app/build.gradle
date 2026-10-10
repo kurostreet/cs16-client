@@ -45,7 +45,13 @@ android {
 	}
 
 	signingConfigs {
-		debug {}
+		debug {
+			// Public upstream debug key, for repeatable test updates only.
+			storeFile = file("../../3rdparty/xash3d-fwgs/android/debug.keystore")
+			storePassword = "android"
+			keyAlias = "androiddebugkey"
+			keyPassword = "android"
+		}
 
 		continuous {
 			if (System.getenv('KEYSTORE_FILE_PATH') != null) {
@@ -103,7 +109,40 @@ android {
 	buildFeatures {
 		buildConfig = true
 	}
+
+	sourceSets {
+		main {
+			java.srcDirs += ["../../3rdparty/SDL/android-project/app/src/main/java",
+				"../../3rdparty/xash3d-fwgs/android/app/src/main/java"]
+			jniLibs.srcDirs += ["build/generated/engine/jniLibs"]
+			assets.srcDirs += ["build/generated/bundle-assets"]
+			if (System.getenv("CZM_GAME_ASSETS_DIR") != null) {
+				assets.srcDirs += [System.getenv("CZM_GAME_ASSETS_DIR")]
+			}
+		}
+	}
+
+	androidResources {
+		noCompress += ["zip"]
+	}
 }
+
+def embeddedEngine = tasks.register("buildBundledEngine", Exec) {
+	workingDir rootProject.projectDir.parentFile
+	commandLine "python3", "scripts/build_android_engine.py",
+		"--ndk", new File(android.sdkDirectory, "ndk/" + android.ndkVersion).absolutePath,
+		"--output", file("build/generated/engine").absolutePath
+	inputs.files(fileTree("../../3rdparty/xash3d-fwgs") {
+		exclude "**/.git/**", "**/.lock-*", "**/__pycache__/**"
+	})
+	inputs.files(fileTree("../../3rdparty/SDL") { exclude "**/.git/**" })
+	inputs.files("../../scripts/build_android_engine.py", "../../scripts/create_resource_pack.py")
+	outputs.dir("build/generated/engine/jniLibs")
+	outputs.file("build/generated/bundle-assets/bundled/engine-resources.zip")
+	outputs.file("build/generated/bundle-assets/bundled/engine-resources.json")
+}
+
+tasks.named("preBuild").configure { dependsOn embeddedEngine }
 
 static def getBuildNum() {
 	LocalDateTime now = LocalDateTime.now()
