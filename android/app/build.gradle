@@ -123,3 +123,12 @@ def getGitHash() {
 
 	return bufferedReader.getText().trim()
 }
+
+// CMake prepares the bundled game assets. Finish native preparation before
+// Gradle snapshots assets, including when building from a clean checkout.
+android.applicationVariants.all { variant ->
+    def variantTaskName = variant.name.capitalize()
+    tasks.matching { it.name == "merge${variantTaskName}Assets" }.configureEach {
+        dependsOn "externalNativeBuild${variantTaskName}"
+    }
+}
