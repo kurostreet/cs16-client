@@ -1,0 +1,814 @@
+diff --git a/engine/client/cl_main.c b/engine/client/cl_main.c
+index 39e4f9c..fbbcfd6 100644
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -1532,7 +1532,7 @@ static void CL_Connect_f( void )
+ 
+ 	// TESTTEST: a see console during connection
+ 	UI_SetActiveMenu( false );
+-	Key_SetKeyDest( key_console );
++	Key_SetKeyDest( CZM_Loading_Enabled( ) ? key_game : key_console );
+ 
+ 	cls.state = ca_connecting;
+ 	cls.net_protocol = proto;
+@@ -1805,6 +1805,8 @@ void CL_Disconnect( void )
+ 	cls.signon = 0;
+ 	cls.net_protocol = PROTO_CURRENT;
+ 
++	CZM_Loading_Disconnected();
++
+ 	// back to menu in non-developer mode
+ 	if( host_developer.value || cls.key_dest == key_menu )
+ 		return;
+@@ -1980,7 +1982,7 @@ static void CL_Retry_f( void )
+ 	CL_Disconnect();
+ 
+ 	UI_SetActiveMenu( false );
+-	Key_SetKeyDest( key_console );
++	Key_SetKeyDest( CZM_Loading_Enabled( ) ? key_game : key_console );
+ 
+ 	cls.state = ca_connecting;
+ 	cls.connect_time = MAX_HEARTBEAT; // CL_CheckForResend() will fire immediately
+@@ -2762,6 +2764,8 @@ static void CL_ErrorMsg( const char *c, const char *args, netadr_t from, sizebuf
+ 			Q_snprintf( formatted_msg, sizeof( formatted_msg ), "^3Server message^7\n%s", args + 1 );
+ 	}
+ 
++	CZM_Loading_SetError( formatted_msg );
++
+ 	// in case we're in console or it's classic mainui which doesn't support messageboxes
+ 	if( !UI_IsVisible() || !UI_ShowMessageBox( formatted_msg ))
+ 		Msg( "%s\n", formatted_msg );
+@@ -3469,9 +3473,11 @@ qboolean CL_PrecacheResources( void )
+ 		if( pRes->type != t_model || pRes->nIndex != WORLD_INDEX )
+ 			continue;
+ 
++		CZM_Loading_PrecacheBegin();
+ 		cl.models[pRes->nIndex] = Mod_LoadWorld( pRes->szFileName, true );
+ 		SetBits( pRes->ucFlags, RES_PRECACHED );
+ 		cl.nummodels = 1;
++		CZM_Loading_PrecacheStep();
+ 		break;
+ 	}
+ 
+@@ -3509,6 +3515,8 @@ qboolean CL_PrecacheResources( void )
+ 		if( FBitSet( pRes->ucFlags, RES_PRECACHED ))
+ 			continue;
+ 
++		CZM_Loading_PrecacheStep();
++
+ 		switch( pRes->type )
+ 		{
+ 		case t_sound:
+@@ -3636,6 +3644,10 @@ void CL_Escape_f( void )
+ 	if( cls.key_dest == key_menu )
+ 		return;
+ 
++	// back button on the loading screen cancels the connection
++	if( CZM_Loading_Escape( ))
++		return;
++
+ 	// the final credits is running
+ 	if( UI_CreditsActive( )) return;
+ 
+diff --git a/engine/client/cl_scrn.c b/engine/client/cl_scrn.c
+index 6c550c7..30fc6e1 100644
+--- a/engine/client/cl_scrn.c
++++ b/engine/client/cl_scrn.c
+@@ -493,6 +493,9 @@ SCR_BeginLoadingPlaque
+ */
+ void SCR_BeginLoadingPlaque( qboolean is_background )
+ {
++	if( !is_background )
++		CZM_Loading_BeginLocal();
++
+ 	S_StopAllSounds( true );
+ 	cl.audio_prepped = false;			// don't play ambients
+ 
+@@ -673,8 +676,21 @@ void SCR_UpdateScreen( void )
+ {
+ 	qboolean screen_redraw = true; // assume screen has been redrawn
+ 
++	CZM_Loading_Frame();
++
+ 	if( !V_PreRender( )) return;
+ 
++	// the menu draws the loading screen on top of a black frame
++	if( CZM_Loading_Active( ) && cls.state != ca_active )
++	{
++		ref.dllFuncs.GL_SetRenderMode( kRenderNormal );
++		ref.dllFuncs.R_DrawStretchPic( 0, 0, refState.width, refState.height, 0, 0, 1, 1, R_GetBuiltinTexture( REF_BLACK_TEXTURE ));
++		if( cls.state == ca_disconnected )
++			Con_RunConsole ();
++		V_PostRender();
++		return;
++	}
++
+ 	switch( cls.state )
+ 	{
+ 	case ca_disconnected:
+@@ -916,6 +932,7 @@ void SCR_Init( void )
+ 	Cvar_RegisterVariable( &cl_levelshot_name );
+ 	Cvar_RegisterVariable( &cl_allow_levelshots );
+ 	Cvar_RegisterVariable( &scr_loading );
++	CZM_Loading_Init();
+ 	Cvar_RegisterVariable( &scr_download );
+ 	Cvar_RegisterVariable( &cl_testlights );
+ 	Cvar_RegisterVariable( &cl_envshot_size );
+diff --git a/engine/client/client.h b/engine/client/client.h
+index 2d6faf7..3ac62ca 100644
+--- a/engine/client/client.h
++++ b/engine/client/client.h
+@@ -804,6 +804,25 @@ void CL_NotifyServerListResponse( void );
+ qboolean CL_NetRequestSend( net_request_t *nr );
+ void CL_Escape_f( void );
+ 
++//
++// czm_loading.c
++//
++void CZM_Loading_Init( void );
++void CZM_Loading_Frame( void );
++qboolean CZM_Loading_Enabled( void );
++qboolean CZM_Loading_Active( void );
++void CZM_Loading_BeginLocal( void );
++void CZM_Loading_SetHostname( const char *hostname );
++void CZM_Loading_SetError( const char *reason );
++void CZM_Loading_PrecacheBegin( void );
++void CZM_Loading_PrecacheStep( void );
++void CZM_Loading_SpawnSent( void );
++void CZM_Loading_Pump( void );
++qboolean CZM_Loading_Escape( void );
++qboolean CZM_Loading_TouchEvent( int type, float x, float y );
++void CZM_Loading_Disconnected( void );
++void Touch_ResetLoadingInput( void );
++
+ //
+ // cl_demo.c
+ //
+diff --git a/engine/client/console.c b/engine/client/console.c
+index 62ac3eb..ae75255 100644
+--- a/engine/client/console.c
++++ b/engine/client/console.c
+@@ -1756,6 +1756,9 @@ void Con_DrawDebug( void )
+ {
+ 	static double	timeStart;
+ 
++	if( CZM_Loading_Active( ))
++		return; // the loading screen shows download progress itself
++
+ 	if( scr_download.value != -1.0f )
+ 	{
+ 		string dlstring;
+@@ -1985,6 +1988,13 @@ Con_DrawConsole
+ */
+ void Con_DrawConsole( void )
+ {
++	// the loading screen replaces the console unless the player opened it
++	if( CZM_Loading_Active( ) && cls.key_dest != key_console )
++	{
++		con.vislines = con.showlines = 0;
++		return;
++	}
++
+ 	// never draw console when changelevel in-progress
+ 	if( cls.state != ca_disconnected && ( cls.changelevel || cls.changedemo ))
+ 		return;
+@@ -2058,6 +2068,9 @@ void Con_DrawVersion( void )
+ 	byte	*color = g_color_table[7];
+ 	string	curbuild;
+ 
++	if( CZM_Loading_Active( ))
++		return;
++
+ 	if( !scr_drawversion.value )
+ 		return;
+ 
+diff --git a/engine/client/czm_loading.c b/engine/client/czm_loading.c
+new file mode 100644
+index 0000000..d42a656
+--- /dev/null
++++ b/engine/client/czm_loading.c
+@@ -0,0 +1,516 @@
++/*
++czm_loading.c - Counter Zombie Mobile loading screen state
++Copyright (C) 2026 Counter Zombie Mobile authors
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++*/
++
++// The engine only tracks loading progress here and publishes it through cvars.
++// The menu library draws the screen (art, text, progress bar, cancel button).
++
++#include "common.h"
++#include "client.h"
++#include "input.h"
++#include "net_api.h"
++
++#define CZM_INFO_CONTEXT 0x435a4d01 // 'CZM' + 1, NetAPI context for the server details query
++
++enum
++{
++	CZM_STAGE_NONE = 0,
++	CZM_STAGE_CONNECT,   // waiting for the server to accept us
++	CZM_STAGE_HANDSHAKE, // server data and resource list
++	CZM_STAGE_DOWNLOAD,  // downloading missing server files
++	CZM_STAGE_PRECACHE,  // loading the map, models and sounds
++	CZM_STAGE_ENTER,     // spawn sent, waiting to enter the game
++	CZM_STAGE_LOCAL,     // starting a local game
++};
++
++static CVAR_DEFINE_AUTO( czm_loading_enable, "1", FCVAR_ARCHIVE, "draw the Counter Zombie Mobile loading screen instead of the console" );
++static CVAR_DEFINE_AUTO( czm_loading_pump, "1", FCVAR_ARCHIVE, "redraw the loading screen while the map and models are loaded" );
++static CVAR_DEFINE_AUTO( czm_loading, "0", 0, "loading screen is active (read by the menu)" );
++static CVAR_DEFINE_AUTO( czm_loading_session, "0", 0, "increments for every loading screen (read by the menu)" );
++static CVAR_DEFINE_AUTO( czm_loading_stage, "0", 0, "current loading stage (read by the menu)" );
++static CVAR_DEFINE_AUTO( czm_loading_dl, "", 0, "download progress: files_done files_total bytes_done bytes_total bytes_per_sec" );
++static CVAR_DEFINE_AUTO( czm_loading_host, "", 0, "server name for the loading screen" );
++static CVAR_DEFINE_AUTO( czm_loading_map, "", 0, "map name for the loading screen" );
++static CVAR_DEFINE_AUTO( czm_loading_players, "", 0, "players on the server for the loading screen" );
++static CVAR_DEFINE_AUTO( czm_loading_ping, "", 0, "ping to the server in milliseconds for the loading screen" );
++static CVAR_DEFINE_AUTO( czm_loading_error, "", 0, "why the last connection failed, shown by the menu" );
++
++static struct
++{
++	qboolean active;
++	qboolean forced;        // local game is starting, client is not connecting yet
++	qboolean seen_loading;  // client went through a connecting state in this session
++	qboolean spawn_sent;
++	qboolean precache;
++	qboolean info_sent;
++	qboolean cancelled;
++	qboolean reopen_menu;
++	qboolean had_downloads;
++
++	double   start;
++	double   forced_time;
++	double   enter_time;
++	double   last_pump;
++	double   speed_time;
++
++	float    percent;
++	float    speed;
++	int      speed_bytes;
++
++	int      dl_files_total;
++	int      dl_bytes_total;
++	int      pc_total;
++	int      pc_done;
++
++	int      info_players;
++	int      info_max;
++	int      info_ping;
++	char     info_host[64];
++	char     info_map[64];
++	char     remote_host[64];
++	char     error[256];
++} czm;
++
++static void CZM_SetString( convar_t *var, const char *value )
++{
++	if( Q_strcmp( var->string, value ))
++		Cvar_DirectSet( var, value );
++}
++
++static void CZM_SetValue( convar_t *var, float value )
++{
++	if( var->value != value )
++		Cvar_DirectSetValue( var, value );
++}
++
++qboolean CZM_Loading_Enabled( void )
++{
++	return czm_loading_enable.value != 0.0f;
++}
++
++qboolean CZM_Loading_Active( void )
++{
++	return czm.active;
++}
++
++static void CZM_InfoResponse( net_response_t *response )
++{
++	const char *s;
++
++	if( !czm.active || response->error != NET_SUCCESS || !response->response )
++		return;
++
++	s = (const char *)response->response;
++
++	czm.info_players = Q_atoi( Info_ValueForKey( s, "current" ));
++	czm.info_max = Q_atoi( Info_ValueForKey( s, "max" ));
++	czm.info_ping = (int)( response->ping * 1000.0 );
++	Q_strncpy( czm.info_host, Info_ValueForKey( s, "hostname" ), sizeof( czm.info_host ));
++	Q_strncpy( czm.info_map, Info_ValueForKey( s, "map" ), sizeof( czm.info_map ));
++}
++
++static void CZM_Begin( void )
++{
++	int session = (int)czm_loading_session.value + 1;
++	qboolean forced = czm.forced;
++	double forced_time = czm.forced_time;
++
++	memset( &czm, 0, sizeof( czm ));
++	czm.active = true;
++	czm.forced = forced;
++	czm.forced_time = forced_time;
++	czm.start = Platform_DoubleTime();
++
++	CZM_SetString( &czm_loading_error, "" );
++	CZM_SetString( &czm_loading_host, "" );
++	CZM_SetString( &czm_loading_map, "" );
++	CZM_SetString( &czm_loading_players, "" );
++	CZM_SetString( &czm_loading_ping, "" );
++	CZM_SetString( &czm_loading_dl, "" );
++	CZM_SetValue( &czm_loading_stage, CZM_STAGE_CONNECT );
++	CZM_SetValue( &czm_loading_session, session );
++	CZM_SetValue( &czm_loading, 1 );
++	Cvar_SetValue( "scr_loading", 0.0f );
++
++	Touch_ResetLoadingInput();
++}
++
++static void CZM_End( qboolean reached_game )
++{
++	qboolean reopen = czm.reopen_menu;
++
++	if( !reached_game && !czm.cancelled && czm.seen_loading && cls.state == ca_disconnected )
++	{
++		// tell the player why we are back in the menu
++		if( COM_StringEmpty( czm.error ))
++			Q_strncpy( czm.error, "#connect_failed", sizeof( czm.error ));
++		CZM_SetString( &czm_loading_error, czm.error );
++	}
++
++	czm.active = false;
++	czm.forced = false;
++	CZM_SetValue( &czm_loading, 0 );
++	CZM_SetValue( &czm_loading_stage, CZM_STAGE_NONE );
++	Cvar_SetValue( "scr_loading", reached_game ? 100.0f : 0.0f );
++
++	if( reopen && cls.state == ca_disconnected && cls.key_dest != key_menu )
++		UI_SetActiveMenu( true );
++}
++
++static void CZM_CountMissing( int *files, int *bytes, int *current_size )
++{
++	const char *current = host.downloadfile;
++
++	*files = *bytes = *current_size = 0;
++
++	for( resource_t *p = cl.resourcesneeded.pNext; p && p != &cl.resourcesneeded; p = p->pNext )
++	{
++		if( !FBitSet( p->ucFlags, RES_WASMISSING ))
++			continue;
++
++		( *files )++;
++		*bytes += p->nDownloadSize;
++
++		if( !COM_StringEmpty( current ) && Q_stristr( current, p->szFileName ))
++			*current_size = p->nDownloadSize;
++	}
++}
++
++static int CZM_CountPlayers( void )
++{
++	int count = 0;
++
++	for( int i = 0; i < cl.maxclients && i < MAX_CLIENTS; i++ )
++	{
++		if( !COM_StringEmpty( cl.players[i].name ))
++			count++;
++	}
++
++	return count;
++}
++
++static void CZM_RequestInfo( void )
++{
++	netadr_t adr = cls.serveradr;
++
++	if( czm.info_sent || cls.state != ca_connecting )
++		return;
++
++	if( NET_NetadrType( &adr ) == NA_UNDEFINED || NET_IsLocalAddress( adr ))
++		return;
++
++	czm.info_sent = true;
++	gNetApi.SendRequest( CZM_INFO_CONTEXT, NETAPI_REQUEST_DETAILS, 0, 5.0, &adr, CZM_InfoResponse );
++}
++
++static void CZM_UpdateInfo( void )
++{
++	char buf[64];
++	int players, maxplayers;
++	const char *host;
++
++	// server name: GoldSrc servers send it with the server data, the query gives it earlier
++	if( !COM_StringEmpty( czm.remote_host ))
++		host = czm.remote_host;
++	else if( !COM_StringEmpty( czm.info_host ))
++		host = czm.info_host;
++	else if( SV_Active( ))
++		host = Cvar_VariableString( "hostname" );
++	else host = cls.servername;
++	CZM_SetString( &czm_loading_host, host ? host : "" );
++
++	if( !COM_StringEmpty( clgame.mapname ))
++		CZM_SetString( &czm_loading_map, clgame.mapname );
++	else CZM_SetString( &czm_loading_map, czm.info_map );
++
++	players = CZM_CountPlayers();
++	if( players <= 0 )
++		players = czm.info_players;
++	maxplayers = cl.maxclients > 0 ? cl.maxclients : czm.info_max;
++
++	if( maxplayers > 0 )
++		Q_snprintf( buf, sizeof( buf ), "%d/%d", Q_max( players, 0 ), maxplayers );
++	else buf[0] = 0;
++	CZM_SetString( &czm_loading_players, buf );
++
++	if( czm.info_ping > 0 )
++		Q_snprintf( buf, sizeof( buf ), "%d", czm.info_ping );
++	else buf[0] = 0;
++	CZM_SetString( &czm_loading_ping, buf );
++}
++
++static void CZM_Update( void )
++{
++	double now = Platform_DoubleTime();
++	int stage, files, bytes, current_size, done_files = 0, done_bytes = 0;
++	float target = 0.0f;
++	char buf[128];
++
++	CZM_RequestInfo();
++	CZM_UpdateInfo();
++
++	CZM_CountMissing( &files, &bytes, &current_size );
++
++	if( cls.state == ca_disconnected || ( czm.forced && !czm.seen_loading ))
++		stage = czm.forced ? CZM_STAGE_LOCAL : CZM_STAGE_CONNECT;
++	else if( cls.state == ca_connecting )
++		stage = CZM_STAGE_CONNECT;
++	else if( czm.spawn_sent )
++		stage = CZM_STAGE_ENTER;
++	else if( czm.precache )
++		stage = CZM_STAGE_PRECACHE;
++	else if( cls.state == ca_validate && files > 0 )
++		stage = CZM_STAGE_DOWNLOAD;
++	else stage = CZM_STAGE_HANDSHAKE;
++
++	if( files > 0 )
++	{
++		czm.had_downloads = true;
++		czm.dl_files_total = Q_max( czm.dl_files_total, files );
++		czm.dl_bytes_total = Q_max( czm.dl_bytes_total, bytes );
++	}
++
++	if( czm.had_downloads )
++	{
++		float fraction = scr_download.value > 0.0f ? bound( 0.0f, scr_download.value * 0.01f, 1.0f ) : 0.0f;
++
++		done_files = czm.dl_files_total - files;
++		done_bytes = czm.dl_bytes_total - bytes + (int)( current_size * fraction );
++		done_bytes = bound( 0, done_bytes, czm.dl_bytes_total );
++
++		// download speed, smoothed over half a second
++		if( czm.speed_time == 0.0 )
++		{
++			czm.speed_time = now;
++			czm.speed_bytes = done_bytes;
++		}
++		else if( now - czm.speed_time >= 0.5 )
++		{
++			float sample = ( done_bytes - czm.speed_bytes ) / ( now - czm.speed_time );
++			czm.speed = czm.speed > 0.0f ? czm.speed * 0.6f + sample * 0.4f : sample;
++			czm.speed_time = now;
++			czm.speed_bytes = done_bytes;
++		}
++
++		Q_snprintf( buf, sizeof( buf ), "%d %d %d %d %d", done_files, czm.dl_files_total,
++			done_bytes, czm.dl_bytes_total, (int)Q_max( czm.speed, 0.0f ));
++		CZM_SetString( &czm_loading_dl, buf );
++	}
++
++	switch( stage )
++	{
++	case CZM_STAGE_LOCAL:
++		target = Q_min( 4.0f + ( now - czm.start ) * 6.0f, 40.0f );
++		break;
++	case CZM_STAGE_CONNECT:
++		target = Q_min( 2.0f + ( now - czm.start ) * 2.0f, 8.0f );
++		break;
++	case CZM_STAGE_HANDSHAKE:
++		target = 10.0f;
++		break;
++	case CZM_STAGE_DOWNLOAD:
++		if( czm.dl_bytes_total > 0 )
++			target = 12.0f + 63.0f * done_bytes / czm.dl_bytes_total;
++		else if( czm.dl_files_total > 0 )
++			target = 12.0f + 63.0f * done_files / czm.dl_files_total;
++		break;
++	case CZM_STAGE_PRECACHE:
++	{
++		float base = czm.had_downloads ? 75.0f : 15.0f;
++		target = base + ( 94.0f - base ) * ( czm.pc_total > 0 ? (float)czm.pc_done / czm.pc_total : 0.0f );
++		break;
++	}
++	case CZM_STAGE_ENTER:
++		target = Q_min( 95.0f + ( now - czm.enter_time ) * 3.0f, 99.0f );
++		break;
++	}
++
++	czm.percent = Q_max( czm.percent, target );
++	CZM_SetValue( &czm_loading_stage, stage );
++	Cvar_SetValue( "scr_loading", (int)czm.percent );
++}
++
++void CZM_Loading_Frame( void )
++{
++	qboolean loading_state = cls.state == ca_connecting || cls.state == ca_connected || cls.state == ca_validate;
++	qboolean want;
++
++	if( czm.forced && !czm.active && cls.state == ca_active )
++		loading_state = false; // changelevel on a local server, wait for the reconnect
++
++	// a local game that never started connecting
++	if( czm.forced && cls.state == ca_disconnected && Platform_DoubleTime() - czm.forced_time > 60.0 )
++		czm.forced = false;
++
++	want = CZM_Loading_Enabled() && !cls.demoplayback && !cls.changedemo && !cl.background && ( czm.forced || loading_state );
++
++	if( czm.active && loading_state )
++		czm.seen_loading = true;
++
++	// finished: the client is in the game
++	if( czm.active && cls.state == ca_active && czm.seen_loading )
++	{
++		CZM_End( true );
++		return;
++	}
++
++	if( want && !czm.active )
++		CZM_Begin();
++	else if( !want && czm.active )
++		CZM_End( cls.state == ca_active );
++
++	if( czm.active )
++		CZM_Update();
++}
++
++void CZM_Loading_BeginLocal( void )
++{
++	if( !CZM_Loading_Enabled( ))
++		return;
++
++	czm.forced = true;
++	czm.forced_time = Platform_DoubleTime();
++	CZM_Loading_Frame();
++}
++
++void CZM_Loading_SetHostname( const char *hostname )
++{
++	if( hostname )
++		Q_strncpy( czm.remote_host, hostname, sizeof( czm.remote_host ));
++}
++
++void CZM_Loading_SetError( const char *reason )
++{
++	if( !czm.active || COM_StringEmpty( reason ))
++		return;
++
++	Q_strncpy( czm.error, reason, sizeof( czm.error ));
++}
++
++void CZM_Loading_PrecacheBegin( void )
++{
++	int total = 0;
++
++	if( !czm.active )
++		return;
++
++	for( resource_t *p = cl.resourcesonhand.pNext; p && p != &cl.resourcesonhand; p = p->pNext )
++	{
++		if( !FBitSet( p->ucFlags, RES_PRECACHED ))
++			total++;
++	}
++
++	czm.precache = true;
++	czm.pc_total = total;
++	czm.pc_done = 0;
++	czm.last_pump = 0.0;
++	CZM_Loading_Pump();
++}
++
++void CZM_Loading_PrecacheStep( void )
++{
++	if( !czm.active || !czm.precache )
++		return;
++
++	czm.pc_done++;
++	CZM_Loading_Pump();
++}
++
++void CZM_Loading_SpawnSent( void )
++{
++	if( !czm.active )
++		return;
++
++	czm.spawn_sent = true;
++	czm.enter_time = Platform_DoubleTime();
++}
++
++// redraw the loading screen while the client is busy inside one frame
++void CZM_Loading_Pump( void )
++{
++	double now;
++
++	if( !czm.active || czm_loading_pump.value == 0.0f )
++		return;
++
++	now = Platform_DoubleTime();
++	if( now - czm.last_pump < 0.08 )
++		return;
++
++	czm.last_pump = now;
++	CZM_Update();
++	SCR_UpdateScreen();
++}
++
++static void CZM_Cancel( void )
++{
++	czm.cancelled = true;
++	czm.reopen_menu = true;
++	Cbuf_AddText( "disconnect\n" );
++}
++
++qboolean CZM_Loading_Escape( void )
++{
++	if( !czm.active || cls.key_dest != key_game )
++		return false;
++
++	CZM_Cancel();
++	return true;
++}
++
++// the cancel button area, in screen fractions; keep in sync with the menu drawing code
++#define CZM_CANCEL_X0 0.815f
++#define CZM_CANCEL_X1 0.955f
++#define CZM_CANCEL_Y0 0.818f
++#define CZM_CANCEL_Y1 0.898f
++
++qboolean CZM_Loading_TouchEvent( int type, float x, float y )
++{
++	if( !czm.active || cls.key_dest != key_game )
++		return false;
++
++	// small margin makes the button easier to hit
++	if( type == event_up && x >= CZM_CANCEL_X0 - 0.01f && x <= CZM_CANCEL_X1 + 0.01f
++		&& y >= CZM_CANCEL_Y0 - 0.02f && y <= CZM_CANCEL_Y1 + 0.02f )
++		CZM_Cancel();
++
++	return true; // swallow all touches while loading
++}
++
++void CZM_Loading_Disconnected( void )
++{
++	if( !czm.active )
++	{
++		czm.forced = false;
++		return;
++	}
++
++	czm.reopen_menu = true; // always return to the menu, even in developer mode
++	CZM_End( false );
++}
++
++void CZM_Loading_Init( void )
++{
++	Cvar_RegisterVariable( &czm_loading_enable );
++	Cvar_RegisterVariable( &czm_loading_pump );
++	Cvar_RegisterVariable( &czm_loading );
++	Cvar_RegisterVariable( &czm_loading_session );
++	Cvar_RegisterVariable( &czm_loading_stage );
++	Cvar_RegisterVariable( &czm_loading_dl );
++	Cvar_RegisterVariable( &czm_loading_host );
++	Cvar_RegisterVariable( &czm_loading_map );
++	Cvar_RegisterVariable( &czm_loading_players );
++	Cvar_RegisterVariable( &czm_loading_ping );
++	Cvar_RegisterVariable( &czm_loading_error );
++}
+diff --git a/engine/client/dll_int/cl_gameui.c b/engine/client/dll_int/cl_gameui.c
+index 30fb334..a9b073f 100644
+--- a/engine/client/dll_int/cl_gameui.c
++++ b/engine/client/dll_int/cl_gameui.c
+@@ -49,8 +49,8 @@ void UI_UpdateMenu( float realtime )
+ 		return;
+ 	}
+ 
+-	// don't show menu while level is loaded
+-	if( GameState->nextstate != STATE_RUNFRAME && !GameState->loadGame )
++	// don't show menu while level is loaded, except the loading screen itself
++	if( GameState->nextstate != STATE_RUNFRAME && !GameState->loadGame && !CZM_Loading_Active( ))
+ 		return;
+ 
+ 	// menu time (not paused, not clamped)
+diff --git a/engine/client/input/in_touch.c b/engine/client/input/in_touch.c
+index 4b444ad..8d54c09 100644
+--- a/engine/client/input/in_touch.c
++++ b/engine/client/input/in_touch.c
+@@ -639,6 +639,28 @@ static void Touch_ResetSticks( void )
+ 	touch.move_stick = false;
+ }
+ 
++// release everything the player was holding when the loading screen appeared
++void Touch_ResetLoadingInput( void )
++{
++	for( touch_button_t *button = touch.list_user.first; button; button = button->next )
++	{
++		if( button->finger != -1 && button->type == touch_command && button->command[0] == '+'
++			&& !FBitSet( button->flags, TOUCH_FL_COMMAND_LATCH ))
++		{
++			char command[256];
++
++			Q_snprintf( command, sizeof( command ), "-%s\n", &button->command[1] );
++			Touch_AddButtonCommand( button, command );
++		}
++
++		button->finger = -1;
++		Touch_ReleaseLatch( button );
++	}
++
++	Touch_ResetSticks();
++	touch.move_finger = touch.resize_finger = touch.look_finger = touch.wheel_finger = -1;
++}
++
+ static void Touch_RemoveButtonFromList( touchbuttonlist_t *list, const char *name, qboolean privileged )
+ {
+ 	IN_TouchEditClear();
+@@ -1602,6 +1624,10 @@ void Touch_Draw( void )
+ 	if( !touch.initialized || ( !touch_enable.value && !touch.clientonly ))
+ 		return;
+ 
++	// game controls make no sense on the loading screen
++	if( CZM_Loading_Active( ))
++		return;
++
+ 	if( cls.key_dest != key_game && !touch_in_menu.value )
+ 		return;
+ 
+@@ -2233,6 +2259,9 @@ int IN_TouchEvent( touchEventType type, int fingerID, float x, float y, float dx
+ 		return true;
+ 	}
+ 
++	if( CZM_Loading_TouchEvent( type, x, y ))
++		return true;
++
+ //	Con_Printf("%f %f\n", TO_SCRN_X(x), TO_SCRN_Y(y));
+ 	// simulate menu mouse click
+ 	if( cls.key_dest != key_game && !touch_in_menu.value )
+diff --git a/engine/client/parse/cl_parse.c b/engine/client/parse/cl_parse.c
+index 29acaf7..915ea58 100644
+--- a/engine/client/parse/cl_parse.c
++++ b/engine/client/parse/cl_parse.c
+@@ -821,7 +821,9 @@ static void CL_ParseServerData( sizebuf_t *msg, connprotocol_t proto )
+ 		MSG_SeekToBit( msg, sizeof( uint8_t ) << 3, SEEK_CUR ); // quake leftover, coop flag
+ 
+ 		Q_strncpy( gamefolder, MSG_ReadString( msg ), sizeof( gamefolder ));
+-		Con_Printf( "Remote host: %s\n", MSG_ReadString( msg ));
++		s = MSG_ReadString( msg );
++		Con_Printf( "Remote host: %s\n", s );
++		CZM_Loading_SetHostname( s );
+ 		// map name is sent as maps/<name>.bsp, only strip the maps/ prefix to keep subdirectories intact
+ 		s = MSG_ReadString( msg );
+ 		if( !Q_strnicmp( s, "maps/", 5 ))
+@@ -1737,6 +1739,8 @@ void CL_RegisterResources( sizebuf_t *msg, connprotocol_t proto )
+ 				MSG_WriteStringf( msg, "spawn %i %i", cl.servercount, crc );
+ 			}
+ 			else MSG_WriteStringf( msg, "spawn %i", cl.servercount );
++
++			CZM_Loading_SpawnSent();
+ 		}
+ 	}
+ 	else
+diff --git a/engine/client/parse/cl_parse_gs.c b/engine/client/parse/cl_parse_gs.c
+index 7103b84..c1af3e3 100644
+--- a/engine/client/parse/cl_parse_gs.c
++++ b/engine/client/parse/cl_parse_gs.c
+@@ -584,7 +584,10 @@ void CL_ParseGoldSrcServerMessage( sizebuf_t *msg )
+ 		case svc_disconnect:
+ 			s = MSG_ReadString( msg );
+ 			if( !COM_StringEmpty( s ))
++			{
+ 				Con_Printf( "Server issued disconnect. Reason: %s\n", s );
++				CZM_Loading_SetError( s );
++			}
+ 			CL_Drop ();
+ 			Host_AbortCurrentFrame ();
+ 			break;

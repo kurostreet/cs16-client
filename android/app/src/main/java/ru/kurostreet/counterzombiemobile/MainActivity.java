@@ -111,8 +111,15 @@ public class MainActivity extends Activity {
                 .putExtra("basedir", installation.writable.getAbsolutePath())
                 .putExtra("package", getPackageName())
                 .putExtra("env", new String[]{"XASH3D_RODIR", installation.data.getAbsolutePath()})
-                .putExtra("argv", "-dev 1 -log -dll @yapb"));
+                .putExtra("argv", launchArguments()));
         finish();
+    }
+
+    // Players get no developer console. For debugging, create files/game/czm-dev.txt
+    // (for example with "run-as" or root) to start the engine in developer mode.
+    private String launchArguments() {
+        boolean developer = installation != null && new java.io.File(installation.writable, "czm-dev.txt").isFile();
+        return developer ? "-dev 2 -log -dll @yapb" : "-log -dll @yapb";
     }
 
     @Override protected void onResume() { super.onResume(); resumed = true; launchWhenReady(); }

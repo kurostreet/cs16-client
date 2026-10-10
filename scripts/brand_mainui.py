@@ -13,31 +13,13 @@ def replace_once(source, old, new, filename):
 
 def brand_background(source):
     filename = "controls/BackgroundBitmap.cpp"
-    source = replace_once(
-        source,
-        "bool CMenuBackgroundBitmap::s_bEnableLogoMovie = false;",
-        "static HIMAGE s_CzmLogo = 0;\n\nbool CMenuBackgroundBitmap::s_bEnableLogoMovie = false;",
-        filename,
-    )
-    source = replace_once(
-        source,
-        "void CMenuBackgroundBitmap::LoadBackground()\n{",
-        'void CMenuBackgroundBitmap::LoadBackground()\n{\n\ts_CzmLogo = EngFuncs::PIC_Load( "gfx/vgui/czm_logo.tga" );',
-        filename,
-    )
+    source = replace_once(source, '#include "BaseWindow.h"\n', '#include "BaseWindow.h"\n#include "CzmMenu.h"\n', filename)
     source = replace_once(
         source,
         "\tif( FBitSet( ui_prefer_won_background->flags, FCVAR_CHANGED ))",
-        '''\t// Keep the supplied square logo intact, leaving room for menu controls.
-\tif( s_CzmLogo )
+        '''\t// Owner-supplied art fills the screen, a dark fade keeps the menu readable.
+\tif( CZM_DrawMenuBackground( m_scPos, m_scSize ))
 \t{
-\t\tUI_FillRect( m_scPos, m_scSize, 0xFF000000 );
-\t\tconst int logoSize = (int)Q_min( ScreenHeight * 0.92f, ScreenWidth * 0.58f );
-\t\tconst int logoX = (int)( ScreenWidth - logoSize - ScreenWidth * 0.04f );
-\t\tconst int logoY = (int)( ( ScreenHeight - logoSize ) * 0.5f );
-\t\tEngFuncs::PIC_Set( s_CzmLogo, 255, 255, 255, 255 );
-\t\tEngFuncs::PIC_Draw( logoX, logoY, logoSize, logoSize );
-
 \t\tchar version[128];
 \t\tint stringLen, charH;
 \t\tsnprintf( version, sizeof( version ), "Counter Zombie Mobile 32 players build %s", EngFuncs::GetCvarString( "cscl_ver" ) );
@@ -61,12 +43,35 @@ def brand_background(source):
 
 
 def brand_base_menu(source):
+    filename = "BaseMenu.cpp"
+    source = replace_once(source, '#include "FontManager.h"\n', '#include "FontManager.h"\n#include "CzmMenu.h"\n', filename)
+    source = replace_once(
+        source,
+        "\t// advance global time\n\tuiStatic.realTime = flTime * 1000;\n",
+        "\t// advance global time\n\tuiStatic.realTime = flTime * 1000;\n\n"
+        "\t// our loading screen replaces the console while the engine connects\n"
+        "\tif( CZM_DrawLoadingScreen( ))\n\t\treturn;\n",
+        filename,
+    )
     return replace_once(
         source,
         "uiStatic.renderPicbuttonText = gMenu.m_gameinfo.flags & GFL_RENDER_PICBUTTON_TEXT;",
         "uiStatic.renderPicbuttonText = true; // Avoid branded text baked into external cache bitmaps.",
-        "BaseMenu.cpp",
+        filename,
     )
+
+
+def brand_font_manager(source):
+    filename = "font/FontManager.cpp"
+    source = replace_once(source, '#include "FontManager.h"\n', '#include "FontManager.h"\n#include "CzmMenu.h"\n', filename)
+    source = replace_once(
+        source,
+        "bool CFontManager::FindFontDataFile( const char *name, int tall, int weight, int flags, char *dataFile, size_t dataFileChars )\n{\n",
+        "bool CFontManager::FindFontDataFile( const char *name, int tall, int weight, int flags, char *dataFile, size_t dataFileChars )\n{\n"
+        "\tif( CZM_FindFontFile( name, dataFile, dataFileChars ))\n\t\treturn true;\n\n",
+        filename,
+    )
+    return replace_once(source, "\t\tprevScale = scale;\n", "\t\tCZM_CreateFonts( scale );\n\t\tprevScale = scale;\n", filename)
 
 
 def brand_main_menu(source):
@@ -107,6 +112,7 @@ def main():
         "BaseMenu.cpp": brand_base_menu,
         "controls/BackgroundBitmap.cpp": brand_background,
         "menus/Main.cpp": brand_main_menu,
+        "font/FontManager.cpp": brand_font_manager,
     }
     for filename, transform in transforms.items():
         content = transform((args.upstream / filename).read_text())

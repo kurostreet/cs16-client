@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 from create_resource_pack import from_directories
+from apply_engine_patches import apply_engine_patches
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = ROOT / "3rdparty/xash3d-fwgs"
@@ -28,6 +29,7 @@ def main():
     output = args.output.resolve()
     ndk = args.ndk.resolve()
     assert (ndk / "build/cmake/android.toolchain.cmake").is_file(), "Install the configured Android NDK"
+    apply_engine_patches()
     for abi in ABIS:
         work = output / "work" / abi
         sdl_out = work / "sdl"
