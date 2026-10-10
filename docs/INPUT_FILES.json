@@ -1,0 +1,38 @@
+{
+  "received_date": "2026-10-10",
+  "baseline_commit": "c1604b609c553a6825278324f70b2ba54013fd41",
+  "files": [
+    {
+      "filename": "cs16-client-main.zip",
+      "role": "upstream_source_archive",
+      "size_bytes": 13961182,
+      "sha256": "e66187f562e51904febecc11e5d7aac29fb73835676e5e415fbf9353c7fc9d71",
+      "uncompressed_bytes": 25837492,
+      "entry_count": 1160
+    },
+    {
+      "filename": "CS16Client-Android.apk",
+      "role": "reference_client_apk",
+      "size_bytes": 39047864,
+      "sha256": "4fcd6a1577de4f2bfc9d486816edaf8ac24bc7e591d1a3f0db2f361ba35f4d54",
+      "uncompressed_bytes": 86275414,
+      "entry_count": 782
+    },
+    {
+      "filename": "xash3d-fwgs-android.apk",
+      "role": "reference_engine_apk",
+      "size_bytes": 47151616,
+      "sha256": "e91c8c5677f97efa6f89880ff4fd32b8a521d8933e8f2ec55b80fd6b81d2d409",
+      "uncompressed_bytes": 117129071,
+      "entry_count": 964
+    },
+    {
+      "filename": "CS_Mobile_Delault_Cached_Experimental_Models_Fixed_And_Old_Player.zip",
+      "role": "reference_game_data_archive",
+      "size_bytes": 267629377,
+      "sha256": "7e889581dcb6f823611af05c56a32b473f4820fbcbb3c74543d64a94a4f40384",
+      "uncompressed_bytes": 474448360,
+      "entry_count": 5613
+    }
+  ]
+}
