@@ -22,7 +22,7 @@ def brand_background(source):
     source = replace_once(
         source,
         "void CMenuBackgroundBitmap::LoadBackground()\n{",
-        'void CMenuBackgroundBitmap::LoadBackground()\n{\n\ts_CzmLogo = EngFuncs::PIC_Load( "gfx/vgui/czm_logo.tga", PIC_NOFLIP_TGA );',
+        'void CMenuBackgroundBitmap::LoadBackground()\n{\n\ts_CzmLogo = EngFuncs::PIC_Load( "gfx/vgui/czm_logo.tga" );',
         filename,
     )
     source = replace_once(
