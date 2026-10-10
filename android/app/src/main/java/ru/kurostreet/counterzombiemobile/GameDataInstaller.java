@@ -55,6 +55,7 @@ public final class GameDataInstaller {
             File marker = new File(data, ".ready");
             File writable = new File(context.getFilesDir(), "game");
             if (marker.isFile() && ready(data, manifests)) {
+                removeOldVersions(parent, data);
                 mkdir(writable);
                 Log.i(TAG, "READY existing data=" + data + " writable=" + writable);
                 return new Installation(data, writable);
@@ -102,6 +103,7 @@ public final class GameDataInstaller {
                 output.write(id.getBytes(StandardCharsets.UTF_8));
                 output.getFD().sync();
             }
+            removeOldVersions(parent, data);
             mkdir(writable);
             progress.update("Запускаем игру…", 100);
             Log.i(TAG, "READY new data=" + data + " writable=" + writable);
@@ -152,6 +154,21 @@ public final class GameDataInstaller {
     private static void mkdir(File file) throws IOException {
         if (!file.isDirectory() && !file.mkdirs()) throw new IOException("Не удалось создать папку игры.");
     }
+    // Game data of previous app versions is never used again; player files live in "game".
+    private static void removeOldVersions(File parent, File current) {
+        File[] versions = parent.listFiles();
+        if (versions == null) return;
+        for (File version : versions) {
+            if (version.equals(current)) continue;
+            try {
+                remove(version);
+                Log.i(TAG, "REMOVED old data=" + version);
+            } catch (IOException e) {
+                Log.w(TAG, "Could not remove old data " + version, e);
+            }
+        }
+    }
+
     private static void remove(File file) throws IOException {
         if (!file.exists()) return;
         File[] children = file.listFiles();
