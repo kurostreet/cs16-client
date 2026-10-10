@@ -4,4 +4,4 @@ plugins {
 
 include ':app'
 
-rootProject.name = 'CS16Client'
+rootProject.name = 'CounterZombieMobile'

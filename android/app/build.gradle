@@ -5,12 +5,12 @@ import java.time.temporal.ChronoUnit
 apply plugin: "com.android.application"
 
 android {
-	namespace = "su.xash.cs16client"
+	namespace = "ru.kurostreet.counterzombiemobile"
 	ndkVersion = "28.2.13676358"
 	compileSdk = 36
 
 	defaultConfig {
-		applicationId = "su.xash.cs16client"
+		applicationId = "ru.kurostreet.counterzombiemobile"
 		versionName = "1.35-" + getGitHash()
 		versionCode = getBuildNum()
 		minSdk = 21
@@ -90,7 +90,7 @@ android {
 	productFlavors {
 		create("googlePlay") {
 			dimension = "version"
-			applicationId = "in.celest.xash3d.cs16client"
+			applicationId = "ru.kurostreet.counterzombiemobile"
 			buildConfigField("Boolean", "IS_GOOGLE_PLAY_BUILD", "true")
 		}
 

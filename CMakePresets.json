@@ -87,7 +87,7 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "BUILD_SERVER": "OFF",
         "MAINUI_USE_STB": "ON",
-        "CMAKE_PROJECT_cs16-client_INCLUDE": "$env{VITASDK}/share/vrtld_shim.cmake"
+        "CMAKE_PROJECT_CounterZombieMobile_INCLUDE": "$env{VITASDK}/share/vrtld_shim.cmake"
       },
       "binaryDir": "${sourceDir}/build"
     },
@@ -100,7 +100,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "BUILD_SERVER": "OFF",
         "MAINUI_USE_STB": "ON",
-        "CMAKE_PROJECT_cs16-client_INCLUDE": "$env{VITASDK}/share/vrtld_shim.cmake"
+        "CMAKE_PROJECT_CounterZombieMobile_INCLUDE": "$env{VITASDK}/share/vrtld_shim.cmake"
       },
       "binaryDir": "${sourceDir}/build"
     },

@@ -62,7 +62,7 @@ public:
 	virtual BOOL IsDeathmatch(void) = 0;
 	virtual BOOL IsTeamplay(void) { return FALSE; }
 	virtual BOOL IsCoOp(void) = 0;
-	virtual const char *GetGameDescription(void) { return "Counter-Strike"; }
+	virtual const char *GetGameDescription(void) { return "Counter Zombie Mobile 32 players"; }
 	virtual BOOL ClientConnected(edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[128]) = 0;
 	virtual void InitHUD(CBasePlayer *pl) = 0;
 	virtual void ClientDisconnected(edict_t *pClient) = 0;

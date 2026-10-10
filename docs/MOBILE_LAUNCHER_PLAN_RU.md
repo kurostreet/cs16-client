@@ -1,4 +1,4 @@
-# План своего лаунчера CS 1.6
+# План Counter Zombie Mobile 32 players
 
 Дата начала: 10 октября 2026 года.
 Репозиторий: https://github.com/kurostreet/cs16-client
@@ -64,3 +64,13 @@ git clone --recurse-submodules https://github.com/kurostreet/cs16-client.git
 cd cs16-client
 git switch feature/mobile-launcher
 ```
+
+## Утверждённое оформление
+
+10 октября 2026 года владелец утвердил название **Counter Zombie Mobile 32 players** и прислал логотип,
+который используется как иконка Android. Оригинал и технические варианты сохранены
+в репозитории; описание находится в `BRANDING_RU.md`.
+
+Публикация в Google Play — целевой этап. Для неё планируем объединение клиента
+и движка в одном приложении, обновления исполняемого кода через Google Play и
+доставку игровых ресурсов с подтверждёнными правами.

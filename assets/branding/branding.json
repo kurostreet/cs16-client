@@ -1,0 +1,15 @@
+{
+  "name": "Counter Zombie Mobile 32 players",
+  "android_application_id": "ru.kurostreet.counterzombiemobile",
+  "original_file": "counter-zombie-mobile-original.jpg",
+  "uploaded_filename": "198050.png",
+  "original_format": "JPEG",
+  "original_sha256": "502ed9061ea1c2b295d85630fc049fd47cc8b97667a33853df411c311026900f",
+  "original_dimensions": [
+    1536,
+    1536
+  ],
+  "approved_by_owner": "2026-10-10",
+  "players_in_name": 32,
+  "note": "32 players is the approved brand name; server capacity is configured and tested separately."
+}

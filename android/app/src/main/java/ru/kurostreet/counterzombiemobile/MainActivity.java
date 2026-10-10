@@ -1,4 +1,4 @@
-package su.xash.cs16client;
+package ru.kurostreet.counterzombiemobile;
 
 import android.app.Activity;
 import android.content.ComponentName;

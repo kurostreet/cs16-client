@@ -1,82 +1,47 @@
-# CS16Client [![Build Status](https://github.com/Velaron/cs16-client/actions/workflows/build.yml/badge.svg)](https://github.com/Velaron/cs16-client/actions) <img align="right" width="128" height="128" src="https://github.com/Velaron/cs16-client/raw/main/android/app/src/main/ic_launcher-playstore.png" alt="CS16Client" />
-Reverse-engineered Counter Strike 1.6 client, designed for mobile platforms and other officially non-supported platforms.
+# Counter Zombie Mobile 32 players
 
-## Donate
-[![Boosty.to](https://img.shields.io/badge/Boosty-F15F2C?logo=boosty&logoColor=fff&style=for-the-badge)](https://boosty.to/velaron)
+<img align="right" width="160" height="160" src="assets/branding/logo-512.png" alt="Counter Zombie Mobile 32 players" />
 
-[Support me](https://boosty.to/velaron) on Boosty.to, if you like my work and would like to support further development goals, like reverse-engineering other great mods.
+Наша Android-версия на основе [CS16Client](https://github.com/Velaron/cs16-client).
+Рабочая ветка: `feature/mobile-launcher`. Исходный `main` сохранён как отправная точка.
 
-Important contributors:
-* [a1batross](https://github.com/a1batross), initial project creator and maintainer.
-* [jeefo](https://github.com/jeefo), the creator of [YaPB](https://github.com/yapb/yapb).
-* The people behind [ReGameDLL_CS](https://github.com/rehlds/ReGameDLL_CS) project.
-* [Vladislav4KZ](https://github.com/Vladislav4KZ), bug-tester and maintainer.
-* [SNMetamorph](https://github.com/SNMetamorph), author of the PSVita port.
-* [Alprnn357](https://github.com/Alprnn357), touch menus maintainer.
-* [wh1tesh1t](https://github.com/wh1tesh1t), [pwd491](https://github.com/pwd491), [Elinsrc](https://github.com/Elinsrc), [xiaodo1337](https://github.com/xiaodo1337), [nekonomicon](https://github.com/nekonomicon), [lewa-j](https://github.com/lewa-j) and others for minor contributions.
+## Текущее состояние
 
-## Download
-You can download a build at the `Releases` section, or use these links for common platforms:
-* [Android](https://github.com/Velaron/cs16-client/releases/download/continuous/CS16Client-Android.apk)
-* [Linux](https://github.com/Velaron/cs16-client/releases/download/continuous/CS16Client-Linux-i386.tar.gz)
-* [Windows](https://github.com/Velaron/cs16-client/releases/download/continuous/CS16Client-Windows-X86.zip)
-* [PS Vita](https://github.com/Velaron/cs16-client/releases/download/continuous/CS16Client-PSVita.zip)
-* [macOS (arm64)](https://github.com/Velaron/cs16-client/releases/download/continuous/CS16Client-macOS-arm64.zip) - not tested
-* [macOS (x86_64)](https://github.com/Velaron/cs16-client/releases/download/continuous/CS16Client-macOS-x86_64.zip) - not tested
+- Собственное название, логотип и иконки Android.
+- Отдельный идентификатор приложения: `ru.kurostreet.counterzombiemobile` (`.test` для тестовых APK).
+- Одна иконка запуска; дополнительный ярлык Condition Zero отключён.
+- Названия проекта, пакетов сборки и тексты поставляемых меню обновлены.
+- Клиент пока запускает отдельный Xash3D FWGS. Встроенный движок, список наших серверов
+  и автоматическая установка игровых ресурсов — следующие этапы.
+- Число «32 players» является частью утверждённого названия. Вместимость сервера
+  задаётся отдельно; нагрузочные испытания на 32 игрока ещё не проводились.
 
-[Other platforms...](https://github.com/Velaron/cs16-client/releases/tag/continuous)
+## Тестовые сборки
 
-## Installation
-To run CS16Client you need the [latest developer build of Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs/releases/tag/continuous).
-You have to own the [game on Steam](https://store.steampowered.com/app/10/CounterStrike//) and copy `valve` and `cstrike` folders into your Xash3D FWGS directory.
-After that, just install the APK and run.
+[Сборки Android](https://github.com/kurostreet/cs16-client/actions) ·
+[Релизы](https://github.com/kurostreet/cs16-client/releases)
 
-## Configuration (CVars)
-| CVar                     | Default       | Min | Max | Description                                                                                 |
-|--------------------------|---------------|-----|-----|---------------------------------------------------------------------------------------------|
-| hud_color                | "255 160 0"   | -   | -   | HUD color in RGB.                                                                           |
-| cl_quakeguns             | 0             | 0   | 1   | Draw centered weapons.                                                                      |
-| cl_weaponlag             | 0             | 0.0 | -   | Enable weapon lag/sway.                                                                     |
-| xhair_additive           | 0             | 0   | 1   | Makes the crosshair additive.                                                               |
-| xhair_color              | "0 255 0 255" | -   | -   | Crosshair's color (RGBA).                                                                   |
-| xhair_dot                | 0             | 0   | 1   | Enables crosshair dot.                                                                      |
-| xhair_dynamic_move       | 1             | 0   | 1   | Jumping, crouching and moving will affect the dynamic crosshair (like cl_dynamiccrosshair). |
-| xhair_dynamic_scale      | 0             | 0   | -   | Scale of the dynamic crosshair movement.                                                    |
-| xhair_gap_useweaponvalue | 0             | 0   | 1   | Makes the crosshair gap scale depend on the active weapon.                                  |
-| xhair_enable             | 0             | 0   | 1   | Enables enhanced crosshair.                                                                 |
-| xhair_gap                | 0             | 0   | 15  | Space between crosshair's lines.                                                            |
-| xhair_pad                | 0             | 0   | -   | Border around crosshair.                                                                    |
-| xhair_size               | 4             | 0   | -   | Crosshair size.                                                                             |
-| xhair_t                  | 0             | 0   | 1   | Enables T-shaped crosshair.                                                                 |
-| xhair_thick              | 0             | 0   | -   | Crosshair thickness.                                                                        |
+На этом этапе нужны [Xash3D FWGS](https://github.com/FWGS/xash3d-fwgs/releases/tag/continuous)
+и игровые файлы из законно приобретённой копии игры. Материалы игрового кэша
+не входят в этот репозиторий и не публикуются вместе с тестовым APK.
 
-## Building
-Clone the source code:
-```shell
-git clone https://github.com/Velaron/cs16-client --recursive
-```
+## Разработка
 
-### Using CMakePresets.json
-```shell
-cmake --preset <preset-name>
-cmake --build build
-cmake --install build --prefix <path-to-your-installation>
-```
-
-### Windows
-```shell
-cmake -A Win32 -S . -B build
-cmake --build build --config Release
-cmake --install build --prefix <path-to-your-installation>
-```
-### Linux and macOS
-```shell
-cmake -S . -B build
-cmake --build build --config Release
-cmake --install build --prefix <path-to-your-installation>
-```
-### Android
-```shell
+```sh
+git clone --recurse-submodules https://github.com/kurostreet/cs16-client.git
+cd cs16-client
+git switch feature/mobile-launcher
 cd android
-./gradlew assembleRelease
+./gradlew assembleGitDebug
 ```
+
+План: [MOBILE_LAUNCHER_PLAN_RU.md](docs/MOBILE_LAUNCHER_PLAN_RU.md).
+Оформление: [BRANDING_RU.md](docs/BRANDING_RU.md).
+
+## Исходная основа и лицензии
+
+Разработка основана на CS16Client; сведения об авторах, исходные лицензии и
+авторские уведомления сохранены. [Исходное описание и список участников](docs/UPSTREAM_README.md),
+[LICENSE](LICENSE), [исходный проект](https://github.com/Velaron/cs16-client).
+Условия зависимостей и права на распространяемые игровые материалы проверяются
+отдельно перед публичным выпуском.
