@@ -16,7 +16,7 @@ concurrency:
 jobs:
   android:
     name: Build branded Android test APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Checkout sources and dependencies
@@ -29,8 +29,10 @@ jobs:
           java-version: 21
           distribution: temurin
           cache: gradle
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
       - name: Install Android build tools
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+        run: sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
       - name: Build test APK
         working-directory: android
         run: ./gradlew --no-daemon assembleGitDebug
