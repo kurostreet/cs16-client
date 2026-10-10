@@ -1,0 +1,31 @@
+# Keep the upstream menu submodule pinned and build local branded source copies.
+set(CZM_MENU_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/mainui_cpp")
+set(CZM_MENU_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/czm-mainui")
+execute_process(
+    COMMAND "${Python_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/brand_mainui.py"
+        "${CZM_MENU_SOURCE_DIR}" "${CZM_MENU_OUTPUT_DIR}"
+    RESULT_VARIABLE CZM_MENU_BRANDING_RESULT
+)
+if(NOT CZM_MENU_BRANDING_RESULT EQUAL 0)
+    message(FATAL_ERROR "Could not prepare Counter Zombie Mobile menu sources")
+endif()
+
+get_target_property(CZM_MENU_SOURCES menu SOURCES)
+foreach(CZM_MENU_FILE BaseMenu.cpp controls/BackgroundBitmap.cpp menus/Main.cpp)
+    set(CZM_UPSTREAM_MENU_FILE "${CZM_MENU_SOURCE_DIR}/${CZM_MENU_FILE}")
+    list(FIND CZM_MENU_SOURCES "${CZM_UPSTREAM_MENU_FILE}" CZM_MENU_SOURCE_INDEX)
+    if(CZM_MENU_SOURCE_INDEX EQUAL -1)
+        message(FATAL_ERROR "Upstream menu source missing: ${CZM_MENU_FILE}")
+    endif()
+    list(REMOVE_ITEM CZM_MENU_SOURCES "${CZM_UPSTREAM_MENU_FILE}")
+    list(APPEND CZM_MENU_SOURCES "${CZM_MENU_OUTPUT_DIR}/${CZM_MENU_FILE}")
+endforeach()
+set_property(TARGET menu PROPERTY SOURCES "${CZM_MENU_SOURCES}")
+
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/brand_mainui.py"
+    "${CZM_MENU_SOURCE_DIR}/BaseMenu.cpp"
+    "${CZM_MENU_SOURCE_DIR}/controls/BackgroundBitmap.cpp"
+    "${CZM_MENU_SOURCE_DIR}/menus/Main.cpp"
+)

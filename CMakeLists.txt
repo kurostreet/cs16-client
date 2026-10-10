@@ -87,6 +87,7 @@ if(BUILD_MAINUI)
 #	set(CS16CLIENT ON)
 	# set(XASH_SDK ../../)
 	add_subdirectory(3rdparty/mainui_cpp)
+	include(CzmBranding)
 	yy_thunks_apply(menu)
 endif()
 

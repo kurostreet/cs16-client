@@ -54,7 +54,13 @@ jobs:
           with ZipFile(os.environ["APK_PATH"]) as apk:
               for name in ["gfx/vgui/czm_logo.tga", "gfx/shell/strings.lst", "touch/buy.cfg"]:
                   assert apk.read("assets/" + name) == Path("3rdparty/cs16client-extras", name).read_bytes(), name
-          print("Bundled branding and game menu assets verified")
+              menu_libs = [name for name in apk.namelist() if name.startswith("lib/") and name.rsplit("/", 1)[-1].startswith("libmenu_")]
+              assert {name.split("/")[1] for name in menu_libs} == {"arm64-v8a", "armeabi-v7a", "x86"}, menu_libs
+              for name in menu_libs:
+                  library = apk.read(name)
+                  assert b"Counter Zombie Mobile 32 players build %s" in library, name
+                  assert b"cs16-client build %s" not in library, name
+          print("Bundled branding assets and native menu branding verified for all ABIs")
           PY
           cp "$APK_PATH" CounterZombieMobile-Android-test.apk
           sha256sum CounterZombieMobile-Android-test.apk > CounterZombieMobile-Android-test.apk.sha256
