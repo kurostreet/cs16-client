@@ -47,6 +47,15 @@ jobs:
           grep -F "package: name='ru.kurostreet.counterzombiemobile.test'" apk-info.txt
           grep -F "application-label:'Counter Zombie Mobile 32 players'" apk-info.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK_PATH"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile(os.environ["APK_PATH"]) as apk:
+              for name in ["gfx/vgui/czm_logo.tga", "gfx/shell/strings.lst", "touch/buy.cfg"]:
+                  assert apk.read("assets/" + name) == Path("3rdparty/cs16client-extras", name).read_bytes(), name
+          print("Bundled branding and game menu assets verified")
+          PY
           cp "$APK_PATH" CounterZombieMobile-Android-test.apk
           sha256sum CounterZombieMobile-Android-test.apk > CounterZombieMobile-Android-test.apk.sha256
       - name: Upload test APK and verification
