@@ -145,6 +145,21 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "s_fps_hint", "Больше — плавнее, но телефон греется", "Higher is smoother but warms the phone" },
 	{ "s_showfps", "FPS на экране", "Show FPS" },
 	{ "s_showping", "Пинг на экране", "Show ping" },
+	{ "s_textsize", "Размер текста", "Text size" },
+	{ "s_textsize_hint", "Чат и сообщения на экране", "Chat and messages on the screen" },
+	{ "s_hudsize", "Размер HUD", "HUD size" },
+	{ "s_hudsize_hint", "Здоровье, деньги, патроны. Со следующей карты", "Health, money, ammo. From the next map" },
+	{ "s_shadows", "Тени игроков", "Player shadows" },
+	{ "s_weather", "Погода", "Weather" },
+	{ "s_weather_hint", "Дождь и снег на картах, где они есть", "Rain and snow on maps that have them" },
+	{ "s_radar", "Прозрачный радар", "See-through radar" },
+	{ "s_mic", "Проверка микрофона", "Microphone test" },
+	{ "s_mic_hint", "Скажи что-нибудь — полоска покажет громкость", "Say something, the bar shows the level" },
+	{ "s_mic_ok", "Микрофон работает", "The microphone works" },
+	{ "s_mic_none", "Нет доступа к микрофону. Разреши его в настройках телефона", "No microphone access. Allow it in the phone settings" },
+	{ "s_mic_match", "Проверка работает в главном меню", "The test works in the main menu" },
+	{ "b_check", "Проверить", "Test" },
+	{ "b_stop", "Стоп", "Stop" },
 	{ "s_effects", "Эффекты", "Effects" },
 	{ "s_effects_hint", "Гильзы, дым и тела. Меньше — быстрее", "Shells, smoke and bodies. Less is faster" },
 	{ "opt_low", "Мало", "Low" },
@@ -165,6 +180,8 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "opt_medium", "Средний", "Medium" },
 	{ "opt_large", "Большой", "Large" },
 	{ "s_xhair_color", "Цвет прицела", "Crosshair color" },
+	{ "s_xhair_dyn", "Динамический прицел", "Dynamic crosshair" },
+	{ "s_xhair_dyn_hint", "Расходится при беге и прыжке. Выключи — будет маленький и ровный", "Spreads when running and jumping. Off keeps it small and still" },
 	{ "s_xhair_trans", "Прозрачный прицел", "Translucent crosshair" },
 	{ "s_hand", "Оружие в руке", "Weapon hand" },
 	{ "opt_right", "Правой", "Right" },
@@ -1322,6 +1339,16 @@ void CZM_ApplyStartupSettings( void )
 		EngFuncs::CvarSetValue( "cl_updaterate", 60.0f );
 		EngFuncs::CvarSetValue( "cl_cmdrate", 60.0f );
 		EngFuncs::CvarSetValue( "czm_defaults", 1.0f );
+	}
+
+	// version 2: smoother hit registration on good internet (the engine keeps it under the FPS),
+	// readable chat on phone screens
+	if( EngFuncs::GetCvarFloat( "czm_defaults" ) < 2.0f )
+	{
+		EngFuncs::CvarSetValue( "cl_updaterate", 101.0f );
+		EngFuncs::CvarSetValue( "cl_cmdrate", 101.0f );
+		EngFuncs::CvarSetValue( "con_fontscale", 2.0f );
+		EngFuncs::CvarSetValue( "czm_defaults", 2.0f );
 	}
 
 	EngFuncs::CvarSetValue( "cl_allowdownload", 1.0f );

@@ -6,7 +6,7 @@ Icons: most glyphs come from game-icons.net (CC BY 3.0, authors listed in
 Every glyph is put on the same round button (dark translucent circle, light
 ring; the fire button has a red ring) and rendered with headless Chromium.
 
-usage: make_czm_touch.py --game-icons /path/to/game-icons/icons [--screenshot editor_bg.jpg]
+usage: make_czm_touch.py --game-icons /path/to/game-icons/icons [--screenshot editor_bg.jpg] [--only fire,jump]
 Needs Playwright with Chromium. The output is committed, the Android build does not run this.
 """
 import argparse
@@ -63,6 +63,10 @@ CUSTOM = {
         <path d="M196 256H60"/><path d="M120 196l-60 60 60 60"/>
         <path d="M316 256h136"/><path d="M392 196l60 60-60 60"/></g>
         <circle cx="256" cy="256" r="34" fill="#fff"/>'''),
+    # double duck: a crouching figure and a swipe up and down
+    "ddrun": svg(f'''<g transform="translate(-40 40) scale(.84)">{DUCK}</g>
+        <g {STROKE} stroke-width="34"><path d="M440 92v328"/><path d="M396 136l44-44 44 44"/>
+        <path d="M396 376l44 44 44-44"/></g>'''),
 }
 
 GAME_ICONS = {
@@ -107,6 +111,7 @@ GAME_ICONS = {
     "screenshot": "delapouite/photo-camera.svg",
     "edit": "lorc/cog.svg",
     "custom": "skoll/click.svg",
+    "kill": "lorc/skull-crossed-bones.svg",
 }
 
 # glyph from a game icon with a small number badge (radio menus)
@@ -161,7 +166,7 @@ body {{ background: transparent; }}
 '''
 
 
-def build_icons(root):
+def build_icons(root, only=None):
     from playwright.sync_api import sync_playwright
 
     glyphs = dict(CUSTOM)
@@ -180,6 +185,10 @@ def build_icons(root):
     for key, text in TEXT.items():
         small = " small" if len(text) > 1 else ""
         cells.append((key, f'<div class="btn"><span class="txt{small}">{text}</span></div>'))
+
+    # --only: render just these icons, the others stay as committed
+    if only:
+        cells = [cell for cell in cells if cell[0] in only]
 
     html = []
     columns = 8
@@ -338,8 +347,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--game-icons", type=Path, required=True)
     parser.add_argument("--screenshot", type=Path)
+    parser.add_argument("--only", help="comma-separated icon names to render")
     args = parser.parse_args()
-    build_icons(args.game_icons)
+    build_icons(args.game_icons, set(args.only.split(",")) if args.only else None)
     build_presets()
     if args.screenshot:
         build_background(args.screenshot)

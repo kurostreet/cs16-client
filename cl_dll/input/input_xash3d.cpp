@@ -38,6 +38,28 @@ extern bool evdev_open;
 
 bool CL_IsDead();
 
+/*
+Auto run (Counter Zombie Mobile): a tap on the button runs forward until the next tap,
+pulling the stick back, a back button, death or a new round. Steering with the stick
+keeps running.
+*/
+static bool s_bAutoRun;
+
+static void IN_AutoRun_f( void )
+{
+	s_bAutoRun = !s_bAutoRun && !CL_IsDead();
+}
+
+bool IN_AutoRunActive( void )
+{
+	return s_bAutoRun;
+}
+
+void IN_StopAutoRun( void )
+{
+	s_bAutoRun = false;
+}
+
 void IN_ToggleButtons( float forwardmove, float sidemove )
 {
 	static unsigned int moveflags = T | S;
@@ -210,6 +232,16 @@ void IN_Move( float frametime, usercmd_t *cmd )
 		if( ac_forwardmove ) cmd->forwardmove  = ac_forwardmove * cl_forwardspeed->value / ac_movecount;
 		if( ac_sidemove ) cmd->sidemove  = ac_sidemove * cl_sidespeed->value / ac_movecount;
 	}
+
+	if( s_bAutoRun )
+	{
+		float stick = ac_movecount ? ac_forwardmove / ac_movecount : 0.0f;
+
+		if( CL_IsDead() || stick < -0.3f || ( in_back.state & 1 ))
+			s_bAutoRun = false;
+		else if( cmd->forwardmove < cl_forwardspeed->value )
+			cmd->forwardmove = cl_forwardspeed->value;
+	}
 	
 	ac_sidemove = ac_forwardmove = rel_pitch = rel_yaw = 0;
 	ac_movecount = 0;
@@ -272,6 +304,7 @@ void IN_Init( void )
 	sensitivity = gEngfuncs.pfnRegisterVariable ( "sensitivity", "3", FCVAR_ARCHIVE );
 	in_joystick = gEngfuncs.pfnRegisterVariable ( "joystick", "0", FCVAR_ARCHIVE );
 	cl_laddermode = gEngfuncs.pfnRegisterVariable ( "cl_laddermode", "2", FCVAR_ARCHIVE );
+	gEngfuncs.pfnAddCommand( "czm_autorun", IN_AutoRun_f );
 	evdev_grab = gEngfuncs.pfnGetCvarPointer("evdev_grab");
 
 	ac_forwardmove = ac_sidemove = rel_yaw = rel_pitch = 0;

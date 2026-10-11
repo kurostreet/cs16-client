@@ -13,9 +13,9 @@
 | Вкладка | Что внутри | Переменные |
 |---|---|---|
 | Управление | обзор, в прицеле, ходьба, гироскоп и его сила, схема кнопок, кнопки на экране (изменить, сбросить) | `sensitivity`, `czm_zoom_sens` → `zoom_sensitivity_ratio`, `touch_forwardzone`/`touch_sidezone`, `gyro_enable`, `gyro_yaw`/`gyro_pitch`, `czm_touch_scheme` |
-| Графика | яркость, лимит FPS (30/60/90/120), FPS и пинг на экране, эффекты (мало/средне/много) | `brightness`, `fps_max`, `cl_showfps`, `net_graph 3`, `cl_corpsestay`, `max_shells`, `max_smokepuffs`, `fastsprites` |
-| Звук | громкость, музыка в меню, голосовой чат, громкость голосов и микрофона | `volume`, `MP3Volume`, `voice_enable`, `voice_scale`, `voice_transmit_scale` |
-| Игра | язык, прицел (превью, размер, цвет, прозрачность), рука, лучшее оружие, меню покупки | `czm_lang`, `cl_crosshair_size`, `cl_crosshair_color`, `cl_crosshair_translucent`, `cl_righthand`, `_cl_autowepswitch`, `_vgui_menus` |
+| Графика | яркость, лимит FPS (30/60/90/120), размер текста, размер HUD, FPS и пинг на экране, эффекты (мало/средне/много), тени игроков, погода, прозрачный радар | `brightness`, `fps_max`, `con_fontscale` (1/2/3), `hud_scale` (0/1.5/2, со следующей карты), `cl_showfps`, `net_graph 3`, `cl_corpsestay`, `max_shells`, `max_smokepuffs`, `fastsprites`, `cl_shadows`, `cl_weather`, `cl_radartype` |
+| Звук | громкость, музыка в меню, голосовой чат, громкость голосов и микрофона, проверка микрофона | `volume`, `MP3Volume`, `voice_enable`, `voice_scale`, `voice_transmit_scale`, `czm_mictest`/`czm_miclevel` |
+| Игра | язык, прицел (превью, размер, цвет, динамический, прозрачность), рука, лучшее оружие, меню покупки | `czm_lang`, `cl_crosshair_size`, `cl_crosshair_color`, `cl_dynamiccrosshair`, `cl_crosshair_translucent`, `cl_righthand`, `_cl_autowepswitch`, `_vgui_menus` |
 | Профиль | ник, спрей | `name`, `cl_logofile` |
 
 Откуда открывается:
@@ -28,9 +28,18 @@
 - «Изменить» открывает наш редактор раскладки ([TOUCH_BUTTONS_RU.md](TOUCH_BUTTONS_RU.md));
 - «Сбросить» возвращает стандартную раскладку текущей схемы.
 
+**Проверка микрофона** (вкладка «Звук»):
+- работает только в главном меню: в матче микрофон занят голосовым чатом;
+- движок открывает микрофон (`czm_mictest 1`), уровень 0–100 пишет в `czm_miclevel`;
+  - `-1` — нет микрофона или разрешения;
+  - сам выключается через 60 секунд без запроса меню или при входе на сервер;
+- полоска зеленеет на речи, подпись меняется на «Микрофон работает»;
+- себя не слышно — так решил владелец.
+
 **Скрыто от игрока:**
 - консоль разработчика;
-- сеть: игра один раз ставит `rate 100000`, `cl_updaterate 60`, `cl_cmdrate 60`;
+- сеть: игра один раз ставит `rate 100000`, затем `cl_updaterate 101`, `cl_cmdrate 101` (движок не шлёт чаще FPS);
+- крупный текст чата по умолчанию: один раз `con_fontscale 2` (`czm_defaults 2`);
 - скачивание файлов с серверов (всегда включено);
 - клавиатура, мышь, джойстик, разрешение экрана, выбор рендера.
 

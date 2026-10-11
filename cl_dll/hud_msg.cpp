@@ -26,6 +26,8 @@
 #include "studio_util.h"
 #include "StudioModelRenderer.h"
 #include "GameStudioModelRenderer.h"
+
+void IN_StopAutoRun( void ); // input_xash3d.cpp
 #include "com_weapons.h"
 
 #include <cstring>
@@ -52,6 +54,9 @@ int CHud :: MsgFunc_ResetHUD(const char *pszName, int iSize, void *pbuf )
 
 	// reset sensitivity
 	m_flMouseSensitivity = 0;
+
+	// a new round or a respawn stops auto run
+	IN_StopAutoRun();
 
 	// reset concussion effect
 	m_iConcussionEffect = 0;

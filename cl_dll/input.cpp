@@ -39,6 +39,7 @@ void IN_Shutdown( void );
 void V_Init( void );
 void VectorAngles( const float *forward, float *angles );
 int CL_ButtonBits( int );
+bool IN_AutoRunActive( void ); // input_xash3d.cpp
 
 // xxx need client dll function to get and clear impuse
 extern cvar_t *in_joystick;
@@ -731,6 +732,10 @@ void DLLEXPORT CL_CreateMove ( float frametime, struct usercmd_s *cmd, int activ
 	// set button and flag bits
 	//
 	cmd->buttons = CL_ButtonBits( 1 );
+
+	// auto run also holds the forward button, ladders climb by it
+	if ( active && IN_AutoRunActive() )
+		cmd->buttons |= IN_FORWARD;
 
 	// If they're in a modal dialog, ignore the attack button.
 	if ( GetClientVoice()->IsInSquelchMode() )

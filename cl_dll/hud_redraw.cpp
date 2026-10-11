@@ -16,6 +16,7 @@
 // hud_redraw.cpp
 //
 #include <math.h>
+#include <stdlib.h>
 #include "hud.h"
 #include "cl_util.h"
 #include "triangleapi.h"
@@ -81,6 +82,31 @@ void CHud::Think(void)
 // Redraw
 // step through the local data,  placing the appropriate graphics & text as appropriate
 // returns 1 if they've changed, 0 otherwise
+bool IN_AutoRunActive( void ); // input_xash3d.cpp
+
+// Counter Zombie Mobile: label in the middle of the screen while auto run is on
+static void CZM_DrawAutoRunLabel( float flTime )
+{
+	const char *lang = gEngfuncs.pfnGetCvarString( "czm_lang" );
+	const char *locale = getenv( "CZM_LOCALE" );
+	float pulse = 0.7f + 0.3f * sinf( flTime * 5.0f );
+	const char *text;
+	bool russian;
+	int width = 0, height = 0;
+
+	// the language chosen in the menu, else the phone language
+	if( lang && lang[0] )
+		russian = !strcmp( lang, "ru" );
+	else
+		russian = !locale || !locale[0] || !strncmp( locale, "ru", 2 ) || !strncmp( locale, "uk", 2 )
+			|| !strncmp( locale, "be", 2 ) || !strncmp( locale, "kk", 2 );
+
+	text = russian ? "\xD0\x90\xD0\x92\xD0\xA2\xD0\x9E\xD0\x91\xD0\x95\xD0\x93" : "AUTO RUN"; // АВТОБЕГ in UTF-8
+	DrawUtils::ConsoleStringSize( text, &width, &height );
+	DrawUtils::SetConsoleTextColor( (unsigned char)255, (unsigned char)( 90 * pulse ), (unsigned char)( 90 * pulse ));
+	DrawUtils::DrawConsoleString(( ScreenWidth - width ) / 2, ScreenHeight * 0.70f, text );
+}
+
 int CHud :: Redraw( float flTime, int intermission )
 {
 	m_fOldTime = m_flTime;	// save time of previous redraw
@@ -114,6 +140,9 @@ int CHud :: Redraw( float flTime, int intermission )
 				pList->p->Draw( flTime );
 			}
 		}
+
+		if( !intermission && IN_AutoRunActive( ))
+			CZM_DrawAutoRunLabel( flTime );
 	}
 
 	// are we in demo mode? do we need to draw the logo in the top corner?

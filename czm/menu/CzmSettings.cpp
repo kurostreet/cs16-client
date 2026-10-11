@@ -134,6 +134,31 @@ void SetEffects( float v )
 	SetCvar( "fastsprites", preset[3] );
 }
 
+// text size: the console font (chat, messages) grows by whole steps and stays sharp
+float GetTextSize( void )
+{
+	float scale = GetCvar( "con_fontscale" );
+	return scale < 1.5f ? 0 : ( scale < 2.5f ? 1 : 2 );
+}
+void SetTextSize( float v ) { SetCvar( "con_fontscale", 1.0f + v ); }
+
+// HUD size: the engine scales the client HUD, the new size is used from the next map
+const float s_hudScales[3] = { 0.0f, 1.5f, 2.0f };
+float GetHudSize( void )
+{
+	float scale = GetCvar( "hud_scale" );
+	return scale < 1.25f ? 0 : ( scale < 1.75f ? 1 : 2 );
+}
+void SetHudSize( float v ) { SetCvar( "hud_scale", s_hudScales[(int)v] ); }
+
+float GetShadows( void ) { return GetCvar( "cl_shadows" ) != 0.0f; }
+void SetShadows( float v ) { SetCvar( "cl_shadows", v ); }
+float GetWeather( void ) { return GetCvar( "cl_weather" ) != 0.0f; }
+void SetWeather( float v ) { SetCvar( "cl_weather", v ); }
+// cl_radartype 0 is the see-through radar
+float GetRadarTrans( void ) { return GetCvar( "cl_radartype" ) == 0.0f; }
+void SetRadarTrans( float v ) { SetCvar( "cl_radartype", v != 0.0f ? 0.0f : 1.0f ); }
+
 // sound
 float GetVolume( void ) { return GetCvar( "volume" ); }
 void SetVolume( float v ) { SetCvar( "volume", v ); }
@@ -146,6 +171,8 @@ float GetVoiceIn( void ) { return GetCvar( "voice_scale" ); }
 void SetVoiceIn( float v ) { SetCvar( "voice_scale", v ); }
 float GetVoiceOut( void ) { return GetCvar( "voice_transmit_scale" ); }
 void SetVoiceOut( float v ) { SetCvar( "voice_transmit_scale", v ); }
+// in a match the voice chat owns the microphone, the test runs in the main menu
+bool MicTestAvailable( void ) { return !CL_IsActive(); }
 
 // game
 float GetLang( void ) { return CZM_IsRussian() ? 0 : 1; }
@@ -192,6 +219,9 @@ void SetXhairColor( float v )
 	EngFuncs::CvarSetString( "cl_crosshair_color", color );
 }
 
+float GetXhairDynamic( void ) { return GetCvar( "cl_dynamiccrosshair" ) != 0.0f; }
+void SetXhairDynamic( float v ) { SetCvar( "cl_dynamiccrosshair", v ); }
+
 float GetXhairTrans( void ) { return GetCvar( "cl_crosshair_translucent" ) != 0.0f; }
 void SetXhairTrans( float v ) { SetCvar( "cl_crosshair_translucent", v ); }
 
@@ -223,6 +253,7 @@ enum ERowType
 	ROW_XHAIR,    // crosshair preview
 	ROW_NICK,
 	ROW_SPRAYS,
+	ROW_MIC,      // microphone test: level meter and a start/stop button
 };
 
 enum EFormat
@@ -262,9 +293,14 @@ const CzmRow s_graphics[] =
 {
 	{ ROW_SLIDER, "s_brightness", NULL, GetBrightness, SetBrightness, NULL, 0.0f, 3.0f, 0.05f, FMT_RANGE, {}, 0 },
 	{ ROW_CHOICE, "s_fps", "s_fps_hint", GetFps, SetFps, NULL, 0, 3, 1, 0, { "30", "60", "90", "120" }, 4 },
+	{ ROW_CHOICE, "s_textsize", "s_textsize_hint", GetTextSize, SetTextSize, NULL, 0, 2, 1, 0, { "opt_small", "opt_medium", "opt_large" }, 3 },
+	{ ROW_CHOICE, "s_hudsize", "s_hudsize_hint", GetHudSize, SetHudSize, NULL, 0, 2, 1, 0, { "opt_small", "opt_medium", "opt_large" }, 3 },
 	{ ROW_SWITCH, "s_showfps", NULL, GetShowFps, SetShowFps, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SWITCH, "s_showping", NULL, GetShowPing, SetShowPing, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_CHOICE, "s_effects", "s_effects_hint", GetEffects, SetEffects, NULL, 0, 2, 1, 0, { "opt_low", "opt_mid", "opt_high" }, 3 },
+	{ ROW_SWITCH, "s_shadows", NULL, GetShadows, SetShadows, NULL, 0, 1, 1, 0, {}, 0 },
+	{ ROW_SWITCH, "s_weather", "s_weather_hint", GetWeather, SetWeather, NULL, 0, 1, 1, 0, {}, 0 },
+	{ ROW_SWITCH, "s_radar", NULL, GetRadarTrans, SetRadarTrans, NULL, 0, 1, 1, 0, {}, 0 },
 };
 
 const CzmRow s_sound[] =
@@ -274,6 +310,7 @@ const CzmRow s_sound[] =
 	{ ROW_SWITCH, "s_voice", "s_voice_hint", GetVoice, SetVoice, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SLIDER, "s_voice_in", NULL, GetVoiceIn, SetVoiceIn, VoiceOn, 0.0f, 2.0f, 0.05f, FMT_PERCENT, {}, 0 },
 	{ ROW_SLIDER, "s_voice_out", NULL, GetVoiceOut, SetVoiceOut, VoiceOn, 0.0f, 2.0f, 0.05f, FMT_PERCENT, {}, 0 },
+	{ ROW_MIC, "s_mic", "s_mic_hint", NULL, NULL, MicTestAvailable, 0, 0, 0, 0, { "b_check", "b_stop" }, 2 },
 };
 
 const CzmRow s_game[] =
@@ -282,6 +319,7 @@ const CzmRow s_game[] =
 	{ ROW_XHAIR, "s_xhair", "s_xhair_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_CHOICE, "s_xhair_size", NULL, GetXhairSize, SetXhairSize, NULL, 0, 3, 1, 0, { "opt_auto", "opt_small", "opt_medium", "opt_large" }, 4 },
 	{ ROW_COLORS, "s_xhair_color", NULL, GetXhairColor, SetXhairColor, NULL, 0, 0, 0, 0, {}, 0 },
+	{ ROW_SWITCH, "s_xhair_dyn", "s_xhair_dyn_hint", GetXhairDynamic, SetXhairDynamic, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SWITCH, "s_xhair_trans", NULL, GetXhairTrans, SetXhairTrans, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_CHOICE, "s_hand", NULL, GetHand, SetHand, NULL, 0, 1, 1, 0, { "opt_right", "opt_left" }, 2 },
 	{ ROW_SWITCH, "s_autoswitch", "s_autoswitch_hint", GetAutoSwitch, SetAutoSwitch, NULL, 0, 1, 1, 0, {}, 0 },
@@ -398,6 +436,7 @@ private:
 	void FinishNickEdit( void );
 	void Toast( const char *key );
 	void Save( void );
+	void StopMicTest( void );
 
 	const CzmRow &Row( int i ) const { return s_tabs[m_iTab].rows[i]; }
 	int RowCount( void ) const { return s_tabs[m_iTab].count; }
@@ -422,6 +461,9 @@ private:
 	int m_iMaxScroll;
 	bool m_bConfirm;
 	bool m_bTouchChanged;
+	bool m_bMicTest;     // the microphone test runs
+	bool m_bMicHeard;    // the meter moved during the test
+	int m_iMicPing;      // last time the test was kept alive
 	const char *m_szToast;
 	int m_iToastTime;
 	CzmTextEdit m_nick;
@@ -442,6 +484,8 @@ CCzmSettings::CCzmSettings() : CMenuFramework( "CzmSettings" )
 	m_iDownY = m_iScrollAtDown = m_iScroll = m_iMaxScroll = 0;
 	m_bConfirm = false;
 	m_bTouchChanged = false;
+	m_bMicTest = m_bMicHeard = false;
+	m_iMicPing = 0;
 	m_szToast = NULL;
 	m_iToastTime = 0;
 	memset( &m_nick, 0, sizeof( m_nick ));
@@ -453,6 +497,7 @@ void CCzmSettings::OpenTab( int tab )
 	if( tab >= 0 && tab < CZM_TAB_COUNT && tab != m_iTab )
 	{
 		m_nick.End();
+		StopMicTest();
 		m_iTab = tab;
 		m_iScroll = 0;
 	}
@@ -480,8 +525,18 @@ void CCzmSettings::Save( void )
 	}
 }
 
+void CCzmSettings::StopMicTest( void )
+{
+	if( !m_bMicTest )
+		return;
+
+	m_bMicTest = false;
+	EngFuncs::ClientCmd( false, "czm_mictest 0\n" );
+}
+
 void CCzmSettings::Hide()
 {
+	StopMicTest();
 	FinishNickEdit();
 	Save();
 	CMenuFramework::Hide();
@@ -580,6 +635,15 @@ void CCzmSettings::Layout( void )
 				l.parts[k] = CZM_Rect( l.control.x + l.control.w * k / row.numOptions, l.control.y,
 					l.control.w * ( k + 1 ) / row.numOptions - l.control.w * k / row.numOptions, ch );
 			l.numParts = row.numOptions;
+			break;
+		}
+		case ROW_MIC:
+		{
+			// level meter on the left of the control area, the button on the right
+			int bh = H * 0.064f, bgap = H * 0.025f, bw = ( controlW - bgap ) / 2, mh = Q_max( 6, (int)( H * 0.018f ));
+			l.parts[0] = CZM_Rect( l.control.x + l.control.w - bw, l.rect.y + ( h - bh ) / 2, bw, bh );
+			l.control = CZM_Rect( l.control.x, l.rect.y + ( h - mh ) / 2, l.control.w - bw - bgap, mh );
+			l.numParts = 1;
 			break;
 		}
 		case ROW_BUTTONS:
@@ -773,6 +837,19 @@ void CCzmSettings::Activate( int hit )
 		case ROW_COLORS:
 			if( part >= 0 )
 				row.set( part );
+			break;
+		case ROW_MIC:
+			if( part != 0 )
+				break;
+			if( m_bMicTest )
+				StopMicTest();
+			else
+			{
+				m_bMicTest = true;
+				m_bMicHeard = false;
+				m_iMicPing = uiStatic.realTime;
+				EngFuncs::ClientCmd( false, "czm_mictest 1\n" );
+			}
 			break;
 		case ROW_BUTTONS:
 			if( part == 0 )
@@ -1045,6 +1122,17 @@ void CCzmSettings::DrawRow( int i )
 	if( row.get == GetGyro && !GyroAvailable( ))
 		hint = CZM_T( "s_gyro_none" );
 
+	// the microphone row tells how the test went
+	if( row.type == ROW_MIC )
+	{
+		if( !MicTestAvailable( ))
+			hint = CZM_T( "s_mic_match" );
+		else if( !m_bMicTest && EngFuncs::GetCvarFloat( "czm_miclevel" ) < 0.0f )
+			hint = CZM_T( "s_mic_none" );
+		else if( m_bMicHeard )
+			hint = CZM_T( "s_mic_ok" );
+	}
+
 	if( l.rect.y + l.rect.h < m_clip.y || l.rect.y > m_clip.y + m_clip.h )
 		return;
 
@@ -1063,6 +1151,17 @@ void CCzmSettings::DrawRow( int i )
 	case ROW_CHOICE:
 		DrawChoice( i, l );
 		break;
+	case ROW_MIC:
+	{
+		float level = m_bMicTest ? bound( 0.0f, EngFuncs::GetCvarFloat( "czm_miclevel" ), 100.0f ) : 0.0f;
+		int fill = l.control.w * level / 100.0f;
+
+		FillClipped( l.control.x, l.control.y, l.control.w, l.control.h, CZM_White( dim ? 20 : 45 ), m_clip );
+		FillClipped( l.control.x, l.control.y, fill, l.control.h, level > 12.0f ? PackRGBA( 34, 197, 94, 255 ) : PackRGBA( 200, 205, 215, 255 ), m_clip );
+		CZM_DrawButton( m_bMicTest ? UI_DIR "button_danger.png" : UI_DIR "button_secondary.png", l.parts[0],
+			CZM_T( m_bMicTest ? row.options[1] : row.options[0] ), dim ? CZM_Grey() : CZM_White(), IsPressed( HIT_ROW + i * 20 + 1 ), CZMF_TILE_STATUS );
+		break;
+	}
 	case ROW_BUTTONS:
 		CZM_DrawButton( UI_DIR "button_secondary.png", l.parts[0], CZM_T( row.options[0] ), CZM_White(),
 			IsPressed( HIT_ROW + i * 20 + 1 ), CZMF_TILE_STATUS );
@@ -1149,6 +1248,25 @@ void CCzmSettings::Draw()
 	int iconSize;
 
 	Layout();
+
+	// microphone test: stop on errors, mark the voice as heard, keep the engine side running
+	if( m_bMicTest )
+	{
+		float level = EngFuncs::GetCvarFloat( "czm_miclevel" );
+
+		if( level < 0.0f || !MicTestAvailable( ))
+			m_bMicTest = false;
+		else
+		{
+			if( level > 12.0f )
+				m_bMicHeard = true;
+			if( uiStatic.realTime - m_iMicPing > 10000 )
+			{
+				m_iMicPing = uiStatic.realTime;
+				EngFuncs::ClientCmd( false, "czm_mictest 1\n" );
+			}
+		}
+	}
 
 	// calm the art down so the controls read well
 	UI_FillRect( 0, 0, W, H, PackRGBA( 0, 0, 0, CL_IsActive() ? 60 : 110 ));

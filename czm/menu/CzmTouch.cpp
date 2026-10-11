@@ -102,6 +102,7 @@ static const CzmAction s_actions[] =
 	{ "back", "Назад (держать)", "Back (hold)", "+back", GROUP_MOVE },
 	{ "left", "Влево (держать)", "Left (hold)", "+moveleft", GROUP_MOVE },
 	{ "right", "Вправо (держать)", "Right (hold)", "+moveright", GROUP_MOVE },
+	{ "ddrun", "Двойной присед (свайп)", "Double duck (swipe)", "_wheel czm_dd czm_dd", GROUP_MOVE },
 	// buying
 	{ "buy", "Покупка", "Buy menu", "buy", GROUP_BUY },
 	{ "ammo1", "Патроны к основному", "Primary ammo", "buyammo1", GROUP_BUY },
@@ -129,8 +130,9 @@ static const CzmAction s_actions[] =
 	{ "vip", "VIP", "VIP", "say /vip", GROUP_SERVER },
 	{ "timeleft", "Сколько осталось", "Time left", "say timeleft", GROUP_SERVER },
 	{ "nextmap", "Следующая карта", "Next map", "say nextmap", GROUP_SERVER },
+	{ "kill", "Kill (если застрял)", "Kill (if stuck)", "kill", GROUP_SERVER },
 	// menus
-	{ "more", "Ещё (скрытые кнопки)", "More (hidden buttons)", "czm_more", GROUP_MENU },
+	{ "more", "Ещё", "More", "czm_more", GROUP_MENU },
 	{ "numbers", "Цифры меню", "Menu digits", "exec touch_default/numbers.cfg", GROUP_MENU },
 	{ "num1", "1", "1", "slot1", GROUP_MENU },
 	{ "num2", "2", "2", "slot2", GROUP_MENU },
@@ -158,7 +160,7 @@ static const char *s_icons[] =
 	"left", "right", "buy", "ammo1", "ammo2", "armor", "autobuy", "rebuy", "chat", "teamchat", "voice", "radio",
 	"radio1", "radio2", "radio3", "score", "zpmenu", "servermenu", "unstuck", "rs", "rtv", "top", "rank", "vip",
 	"timeleft", "nextmap", "more", "numbers", "num1", "num2", "num3", "num4", "num5", "num6", "num7", "num8", "num9",
-	"num0", "cancel", "team", "screenshot", "edit", "custom",
+	"num0", "cancel", "team", "screenshot", "edit", "custom", "ddrun", "kill",
 };
 
 #define CZM_ICONS ( (int)( sizeof( s_icons ) / sizeof( s_icons[0] )))
@@ -259,7 +261,10 @@ struct CzmTouchButton
 
 static bool ButtonEditable( const CzmTouchButton &b )
 {
-	return b.texture[0] && b.texture[0] != '#' && b.command[0] != '_' && !( b.flags & TOUCH_FLAG_NOEDIT );
+	// _move and _look are the walk and look zones, _wheel is a swipe button the player may own
+	if( b.command[0] == '_' && strncmp( b.command, "_wheel ", 7 ) && strncmp( b.command, "_hwheel ", 8 ))
+		return false;
+	return b.texture[0] && b.texture[0] != '#' && !( b.flags & TOUCH_FLAG_NOEDIT );
 }
 
 // the action a button runs, NULL for commands we do not know
@@ -412,6 +417,7 @@ private:
 	CzmTextEdit m_say, m_cmd;
 	const char *m_szToast;
 	int m_iToastTime;
+	int m_iShowTime;    // the hint at the bottom is shown for a few seconds
 
 	// layout, recalculated every frame
 	int W, H;
@@ -445,6 +451,7 @@ CCzmTouchEditor::CCzmTouchEditor() : CMenuFramework( "CzmTouchEditor" )
 	memset( &m_cmd, 0, sizeof( m_cmd ));
 	m_szToast = NULL;
 	m_iToastTime = 0;
+	m_iShowTime = 0;
 	m_iItems = 0;
 	W = H = 0;
 }
@@ -552,6 +559,7 @@ void CCzmTouchEditor::Show()
 	m_iDragButton = -1;
 	m_iSlider = 0;
 	m_szToast = NULL;
+	m_iShowTime = uiStatic.realTime;
 	m_bCollapsed = false;
 	Load( CZM_TouchScheme(), false );
 	CZM_SetGameVisible( true );
@@ -895,7 +903,11 @@ int CCzmTouchEditor::HitTest( void ) const
 		if( m_collapse.Contains( x, y ))
 			return HIT_COLLAPSE;
 		if( m_bar.Contains( x, y ))
-			return HIT_BAR;
+		{
+			// a button peeking out between the bar's pills can still be taken
+			button = ButtonAt( x, y );
+			return button >= 0 ? HIT_BUTTON + button : HIT_BAR;
+		}
 	}
 
 	if( m_iSelected >= 0 && m_panel.Contains( x, y ))
@@ -1485,6 +1497,8 @@ void CCzmTouchEditor::DrawConfirm( void )
 
 void CCzmTouchEditor::Draw()
 {
+	bool dragging;
+
 	Layout();
 
 	// in the menu: the owner's screenshot from a match, in a match: the game itself
@@ -1493,7 +1507,10 @@ void CCzmTouchEditor::Draw()
 
 	DrawButtons();
 
-	if( m_iSelected < 0 && m_overlay == OV_NONE )
+	// while a button is dragged nothing covers the screen
+	dragging = m_iDragButton >= 0 && m_bMoved;
+
+	if( m_iSelected < 0 && m_overlay == OV_NONE && !dragging && uiStatic.realTime - m_iShowTime < 6000 )
 	{
 		HFont font = CZM_Font( CZMF_TILE_STATUS );
 		const char *hint = CZM_IsRussian() ? "Нажми на кнопку, чтобы настроить. Тащи пальцем, чтобы переместить."
@@ -1504,6 +1521,9 @@ void CCzmTouchEditor::Draw()
 		CZM_DrawPill( UI_DIR "button_secondary.png", r.x, r.y, r.w, r.h, CZM_White( 220 ));
 		CZM_DrawText( font, r.x, r.y + ( r.h - CZM_FontHeight( font )) / 2, r.w, hint, CZM_White(), QM_CENTER );
 	}
+
+	if( dragging )
+		return;
 
 	DrawBar();
 
