@@ -1,5 +1,5 @@
 diff --git a/engine/client/cl_main.c b/engine/client/cl_main.c
-index 39e4f9c..fbbcfd6 100644
+index 39e4f9c..6bfffb8 100644
 --- a/engine/client/cl_main.c
 +++ b/engine/client/cl_main.c
 @@ -1532,7 +1532,7 @@ static void CL_Connect_f( void )
@@ -29,7 +29,23 @@ index 39e4f9c..fbbcfd6 100644
  
  	cls.state = ca_connecting;
  	cls.connect_time = MAX_HEARTBEAT; // CL_CheckForResend() will fire immediately
-@@ -2762,6 +2764,8 @@ static void CL_ErrorMsg( const char *c, const char *args, netadr_t from, sizebuf
+@@ -2236,6 +2238,7 @@ static void CL_ParseGoldSrcStatusMessage( netadr_t from, sizebuf_t *msg, qboolea
+ 
+ 	// tell mainui about server
+ 	UI_AddServerToList( from, s );
++	CZM_Loading_InfoReply( from, s );
+ 
+ 	// now process NetAPI requst
+ 	net_request_t *nr = CL_NetRequestFind( from, NETAPI_REQUEST_DETAILS );
+@@ -2688,6 +2691,7 @@ static void CL_Challenge( const char *c, netadr_t from, sizebuf_t *msg )
+ 	// query challenge is binary: challenge type byte and the challenge value
+ 	if( c[0] == S2C_GOLDSRC_CHALLENGE[0] && Q_strcmp( c, S2C_GOLDSRC_CHALLENGE ))
+ 	{
++		CZM_Loading_QueryChallenge( from );
+ 		CL_NetRequestChallenge( from, msg );
+ 		return;
+ 	}
+@@ -2762,6 +2766,8 @@ static void CL_ErrorMsg( const char *c, const char *args, netadr_t from, sizebuf
  			Q_snprintf( formatted_msg, sizeof( formatted_msg ), "^3Server message^7\n%s", args + 1 );
  	}
  
@@ -38,7 +54,7 @@ index 39e4f9c..fbbcfd6 100644
  	// in case we're in console or it's classic mainui which doesn't support messageboxes
  	if( !UI_IsVisible() || !UI_ShowMessageBox( formatted_msg ))
  		Msg( "%s\n", formatted_msg );
-@@ -3469,9 +3473,11 @@ qboolean CL_PrecacheResources( void )
+@@ -3469,9 +3475,11 @@ qboolean CL_PrecacheResources( void )
  		if( pRes->type != t_model || pRes->nIndex != WORLD_INDEX )
  			continue;
  
@@ -50,7 +66,7 @@ index 39e4f9c..fbbcfd6 100644
  		break;
  	}
  
-@@ -3509,6 +3515,8 @@ qboolean CL_PrecacheResources( void )
+@@ -3509,6 +3517,8 @@ qboolean CL_PrecacheResources( void )
  		if( FBitSet( pRes->ucFlags, RES_PRECACHED ))
  			continue;
  
@@ -59,7 +75,7 @@ index 39e4f9c..fbbcfd6 100644
  		switch( pRes->type )
  		{
  		case t_sound:
-@@ -3636,6 +3644,10 @@ void CL_Escape_f( void )
+@@ -3636,6 +3646,10 @@ void CL_Escape_f( void )
  	if( cls.key_dest == key_menu )
  		return;
  
@@ -115,10 +131,10 @@ index 6c550c7..30fc6e1 100644
  	Cvar_RegisterVariable( &cl_testlights );
  	Cvar_RegisterVariable( &cl_envshot_size );
 diff --git a/engine/client/client.h b/engine/client/client.h
-index 2d6faf7..8d0b6db 100644
+index 2d6faf7..c248c11 100644
 --- a/engine/client/client.h
 +++ b/engine/client/client.h
-@@ -804,6 +804,26 @@ void CL_NotifyServerListResponse( void );
+@@ -804,6 +804,28 @@ void CL_NotifyServerListResponse( void );
  qboolean CL_NetRequestSend( net_request_t *nr );
  void CL_Escape_f( void );
  
@@ -131,6 +147,8 @@ index 2d6faf7..8d0b6db 100644
 +qboolean CZM_Loading_Active( void );
 +void CZM_Loading_BeginLocal( void );
 +void CZM_Loading_ServerData( void );
++void CZM_Loading_InfoReply( netadr_t from, const char *info );
++void CZM_Loading_QueryChallenge( netadr_t from );
 +void CZM_Loading_SetHostname( const char *hostname );
 +void CZM_Loading_SetError( const char *reason );
 +void CZM_Loading_PrecacheBegin( void );
@@ -185,10 +203,10 @@ index 62ac3eb..ae75255 100644
  
 diff --git a/engine/client/czm_loading.c b/engine/client/czm_loading.c
 new file mode 100644
-index 0000000..f89d226
+index 0000000..ea6e755
 --- /dev/null
 +++ b/engine/client/czm_loading.c
-@@ -0,0 +1,574 @@
+@@ -0,0 +1,665 @@
 +/*
 +czm_loading.c - Counter Zombie Mobile loading screen state
 +Copyright (C) 2026 Counter Zombie Mobile authors
@@ -297,6 +315,107 @@ index 0000000..f89d226
 +qboolean CZM_Loading_Active( void )
 +{
 +	return czm.active;
++}
++
++/*
++=================
++server info queries
++
++Some GoldSrc servers drop the NetAPI query because it carries a -1 challenge,
++so we also send the plain query. NetAPI still handles servers that answer with
++a challenge first. The first answer after a query gives the ping (many servers
++ignore the ping packet).
++=================
++*/
++#define CZM_MAX_QUERIES 16
++
++static struct
++{
++	netadr_t adr;
++	double   sent;
++} czm_queries[CZM_MAX_QUERIES];
++
++static void CZM_SendInfoQuery( netadr_t *adr, int context, net_api_response_func_t func )
++{
++	double now = Platform_DoubleTime();
++	double oldest = now;
++	int slot = 0;
++	byte buf[64];
++	sizebuf_t msg;
++
++	for( int i = 0; i < CZM_MAX_QUERIES; i++ )
++	{
++		if( NET_CompareAdr( czm_queries[i].adr, *adr ))
++		{
++			slot = i;
++			break;
++		}
++
++		if( czm_queries[i].sent < oldest )
++		{
++			oldest = czm_queries[i].sent;
++			slot = i;
++		}
++	}
++
++	czm_queries[slot].adr = *adr;
++	czm_queries[slot].sent = now;
++
++	MSG_Init( &msg, "CZMQuery", buf, sizeof( buf ));
++	MSG_WriteString( &msg, A2S_GOLDSRC_INFO );
++	Netchan_OutOfBand( NS_CLIENT, *adr, MSG_GetNumBytesWritten( &msg ), MSG_GetData( &msg ));
++
++	gNetApi.SendRequest( context, NETAPI_REQUEST_DETAILS, 0, 4.0, adr, func );
++}
++
++// the server asked for a challenge, the engine resends the query right away
++void CZM_Loading_QueryChallenge( netadr_t from )
++{
++	for( int i = 0; i < CZM_MAX_QUERIES; i++ )
++	{
++		if( czm_queries[i].sent > 0.0 && NET_CompareAdr( czm_queries[i].adr, from ))
++		{
++			czm_queries[i].sent = Platform_DoubleTime();
++			break;
++		}
++	}
++}
++
++// any server info answer, info is the infostring the menu gets (host, map, numcl, maxcl)
++void CZM_Loading_InfoReply( netadr_t from, const char *info )
++{
++	double now = Platform_DoubleTime();
++	qboolean ours = czm.active && NET_CompareAdr( from, cls.serveradr );
++
++	for( int i = 0; i < CZM_MAX_QUERIES; i++ )
++	{
++		if( czm_queries[i].sent <= 0.0 || !NET_CompareAdr( czm_queries[i].adr, from ))
++			continue;
++
++		if( now - czm_queries[i].sent < 5.0 )
++		{
++			int ping = (int)(( now - czm_queries[i].sent ) * 1000.0 );
++			char s[64];
++
++			if( ours )
++				czm.info_ping = ping;
++
++			Q_snprintf( s, sizeof( s ), "\\czmping\\%d", ping );
++			UI_AddServerToList( from, s );
++		}
++
++		czm_queries[i].sent = 0.0; // only the first answer counts
++		break;
++	}
++
++	if( ours )
++	{
++		czm.info_answered = true;
++		czm.info_players = Q_atoi( Info_ValueForKey( info, "numcl" ));
++		czm.info_max = Q_atoi( Info_ValueForKey( info, "maxcl" ));
++		Q_strncpy( czm.info_host, Info_ValueForKey( info, "host" ), sizeof( czm.info_host ));
++		Q_strncpy( czm.info_map, Info_ValueForKey( info, "map" ), sizeof( czm.info_map ));
++	}
 +}
 +
 +static void CZM_InfoResponse( net_response_t *response )
@@ -413,7 +532,7 @@ index 0000000..f89d226
 +
 +	czm.info_requests++;
 +	czm.info_time = now;
-+	gNetApi.SendRequest( CZM_INFO_CONTEXT, NETAPI_REQUEST_DETAILS, 0, 4.0, &adr, CZM_InfoResponse );
++	CZM_SendInfoQuery( &adr, CZM_INFO_CONTEXT, CZM_InfoResponse );
 +}
 +
 +static void CZM_UpdateInfo( void )
@@ -665,6 +784,8 @@ index 0000000..f89d226
 +{
 +	czm.cancelled = true;
 +	czm.reopen_menu = true;
++	// stop HTTP downloads of server files too, they would go on in the background
++	Cbuf_AddText( "http_clear\n" );
 +	Cbuf_AddText( "disconnect\n" );
 +}
 +
@@ -713,18 +834,7 @@ index 0000000..f89d226
 +	// nothing to do: the engine already passed the server info to the menu
 +}
 +
-+static void CZM_QueryPingResponse( net_response_t *response )
-+{
-+	char info[64];
-+
-+	if( response->error != NET_SUCCESS )
-+		return;
-+
-+	Q_snprintf( info, sizeof( info ), "\\czmping\\%d", (int)( response->ping * 1000.0 ));
-+	UI_AddServerToList( response->remote_address, info );
-+}
-+
-+// czm_queryserver <address>: ask a server for its info and ping, answers go to the menu
++// czm_queryserver <address>: ask a server for its info, the answer and the ping go to the menu
 +static void CZM_QueryServer_f( void )
 +{
 +	netadr_t adr;
@@ -743,8 +853,7 @@ index 0000000..f89d226
 +	if( adr.port == 0 )
 +		adr.port = MSG_BigShort( PORT_SERVER );
 +
-+	gNetApi.SendRequest( CZM_QUERY_CONTEXT, NETAPI_REQUEST_DETAILS, 0, 4.0, &adr, CZM_QueryDetailsResponse );
-+	gNetApi.SendRequest( CZM_QUERY_CONTEXT + 1, NETAPI_REQUEST_PING, 0, 4.0, &adr, CZM_QueryPingResponse );
++	CZM_SendInfoQuery( &adr, CZM_QUERY_CONTEXT, CZM_QueryDetailsResponse );
 +}
 +
 +void CZM_Loading_Init( void )

@@ -113,9 +113,19 @@ public class MainActivity extends Activity {
                 .putExtra("env", new String[]{
                         "XASH3D_RODIR", installation.data.getAbsolutePath(),
                         // the game menu picks Russian or English from the phone language on the first start
-                        "CZM_LOCALE", java.util.Locale.getDefault().getLanguage()})
+                        "CZM_LOCALE", java.util.Locale.getDefault().getLanguage(),
+                        // shown in the About panel of the game menu
+                        "CZM_APP_VERSION", appVersion()})
                 .putExtra("argv", launchArguments()));
         finish();
+    }
+
+    private String appVersion() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     // Players get no developer console. For debugging, create files/game/czm-dev.txt

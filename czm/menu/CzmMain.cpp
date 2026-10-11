@@ -186,6 +186,9 @@ void CCzmMainMenu::Show()
 	m_iPressed = HIT_NONE;
 	CMenuFramework::Show();
 	CZM_QueryServers( true );
+
+	// the engine build string would sit on the navigation bar, the version is in About
+	EngFuncs::CvarSetValue( "scr_drawversion", 0.0f );
 }
 
 void CCzmMainMenu::Think()
@@ -275,7 +278,7 @@ void CCzmMainMenu::Layout( void )
 	else
 	{
 		int pw = Q_min( (int)( H * 1.0f ), (int)( W * 0.62f ));
-		int ph = H * 0.68f;
+		int ph = H * 0.62f;
 		int pad = H * 0.045f;
 		int closeSize = H * 0.09f;
 		int lineStep, aboutTop;

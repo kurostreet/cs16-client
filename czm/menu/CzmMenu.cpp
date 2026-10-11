@@ -433,6 +433,12 @@ bool CZM_CursorIn( int x, int y, int w, int h )
 
 const char *CZM_Version( void )
 {
+	// the app version from the launcher, the client build number otherwise
+	const char *version = getenv( "CZM_APP_VERSION" );
+
+	if( version && version[0] )
+		return version;
+
 	return EngFuncs::GetCvarString( "cscl_ver" );
 }
 
