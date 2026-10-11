@@ -56,6 +56,7 @@ int CZM_TextWidth( HFont font, const char *text );
 void CZM_DrawText( HFont font, int x, int y, int w, const char *text, unsigned int color, unsigned int justify = QM_LEFT );
 // line starts of text wrapped into width (starts needs maxLines + 1 places), returns the number of lines
 int CZM_WrapText( HFont font, const char *text, int width, int *starts, int maxLines );
+void CZM_WrapLine( const char *text, const int *starts, int l, char *out, size_t size );
 
 // fonts are recreated together with the menu fonts when the resolution changes
 void CZM_CreateFonts( float scale );

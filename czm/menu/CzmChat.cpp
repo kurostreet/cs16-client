@@ -819,13 +819,7 @@ void CCzmChat::DrawMessages( void )
 		y = top + CZM_FontHeight( nameFont ) + H / 160;
 		for( int l = 0; l < m.numLines; l++ )
 		{
-			int start = m.starts[l], end = m.starts[l + 1];
-			int len = end - start;
-
-			while( len > 0 && m.text[start + len - 1] == ' ' )
-				len--;
-			memcpy( line, m.text + start, len );
-			line[len] = 0;
+			CZM_WrapLine( m.text, m.starts, l, line, sizeof( line ));
 			CZM_DrawText( textFont, m_iTextX, y, m_iTextW, line, PackRGBA( 226, 230, 236, 255 ));
 			y += lineH;
 		}

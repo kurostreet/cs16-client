@@ -820,10 +820,8 @@ void CCzmMainMenu::DrawBell( void )
 		for( int l = 0; l < lines && ty + CZM_FontHeight( textFont ) < m_updateButton.y; l++ )
 		{
 			char line[512];
-			int len = Q_min( starts[l + 1] - starts[l], (int)sizeof( line ) - 1 );
 
-			memcpy( line, update->notes + starts[l], len );
-			line[len] = 0;
+			CZM_WrapLine( update->notes, starts, l, line, sizeof( line ));
 			CZM_DrawText( textFont, c.x + H * 0.03f, ty, c.w - H * 0.06f, line, PackRGBA( 220, 224, 232, 255 ));
 			ty += CZM_FontHeight( textFont ) * 115 / 100;
 		}
@@ -891,7 +889,7 @@ void CCzmMainMenu::DrawBell( void )
 	{
 		const CzmNews *n = CZM_NewsItem( i );
 		char date[32], line[1024];
-		int starts[7], lines;
+		int starts[11], lines;
 		time_t t = n->time;
 
 		strftime( date, sizeof( date ), "%d.%m.%Y", localtime( &t ));
@@ -900,13 +898,10 @@ void CCzmMainMenu::DrawBell( void )
 		CZM_DrawText( smallFont, x + ( n->id > seen ? H * 0.025f : 0 ), y, w, date, dim );
 		y += CZM_FontHeight( smallFont ) + H * 0.006f;
 
-		lines = CZM_WrapText( textFont, n->text, w, starts, 6 );
+		lines = CZM_WrapText( textFont, n->text, w, starts, 10 );
 		for( int l = 0; l < lines && y + CZM_FontHeight( textFont ) <= bottom; l++ )
 		{
-			int len = Q_min( starts[l + 1] - starts[l], (int)sizeof( line ) - 1 );
-
-			memcpy( line, n->text + starts[l], len );
-			line[len] = 0;
+			CZM_WrapLine( n->text, starts, l, line, sizeof( line ));
 			CZM_DrawText( textFont, x, y, w, line, CZM_White());
 			y += CZM_FontHeight( textFont ) * 115 / 100;
 		}

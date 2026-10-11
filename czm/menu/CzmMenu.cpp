@@ -636,24 +636,33 @@ void CZM_CleanName( const char *in, char *out, size_t size )
 	out[len] = 0;
 }
 
-// line starts of text wrapped into width; long words are cut between letters
+static bool CZM_IsLineBreak( char c )
+{
+	return c == '\n' || c == '\r';
+}
+
+// line starts of text wrapped into width; long words are cut between letters,
+// a line break in the text always starts a new line (an empty one too)
 int CZM_WrapText( HFont font, const char *text, int width, int *starts, int maxLines )
 {
 	int len = strlen( text ), lines = 0, start = 0;
-	char buf[512];
+	char buf[1024];
 
 	while( start < len && lines < maxLines )
 	{
 		int lastSpace = -1, end = start, fit = start;
 
 		starts[lines++] = start;
-		// the longest piece from start that fits
-		while( end < len )
+		// the longest piece from start that fits, never past a line break
+		while( end < len && !CZM_IsLineBreak( text[end] ))
 		{
 			int next = end + 1;
 
 			while( next < len && ( text[next] & 0xC0 ) == 0x80 )
 				next++;
+			// no line on the screen is that long: cut it here
+			if( next - start >= (int)sizeof( buf ))
+				break;
 			memcpy( buf, text + start, next - start );
 			buf[next - start] = 0;
 			if( CZM_TextWidth( font, buf ) > width )
@@ -670,6 +679,13 @@ int CZM_WrapText( HFont font, const char *text, int width, int *starts, int maxL
 			break;
 		}
 
+		// the text breaks the line itself: go on after the break ("\r\n" is one)
+		if( CZM_IsLineBreak( text[end] ))
+		{
+			start = end + (( text[end] == '\r' && text[end + 1] == '\n' ) ? 2 : 1 );
+			continue;
+		}
+
 		// cut at the last space if there is one, else between letters
 		start = lastSpace > start ? lastSpace + 1 : Q_max( fit, start + 1 );
 		while( start < len && text[start] == ' ' )
@@ -678,6 +694,30 @@ int CZM_WrapText( HFont font, const char *text, int width, int *starts, int maxL
 
 	starts[lines] = len;
 	return lines;
+}
+
+// line l of a text wrapped by CZM_WrapText, without the line break and the spaces at its end
+void CZM_WrapLine( const char *text, const int *starts, int l, char *out, size_t size )
+{
+	int start = starts[l], end = starts[l + 1], len;
+
+	for( int i = start; i < end; i++ )
+	{
+		if( CZM_IsLineBreak( text[i] ))
+		{
+			end = i;
+			break;
+		}
+	}
+	while( end > start && ( text[end - 1] == ' ' || text[end - 1] == '\t' ))
+		end--;
+
+	len = Q_min( end - start, (int)size - 1 );
+	// a cut never splits a letter
+	while( len > 0 && len < end - start && ( text[start + len] & 0xC0 ) == 0x80 )
+		len--;
+	memcpy( out, text + start, len );
+	out[len] = 0;
 }
 
 bool CZM_CursorIn( int x, int y, int w, int h )
