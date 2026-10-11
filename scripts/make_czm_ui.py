@@ -143,6 +143,30 @@ def icon(kind, size=128, color=(255, 255, 255, 255)):
     elif kind == "pencil":
         d.polygon([(S * .18, S * .82), (S * .24, S * .60), (S * .68, S * .16), (S * .84, S * .32), (S * .40, S * .76)],
                   outline=c, width=lw)
+    elif kind == "back":
+        d.line([S * .70, S * .50, S * .26, S * .50], fill=c, width=lw)
+        d.line([S * .48, S * .26, S * .24, S * .50], fill=c, width=lw)
+        d.line([S * .48, S * .74, S * .24, S * .50], fill=c, width=lw)
+        r = lw / 2
+        for x, y in ((S * .24, S * .50), (S * .48, S * .26), (S * .48, S * .74), (S * .70, S * .50)):
+            d.ellipse([x - r, y - r, x + r, y + r], fill=c)
+    elif kind == "display":
+        d.rounded_rectangle([S * .08, S * .16, S * .92, S * .70], radius=S * .06, outline=c, width=lw)
+        d.rectangle([S * .44, S * .70, S * .56, S * .82], fill=c)
+        d.rounded_rectangle([S * .28, S * .80, S * .72, S * .80 + lw], radius=lw / 2, fill=c)
+    elif kind == "sound":
+        d.polygon([(S * .10, S * .38), (S * .28, S * .38), (S * .50, S * .18), (S * .50, S * .82), (S * .28, S * .62),
+                   (S * .10, S * .62)], fill=c)
+        d.arc([S * .44, S * .30, S * .74, S * .70], -55, 55, fill=c, width=lw)
+        d.arc([S * .44, S * .14, S * .92, S * .86], -55, 55, fill=c, width=lw)
+    elif kind == "target":
+        d.ellipse([S * .16, S * .16, S * .84, S * .84], outline=c, width=lw)
+        for a, b in (((.50, .04), (.50, .30)), ((.50, .70), (.50, .96)), ((.04, .50), (.30, .50)), ((.70, .50), (.96, .50))):
+            d.line([S * a[0], S * a[1], S * b[0], S * b[1]], fill=c, width=lw)
+        d.ellipse([S * .44, S * .44, S * .56, S * .56], fill=c)
+    elif kind == "check":
+        d.line([S * .18, S * .52, S * .42, S * .76], fill=c, width=int(lw * 1.4))
+        d.line([S * .40, S * .76, S * .84, S * .28], fill=c, width=int(lw * 1.4))
     elif kind == "close":
         d.line([S * .22, S * .22, S * .78, S * .78], fill=c, width=lw)
         d.line([S * .78, S * .22, S * .22, S * .78], fill=c, width=lw)
@@ -173,7 +197,7 @@ def main():
         make_tile(name, art, focus, accent)
     make_tile_shadow("tile_shadow.png")
     make_dot("dot.png")
-    for kind in ("bell", "user", "stick", "gear", "info", "pencil", "close"):
+    for kind in ("bell", "user", "stick", "gear", "info", "pencil", "close", "back", "display", "sound", "target", "check"):
         save(icon(kind), f"icon_{kind}.png")
     make_avatar("avatar.png")
     # header chips and buttons, drawn at their real aspect by the menu
@@ -184,6 +208,14 @@ def main():
     save(rounded(640, 120, 60, (35, 39, 48, 255), (255, 255, 255, 64), 3), "button_secondary.png")
     save(rounded(640, 120, 60, (35, 39, 48, 255), (248, 113, 113, 170), 3), "button_danger.png")
     save(rounded(800, 680, 36, (12, 14, 19, 240), (255, 255, 255, 52), 2), "panel.png")
+    # settings: cards for sprays and fields, active tab
+    save(rounded(160, 160, 28, (24, 27, 34, 230), (255, 255, 255, 46), 2), "card.png")
+    save(rounded(160, 160, 28, (40, 16, 18, 235), (239, 68, 68, 255), 5), "card_on.png")
+    tab = rounded(400, 120, 30, (220, 38, 38, 255))
+    shine = Image.new("RGBA", tab.size, (255, 255, 255, 0))
+    shine.putalpha(vgrad(tab.width, tab.height, 60, 0))
+    tab = Image.alpha_composite(tab, Image.composite(shine, Image.new("RGBA", tab.size, (0, 0, 0, 0)), tab.getchannel("A")))
+    save(tab, "tab_on.png")
     # header fade: opaque at the top, transparent at the bottom
     fade = Image.new("RGBA", (4, 256), (0, 0, 0, 0))
     fade.putalpha(vgrad(4, 256, 255, 0))

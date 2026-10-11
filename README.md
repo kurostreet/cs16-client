@@ -58,3 +58,4 @@ SDL — `98d1f3a45aae568ccd6ed5fec179330f47d4d356` (2.32.8).
 Оформление: [BRANDING_RU.md](docs/BRANDING_RU.md).
 Меню и экран загрузки: [LOADING_SCREEN_RU.md](docs/LOADING_SCREEN_RU.md).
 Новое главное меню: [MAIN_SCREEN_RU.md](docs/MAIN_SCREEN_RU.md).
+Настройки, спреи, первый запуск: [SETTINGS_RU.md](docs/SETTINGS_RU.md).

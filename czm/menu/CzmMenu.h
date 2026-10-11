@@ -114,4 +114,79 @@ bool CZM_DrawMenuBackground( Point pos, Size size );
 // draws the loading screen while the engine connects, returns true if it owns the frame
 bool CZM_DrawLoadingScreen( void );
 
+/*
+ * shared pieces of our windows
+ */
+struct CzmRect
+{
+	int x, y, w, h;
+
+	bool Contains( int px, int py ) const
+	{
+		return w > 0 && h > 0 && px >= x && px < x + w && py >= y && py < y + h;
+	}
+
+	bool HasCursor( void ) const;
+
+	// touch targets are a bit larger than what is drawn
+	CzmRect Grown( int by ) const
+	{
+		CzmRect r = { x - by, y - by, w + by * 2, h + by * 2 };
+		return r;
+	}
+};
+
+CzmRect CZM_Rect( int x, int y, int w, int h );
+unsigned int CZM_White( int alpha = 255 );
+unsigned int CZM_Grey( void );
+int CZM_LineWidth( void );
+void CZM_PlayClick( void );
+void CZM_DrawPanel( const CzmRect &r );
+void CZM_DrawButton( const char *image, const CzmRect &r, const char *label, unsigned int textColor, bool pressed, int font = CZMF_BUTTON );
+
+// one-line text input with the phone keyboard (nickname)
+struct CzmTextEdit
+{
+	char text[32];
+	bool active;
+
+	void Begin( const char *initial, const CzmRect &r );
+	void End( void );
+	bool KeyDown( int key ); // true if the key belonged to the field
+	void Char( int ch );
+};
+
+void CZM_DrawField( const CzmRect &r, const CzmTextEdit &edit, const char *value, const char *placeholder, bool pressed );
+
+/*
+ * settings and profile
+ */
+enum
+{
+	CZM_TAB_LAST = -1, // the tab the player saw last time
+	CZM_TAB_CONTROLS = 0,
+	CZM_TAB_GRAPHICS,
+	CZM_TAB_SOUND,
+	CZM_TAB_GAME,
+	CZM_TAB_PROFILE,
+	CZM_TAB_COUNT
+};
+
+void CZM_OpenSettings( int tab );
+
+bool CZM_NickIsValid( const char *nick );
+void CZM_SetNick( const char *nick );
+
+int CZM_SprayCount( void );
+const char *CZM_SprayName( int index );  // file name without the extension
+const char *CZM_SprayImage( int index ); // logos/<name>.png
+int CZM_CurrentSpray( void );            // -1 if the player uses a stock spray
+void CZM_SetSpray( int index );
+
+// first start: language and nickname window, good network settings once
+bool CZM_FirstStart( void );
+void CZM_FinishFirstStart( void );
+// settings the engine does not keep by itself, call when the main screen opens
+void CZM_ApplyStartupSettings( void );
+
 #endif // CZM_MENU_H

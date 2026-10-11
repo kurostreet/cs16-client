@@ -111,6 +111,73 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "resume", "Продолжить", "Resume" },
 	{ "settings", "Настройки", "Settings" },
 	{ "to_menu", "Выйти в меню", "Leave to menu" },
+	// settings
+	{ "set_title", "НАСТРОЙКИ", "SETTINGS" },
+	{ "tab_controls", "Управление", "Controls" },
+	{ "tab_graphics", "Графика", "Graphics" },
+	{ "tab_sound", "Звук", "Sound" },
+	{ "tab_game", "Игра", "Game" },
+	{ "tab_profile", "Профиль", "Profile" },
+	{ "s_look", "Обзор", "Look" },
+	{ "s_look_hint", "Как быстро поворачивается камера", "How fast the camera turns" },
+	{ "s_zoom", "В прицеле", "While aiming" },
+	{ "s_zoom_hint", "Чувствительность с оптикой", "Sensitivity with a scope" },
+	{ "s_move", "Ходьба", "Movement" },
+	{ "s_move_hint", "Чем больше, тем короче движение пальца", "Higher means a shorter finger move" },
+	{ "s_gyro", "Гироскоп", "Gyroscope" },
+	{ "s_gyro_hint", "Наклон телефона двигает прицел", "Tilt the phone to aim" },
+	{ "s_gyro_none", "На этом телефоне нет гироскопа", "This phone has no gyroscope" },
+	{ "s_gyro_power", "Сила гироскопа", "Gyroscope strength" },
+	{ "s_buttons", "Кнопки на экране", "On-screen buttons" },
+	{ "s_buttons_hint", "Перетаскивание и размер кнопок", "Move and resize the buttons" },
+	{ "b_edit", "Изменить", "Edit" },
+	{ "b_reset", "Сбросить", "Reset" },
+	{ "reset_confirm", "Сбросить раскладку кнопок?", "Reset the button layout?" },
+	{ "reset_done", "Раскладка кнопок сброшена", "Button layout reset" },
+	{ "s_brightness", "Яркость", "Brightness" },
+	{ "s_fps", "Лимит FPS", "FPS limit" },
+	{ "s_fps_hint", "Больше — плавнее, но телефон греется", "Higher is smoother but warms the phone" },
+	{ "s_showfps", "FPS на экране", "Show FPS" },
+	{ "s_showping", "Пинг на экране", "Show ping" },
+	{ "s_effects", "Эффекты", "Effects" },
+	{ "s_effects_hint", "Гильзы, дым и тела. Меньше — быстрее", "Shells, smoke and bodies. Less is faster" },
+	{ "opt_low", "Мало", "Low" },
+	{ "opt_mid", "Средне", "Medium" },
+	{ "opt_high", "Много", "High" },
+	{ "s_volume", "Громкость", "Volume" },
+	{ "s_music", "Музыка в меню", "Menu music" },
+	{ "s_voice", "Голосовой чат", "Voice chat" },
+	{ "s_voice_hint", "Слышать игроков и говорить", "Hear and talk to players" },
+	{ "s_voice_in", "Громкость голосов", "Voice volume" },
+	{ "s_voice_out", "Громкость микрофона", "Microphone volume" },
+	{ "s_lang", "Язык", "Language" },
+	{ "s_xhair", "Прицел", "Crosshair" },
+	{ "s_xhair_hint", "Так он выглядит в игре", "How it looks in the game" },
+	{ "s_xhair_size", "Размер прицела", "Crosshair size" },
+	{ "opt_auto", "Авто", "Auto" },
+	{ "opt_small", "Малый", "Small" },
+	{ "opt_medium", "Средний", "Medium" },
+	{ "opt_large", "Большой", "Large" },
+	{ "s_xhair_color", "Цвет прицела", "Crosshair color" },
+	{ "s_xhair_trans", "Прозрачный прицел", "Translucent crosshair" },
+	{ "s_hand", "Оружие в руке", "Weapon hand" },
+	{ "opt_right", "Правой", "Right" },
+	{ "opt_left", "Левой", "Left" },
+	{ "s_autoswitch", "Брать лучшее оружие", "Switch to better weapons" },
+	{ "s_autoswitch_hint", "Подобрал оружие мощнее — оно сразу в руке", "A stronger weapon you pick up is used at once" },
+	{ "s_buymenu", "Меню покупки", "Buy menu" },
+	{ "opt_new", "Новое", "New" },
+	{ "opt_classic", "Классика", "Classic" },
+	{ "s_nick", "Ник", "Nickname" },
+	{ "s_nick_hint", "Так тебя видят другие игроки", "How other players see you" },
+	{ "nick_placeholder", "Твой ник", "Your nickname" },
+	{ "nick_bad", "Введи свой ник, от 2 символов", "Enter your nickname, 2 characters or more" },
+	{ "s_spray", "Спрей", "Spray" },
+	{ "s_spray_hint", "Рисуется кнопкой спрея в игре", "Drawn with the spray button in the game" },
+	// first start
+	{ "setup_title", "Добро пожаловать!", "Welcome!" },
+	{ "setup_text", "Выбери язык и придумай ник", "Choose a language and a nickname" },
+	{ "setup_go", "Играть", "Play" },
 };
 
 static bool s_bInitialized;
@@ -120,8 +187,12 @@ void CZM_Init( void )
 	if( s_bInitialized )
 		return;
 
+	// archived cvars must exist before config.cfg runs, the menu creates its fonts early enough
 	s_bInitialized = true;
 	EngFuncs::CvarRegister( "czm_lang", "", FCVAR_ARCHIVE );
+	EngFuncs::CvarRegister( "czm_setup", "0", FCVAR_ARCHIVE );
+	EngFuncs::CvarRegister( "czm_defaults", "0", FCVAR_ARCHIVE );
+	EngFuncs::CvarRegister( "czm_zoom_sens", "1.2", FCVAR_ARCHIVE );
 	EngFuncs::CvarRegister( "czm_connect_name", "", 0 );
 	EngFuncs::CvarRegister( "czm_connect_adr", "", 0 );
 }
@@ -929,4 +1000,313 @@ bool CZM_DrawLoadingScreen( void )
 	CZM_DrawCancelButton();
 
 	return true;
+}
+
+/*
+=================
+shared pieces of our windows
+=================
+*/
+bool CzmRect::HasCursor( void ) const
+{
+	return Contains( uiStatic.cursorX, uiStatic.cursorY );
+}
+
+CzmRect CZM_Rect( int x, int y, int w, int h )
+{
+	CzmRect r = { x, y, w, h };
+	return r;
+}
+
+unsigned int CZM_White( int alpha )
+{
+	return PackRGBA( 255, 255, 255, alpha );
+}
+
+unsigned int CZM_Grey( void )
+{
+	return PackRGBA( 170, 176, 186, 255 );
+}
+
+int CZM_LineWidth( void )
+{
+	return Q_max( 1, ScreenHeight / 600 );
+}
+
+void CZM_PlayClick( void )
+{
+	EngFuncs::PlayLocalSound( uiStatic.sounds[SND_LAUNCH] );
+}
+
+void CZM_DrawPanel( const CzmRect &r )
+{
+	CZM_DrawSliced( "gfx/czm/ui/panel.png", r.x, r.y, r.w, r.h, 40, (int)( ScreenHeight * 0.026f ));
+}
+
+void CZM_DrawButton( const char *image, const CzmRect &r, const char *label, unsigned int textColor, bool pressed, int font )
+{
+	HFont hfont = CZM_Font( font );
+
+	CZM_DrawPill( image, r.x, r.y, r.w, r.h, pressed ? PackRGBA( 185, 185, 185, 255 ) : CZM_White());
+	CZM_DrawText( hfont, r.x + r.h / 4, r.y + ( r.h - CZM_FontHeight( hfont )) / 2, r.w - r.h / 2, label, textColor, QM_CENTER );
+}
+
+/*
+=================
+text input
+=================
+*/
+void CzmTextEdit::Begin( const char *initial, const CzmRect &r )
+{
+	Q_strncpy( text, initial ? initial : "", sizeof( text ));
+	active = true;
+	EngFuncs::SetTextInputRect( r.x, r.y, r.w, r.h );
+	UI_EnableTextInput( true );
+}
+
+void CzmTextEdit::End( void )
+{
+	if( !active )
+		return;
+
+	active = false;
+	UI_EnableTextInput( false );
+}
+
+bool CzmTextEdit::KeyDown( int key )
+{
+	if( !active )
+		return false;
+
+	if( UI::Key::IsBackspace( key ))
+	{
+		size_t len = strlen( text );
+
+		// remove one whole UTF-8 character
+		if( len > 0 )
+		{
+			len--;
+			while( len > 0 && ( (unsigned char)text[len] & 0xC0 ) == 0x80 )
+				len--;
+			text[len] = 0;
+		}
+		return true;
+	}
+
+	if( UI::Key::IsEnter( key ))
+	{
+		End();
+		return true;
+	}
+
+	return false;
+}
+
+void CzmTextEdit::Char( int ch )
+{
+	size_t len;
+
+	// characters that break names in commands and colour codes
+	if( !active || ch < 32 || ch == '"' || ch == '\\' || ch == '^' || ch == ';' || ch == '%' )
+		return;
+
+	len = strlen( text );
+
+	// keep room for a whole UTF-8 character
+	if( len + ( ch >= 0xC0 ? 4 : 1 ) >= sizeof( text ))
+		return;
+
+	text[len] = (char)ch;
+	text[len + 1] = 0;
+}
+
+void CZM_DrawField( const CzmRect &r, const CzmTextEdit &edit, const char *value, const char *placeholder, bool pressed )
+{
+	HFont font = CZM_Font( CZMF_TILE_STATUS );
+	int pad = r.h * 0.45f;
+	int textY = r.y + ( r.h - CZM_FontHeight( font )) / 2;
+	int pencil = r.h * 0.40f;
+	const char *text = edit.active ? edit.text : value;
+
+	CZM_DrawPill( edit.active ? "gfx/czm/ui/button_danger.png" : "gfx/czm/ui/button_secondary.png",
+		r.x, r.y, r.w, r.h, pressed ? PackRGBA( 200, 200, 200, 255 ) : CZM_White());
+
+	if( text && text[0] )
+		CZM_DrawText( font, r.x + pad, textY, r.w - pad * 2 - pencil, text, CZM_White());
+	else
+		CZM_DrawText( font, r.x + pad, textY, r.w - pad * 2 - pencil, placeholder, PackRGBA( 130, 136, 146, 255 ));
+
+	if( edit.active )
+	{
+		// blinking cursor after the text
+		if(( uiStatic.realTime / 500 ) % 2 == 0 )
+		{
+			int x = r.x + pad + Q_min( CZM_TextWidth( font, text ), r.w - pad * 2 - pencil ) + 2;
+			UI_FillRect( x, textY, Q_max( 2, ScreenHeight / 400 ), CZM_FontHeight( font ), PackRGBA( 239, 68, 68, 255 ));
+		}
+	}
+	else
+	{
+		CZM_DrawImage( "gfx/czm/ui/icon_pencil.png", r.x + r.w - pad - pencil, r.y + ( r.h - pencil ) / 2, pencil, pencil,
+			PackRGBA( 200, 205, 215, 255 ));
+	}
+}
+
+/*
+=================
+nickname and sprays
+=================
+*/
+static int CZM_Utf8Length( const char *s )
+{
+	int count = 0;
+
+	for( ; *s; s++ )
+	{
+		if(( (unsigned char)*s & 0xC0 ) != 0x80 )
+			count++;
+	}
+
+	return count;
+}
+
+bool CZM_NickIsValid( const char *nick )
+{
+	// names the engine and stock configs give everyone, servers dislike them
+	static const char *stock[] = { "CS_Mobile_Xash3D", "Player", "unnamed" };
+	char clean[64];
+	const char *s;
+	int letters = 0;
+
+	if( !nick )
+		return false;
+
+	CZM_CleanName( nick, clean, sizeof( clean ));
+
+	for( s = clean; *s; s++ )
+	{
+		if( *s != ' ' )
+			letters++;
+	}
+
+	if( letters < 2 || CZM_Utf8Length( clean ) < 2 )
+		return false;
+
+	for( size_t i = 0; i < sizeof( stock ) / sizeof( stock[0] ); i++ )
+	{
+		if( !stricmp( clean, stock[i] ))
+			return false;
+	}
+
+	return true;
+}
+
+void CZM_SetNick( const char *nick )
+{
+	EngFuncs::CvarSetString( "name", nick );
+}
+
+static const char *s_sprays[] =
+{
+	"czm_logo", "czm_zombie", "czm_hunter", "czm_soldier", "czm_biohazard",
+	"czm_skull", "czm_claws", "czm_gg", "czm_zm",
+};
+
+int CZM_SprayCount( void )
+{
+	return sizeof( s_sprays ) / sizeof( s_sprays[0] );
+}
+
+const char *CZM_SprayName( int index )
+{
+	return ( index >= 0 && index < CZM_SprayCount()) ? s_sprays[index] : "";
+}
+
+const char *CZM_SprayImage( int index )
+{
+	static char path[64];
+
+	snprintf( path, sizeof( path ), "logos/%s.png", CZM_SprayName( index ));
+	return path;
+}
+
+int CZM_CurrentSpray( void )
+{
+	const char *current = EngFuncs::GetCvarString( "cl_logofile" );
+
+	for( int i = 0; current && i < CZM_SprayCount(); i++ )
+	{
+		if( !stricmp( current, s_sprays[i] ))
+			return i;
+	}
+
+	return -1;
+}
+
+void CZM_SetSpray( int index )
+{
+	int length = 0;
+	byte *data;
+
+	if( index < 0 || index >= CZM_SprayCount())
+		return;
+
+	// the engine packs logos/remapped.png into tempdecal.wad for the server
+	data = EngFuncs::COM_LoadFile( CZM_SprayImage( index ), &length );
+	if( !data || length <= 0 )
+		return;
+
+	EngFuncs::DeleteFile( "logos/remapped.bmp" );
+	EngFuncs::COM_SaveFile( "logos/remapped.png", data, length );
+	EngFuncs::COM_FreeFile( data );
+
+	EngFuncs::CvarSetString( "cl_logoext", "png" );
+	EngFuncs::CvarSetString( "cl_logofile", s_sprays[index] );
+	EngFuncs::CvarSetValue( "@cl_logoupdate", !EngFuncs::GetCvarFloat( "@cl_logoupdate" ));
+}
+
+/*
+=================
+first start and startup settings
+=================
+*/
+static void CZM_RegisterSettingsCvars( void )
+{
+	CZM_Init();
+}
+
+bool CZM_FirstStart( void )
+{
+	CZM_RegisterSettingsCvars();
+	return EngFuncs::GetCvarFloat( "czm_setup" ) == 0.0f;
+}
+
+void CZM_FinishFirstStart( void )
+{
+	CZM_RegisterSettingsCvars();
+	EngFuncs::CvarSetValue( "czm_setup", 1.0f );
+
+	if( CZM_CurrentSpray() < 0 )
+		CZM_SetSpray( 0 );
+
+	EngFuncs::ClientCmd( false, "host_writeconfig\n" );
+}
+
+void CZM_ApplyStartupSettings( void )
+{
+	CZM_RegisterSettingsCvars();
+
+	// the client does not save the zoom sensitivity, we keep our own copy
+	EngFuncs::CvarSetValue( "zoom_sensitivity_ratio", EngFuncs::GetCvarFloat( "czm_zoom_sens" ));
+
+	// settings players no longer see: smooth network play and server downloads
+	if( EngFuncs::GetCvarFloat( "czm_defaults" ) < 1.0f )
+	{
+		EngFuncs::CvarSetValue( "rate", 100000.0f );
+		EngFuncs::CvarSetValue( "cl_updaterate", 60.0f );
+		EngFuncs::CvarSetValue( "cl_cmdrate", 60.0f );
+		EngFuncs::CvarSetValue( "czm_defaults", 1.0f );
+	}
+
+	EngFuncs::CvarSetValue( "cl_allowdownload", 1.0f );
 }
