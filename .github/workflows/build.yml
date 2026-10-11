@@ -61,7 +61,10 @@ jobs:
               for name in ["gfx/vgui/czm_logo.tga", "gfx/shell/strings.lst", "touch/buy.cfg",
                            "gfx/czm/menu_bg.png", "gfx/czm/title.png", "gfx/czm/fade_left.png", "gfx/czm/fade_bottom.png",
                            "gfx/czm/loading_1.png", "gfx/czm/loading_5.png", "gfx/fonts/czm/InterDisplay-Black.otf",
-                           "gfx/fonts/czm/Inter-SemiBold.otf", "gfx/fonts/czm/Inter-Medium.otf"]:
+                           "gfx/fonts/czm/Inter-SemiBold.otf", "gfx/fonts/czm/Inter-Medium.otf",
+                           "gfx/fonts/czm/InterDisplay-BlackItalic.otf", "gfx/czm/ui/tile_attack.png",
+                           "gfx/czm/ui/tile_escape.png", "gfx/czm/ui/tile_boss.png", "gfx/czm/ui/panel.png",
+                           "gfx/czm/ui/dot.png", "gfx/czm/ui/avatar.png"]:
                   assert apk.read("assets/" + name) == Path("3rdparty/cs16client-extras", name).read_bytes(), name
               for abi, suffix in [("arm64-v8a", "arm64"), ("armeabi-v7a", "armv7l"), ("x86", "i386")]:
                   for library in ["SDL2", "xash", "filesystem_stdio", "ref_gles1", "ref_gl4es", "ref_gles3compat",
@@ -72,8 +75,10 @@ jobs:
                   assert b"Counter Zombie Mobile 32 players build %s" in menu
                   assert b"cs16-client build %s" not in menu
                   assert b"czm_loading_session" in menu and b"gfx/czm/loading_%d.png" in menu, abi
+                  assert b"menu_czmmain" in menu and b"czm_queryserver" in menu, abi
                   engine = apk.read("lib/" + abi + "/libxash.so")
                   assert b"czm_loading_enable" in engine and b"czm_loading_error" in engine, abi
+                  assert b"czm_queryserver" in engine, abi
               for name in ["engine-resources", "client-resources"]:
                   metadata = json.loads(apk.read("assets/bundled/" + name + ".json"))
                   assert hashlib.sha256(apk.read("assets/bundled/" + name + ".zip")).hexdigest() == metadata["sha256"]

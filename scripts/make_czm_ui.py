@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Build Counter Zombie Mobile main menu UI textures: mode tiles, icons, chips and buttons.
+
+Output goes to 3rdparty/cs16client-extras/gfx/czm/ui/ and is committed, so the Android
+build does not need Pillow. Re-run after changing the owner's art or the design.
+"""
+import math
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFilter
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCES = ROOT / "assets/branding"
+OUTPUT = ROOT / "3rdparty/cs16client-extras/gfx/czm/ui"
+SS = 4  # supersampling factor for smooth edges
+
+TILE_W, TILE_H = 1110, 300  # 3.7:1, the menu keeps this aspect
+TILES = {
+    # name: (source art, crop focus x/y, accent colour)
+    "tile_attack.png": ("loading-4.png", (0.62, 0.55), (255, 59, 47)),
+    "tile_escape.png": ("loading-5.png", (0.75, 0.45), (34, 211, 238)),
+    "tile_boss.png": ("loading-3.png", (0.62, 0.30), (168, 85, 247)),
+}
+
+
+def save(image, name):
+    path = OUTPUT / name
+    image.save(path, "PNG", optimize=True)
+    print(path.relative_to(ROOT), image.size, path.stat().st_size, "bytes")
+
+
+def cover(img, w, h, cx, cy):
+    s = max(w / img.width, h / img.height)
+    img = img.resize((round(img.width * s), round(img.height * s)), Image.LANCZOS)
+    x = int((img.width - w) * cx)
+    y = int((img.height - h) * cy)
+    return img.crop((x, y, x + w, y + h))
+
+
+def hgrad(w, h, left, right):
+    g = Image.new("L", (w, 1))
+    for x in range(w):
+        t = x / max(1, w - 1)
+        t = t * t * (3 - 2 * t)
+        g.putpixel((x, 0), int(left + (right - left) * t))
+    return g.resize((w, h))
+
+
+def vgrad(w, h, top, bottom):
+    g = Image.new("L", (1, h))
+    for y in range(h):
+        g.putpixel((0, y), int(top + (bottom - top) * y / max(1, h - 1)))
+    return g.resize((w, h))
+
+
+def smooth_polygon_mask(w, h, points):
+    big = Image.new("L", (w * SS, h * SS), 0)
+    ImageDraw.Draw(big).polygon([(x * SS, y * SS) for x, y in points], fill=255)
+    return big.resize((w, h), Image.LANCZOS)
+
+
+def make_tile(name, art, focus, accent):
+    w, h = TILE_W, TILE_H
+    skew = int(h * 0.30)
+    base = cover(Image.open(SOURCES / art).convert("RGBA"), w, h, *focus)
+    shade = Image.new("RGBA", (w, h), (0, 0, 0, 255))
+    shade.putalpha(hgrad(w, h, 215, 30))
+    base = Image.alpha_composite(base, shade)
+    glow = Image.new("RGBA", (w, h), accent + (255,))
+    glow.putalpha(vgrad(w, h, 0, 90))
+    base = Image.alpha_composite(base, glow)
+
+    # play button baked on the right side
+    bs = int(h * 0.36)
+    bx, by = w - bs - int(h * 0.14), (h - bs) // 2
+    big = Image.new("RGBA", (bs * SS, bs * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big)
+    d.ellipse([0, 0, bs * SS - 1, bs * SS - 1], fill=accent + (255,))
+    d.ellipse([0, 0, bs * SS - 1, bs * SS - 1], outline=(255, 255, 255, 210), width=3 * SS)
+    S = bs * SS
+    d.polygon([(S * .40, S * .30), (S * .40, S * .70), (S * .72, S * .50)], fill=(255, 255, 255, 255))
+    base.alpha_composite(big.resize((bs, bs), Image.LANCZOS), (bx, by))
+
+    base.putalpha(smooth_polygon_mask(w, h, [(skew, 0), (w, 0), (w, h), (0, h)]))
+    outline = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
+    ImageDraw.Draw(outline).line([(skew * SS, 2 * SS), ((w - 2) * SS, 2 * SS), ((w - 2) * SS, (h - 2) * SS),
+                                  (2 * SS, (h - 2) * SS), (skew * SS, 2 * SS)], fill=accent + (235,), width=4 * SS)
+    base = Image.alpha_composite(base, outline.resize((w, h), Image.LANCZOS))
+    save(base, name)
+
+
+def make_tile_shadow(name):
+    # soft shadow under a tile, drawn 10% of the tile height larger on every side
+    w, h = TILE_W // 2, TILE_H // 2
+    m = h // 10
+    skew = int(h * 0.30)
+    shadow = Image.new("RGBA", (w + 2 * m, h + 2 * m), (0, 0, 0, 0))
+    mask = Image.new("L", shadow.size, 0)
+    ImageDraw.Draw(mask).polygon([(m + skew, m), (m + w, m), (m + w, m + h), (m, m + h)], fill=175)
+    shadow.putalpha(mask.filter(ImageFilter.GaussianBlur(m * 0.45)))
+    save(shadow, name)
+
+
+def make_dot(name, size=64):
+    big = Image.new("RGBA", (size * SS, size * SS), (0, 0, 0, 0))
+    ImageDraw.Draw(big).ellipse([0, 0, size * SS - 1, size * SS - 1], fill=(255, 255, 255, 255))
+    save(big.resize((size, size), Image.LANCZOS), name)
+
+
+def icon(kind, size=128, color=(255, 255, 255, 255)):
+    S = size * SS
+    im = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    lw = int(S * 0.085)
+    c = color
+    clear = (0, 0, 0, 0)
+    if kind == "bell":
+        d.rounded_rectangle([S * .22, S * .22, S * .78, S * .74], radius=S * .26, outline=c, width=lw)
+        d.rectangle([S * .22 + lw, S * .52, S * .78 - lw, S * .74 - lw / 2], fill=clear)
+        d.rectangle([S * .22, S * .50, S * .22 + lw, S * .72], fill=c)
+        d.rectangle([S * .78 - lw, S * .50, S * .78, S * .72], fill=c)
+        d.rounded_rectangle([S * .10, S * .70, S * .90, S * .70 + lw], radius=lw / 2, fill=c)
+        d.ellipse([S * .40, S * .78, S * .60, S * .95], fill=c)
+        d.rounded_rectangle([S * .46, S * .06, S * .54, S * .22], radius=lw / 2, fill=c)
+    elif kind == "user":
+        d.ellipse([S * .31, S * .08, S * .69, S * .46], outline=c, width=lw)
+        d.arc([S * .12, S * .54, S * .88, S * 1.30], 180, 360, fill=c, width=lw)
+    elif kind == "stick":
+        d.ellipse([S * .08, S * .08, S * .92, S * .92], outline=c, width=lw)
+        d.ellipse([S * .34, S * .20, S * .70, S * .56], fill=c)
+    elif kind == "gear":
+        cx = cy = S / 2
+        for i in range(8):
+            a = i * math.pi / 4
+            x, y = cx + math.cos(a) * S * .37, cy + math.sin(a) * S * .37
+            d.ellipse([x - S * .095, y - S * .095, x + S * .095, y + S * .095], fill=c)
+        d.ellipse([S * .19, S * .19, S * .81, S * .81], fill=c)
+        d.ellipse([S * .37, S * .37, S * .63, S * .63], fill=clear)
+    elif kind == "info":
+        d.ellipse([S * .07, S * .07, S * .93, S * .93], outline=c, width=lw)
+        d.ellipse([S * .43, S * .22, S * .57, S * .36], fill=c)
+        d.rounded_rectangle([S * .44, S * .42, S * .56, S * .76], radius=lw / 3, fill=c)
+    elif kind == "pencil":
+        d.polygon([(S * .18, S * .82), (S * .24, S * .60), (S * .68, S * .16), (S * .84, S * .32), (S * .40, S * .76)],
+                  outline=c, width=lw)
+    elif kind == "close":
+        d.line([S * .22, S * .22, S * .78, S * .78], fill=c, width=lw)
+        d.line([S * .78, S * .22, S * .22, S * .78], fill=c, width=lw)
+    return im.resize((size, size), Image.LANCZOS)
+
+
+def rounded(w, h, radius, fill, outline=None, width=0):
+    big = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
+    ImageDraw.Draw(big).rounded_rectangle([0, 0, w * SS - 1, h * SS - 1], radius=radius * SS, fill=fill,
+                                          outline=outline, width=width * SS)
+    return big.resize((w, h), Image.LANCZOS)
+
+
+def make_avatar(name, size=256):
+    logo = Image.open(SOURCES / "counter-zombie-mobile-original.jpg").convert("RGBA").resize((size, size), Image.LANCZOS)
+    mask = Image.new("L", (size * SS, size * SS), 0)
+    ImageDraw.Draw(mask).ellipse([0, 0, size * SS - 1, size * SS - 1], fill=255)
+    logo.putalpha(mask.resize((size, size), Image.LANCZOS))
+    ring = Image.new("RGBA", (size * SS, size * SS), (0, 0, 0, 0))
+    ImageDraw.Draw(ring).ellipse([2 * SS, 2 * SS, (size - 2) * SS, (size - 2) * SS], outline=(255, 59, 47, 255), width=10 * SS)
+    logo = Image.alpha_composite(logo, ring.resize((size, size), Image.LANCZOS))
+    save(logo, name)
+
+
+def main():
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    for name, (art, focus, accent) in TILES.items():
+        make_tile(name, art, focus, accent)
+    make_tile_shadow("tile_shadow.png")
+    make_dot("dot.png")
+    for kind in ("bell", "user", "stick", "gear", "info", "pencil", "close"):
+        save(icon(kind), f"icon_{kind}.png")
+    make_avatar("avatar.png")
+    # header chips and buttons, drawn at their real aspect by the menu
+    save(rounded(128, 128, 64, (10, 12, 16, 160), (255, 255, 255, 64), 2), "chip_round.png")
+    save(rounded(272, 128, 64, (10, 12, 16, 160), (255, 255, 255, 64), 2), "chip_lang.png")
+    save(rounded(128, 112, 56, (220, 38, 38, 255)), "pill_lang_on.png")
+    save(rounded(640, 120, 60, (220, 38, 38, 255)), "button_primary.png")
+    save(rounded(640, 120, 60, (35, 39, 48, 255), (255, 255, 255, 64), 3), "button_secondary.png")
+    save(rounded(640, 120, 60, (35, 39, 48, 255), (248, 113, 113, 170), 3), "button_danger.png")
+    save(rounded(800, 680, 36, (12, 14, 19, 240), (255, 255, 255, 52), 2), "panel.png")
+    # header fade: opaque at the top, transparent at the bottom
+    fade = Image.new("RGBA", (4, 256), (0, 0, 0, 0))
+    fade.putalpha(vgrad(4, 256, 255, 0))
+    save(fade, "fade_top.png")
+
+
+if __name__ == "__main__":
+    main()

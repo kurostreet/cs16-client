@@ -12,7 +12,8 @@ if(NOT CZM_MENU_BRANDING_RESULT EQUAL 0)
 endif()
 
 get_target_property(CZM_MENU_SOURCES menu SOURCES)
-foreach(CZM_MENU_FILE BaseMenu.cpp controls/BackgroundBitmap.cpp menus/Main.cpp font/FontManager.cpp)
+foreach(CZM_MENU_FILE BaseMenu.cpp controls/BackgroundBitmap.cpp menus/Main.cpp font/FontManager.cpp
+        menus/ServerBrowser.cpp menus/ConnectionProgress.cpp)
     set(CZM_UPSTREAM_MENU_FILE "${CZM_MENU_SOURCE_DIR}/${CZM_MENU_FILE}")
     list(FIND CZM_MENU_SOURCES "${CZM_UPSTREAM_MENU_FILE}" CZM_MENU_SOURCE_INDEX)
     if(CZM_MENU_SOURCE_INDEX EQUAL -1)
@@ -23,8 +24,11 @@ foreach(CZM_MENU_FILE BaseMenu.cpp controls/BackgroundBitmap.cpp menus/Main.cpp 
 endforeach()
 set_property(TARGET menu PROPERTY SOURCES "${CZM_MENU_SOURCES}")
 
-# Counter Zombie Mobile menu art and loading screen
-target_sources(menu PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmMenu.cpp")
+# Counter Zombie Mobile main screen, menu art and loading screen
+target_sources(menu PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmMenu.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmMain.cpp"
+)
 target_include_directories(menu PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu")
 
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
@@ -33,4 +37,6 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CZM_MENU_SOURCE_DIR}/controls/BackgroundBitmap.cpp"
     "${CZM_MENU_SOURCE_DIR}/menus/Main.cpp"
     "${CZM_MENU_SOURCE_DIR}/font/FontManager.cpp"
+    "${CZM_MENU_SOURCE_DIR}/menus/ServerBrowser.cpp"
+    "${CZM_MENU_SOURCE_DIR}/menus/ConnectionProgress.cpp"
 )

@@ -115,10 +115,10 @@ index 6c550c7..30fc6e1 100644
  	Cvar_RegisterVariable( &cl_testlights );
  	Cvar_RegisterVariable( &cl_envshot_size );
 diff --git a/engine/client/client.h b/engine/client/client.h
-index 2d6faf7..3ac62ca 100644
+index 2d6faf7..8d0b6db 100644
 --- a/engine/client/client.h
 +++ b/engine/client/client.h
-@@ -804,6 +804,25 @@ void CL_NotifyServerListResponse( void );
+@@ -804,6 +804,26 @@ void CL_NotifyServerListResponse( void );
  qboolean CL_NetRequestSend( net_request_t *nr );
  void CL_Escape_f( void );
  
@@ -130,6 +130,7 @@ index 2d6faf7..3ac62ca 100644
 +qboolean CZM_Loading_Enabled( void );
 +qboolean CZM_Loading_Active( void );
 +void CZM_Loading_BeginLocal( void );
++void CZM_Loading_ServerData( void );
 +void CZM_Loading_SetHostname( const char *hostname );
 +void CZM_Loading_SetError( const char *reason );
 +void CZM_Loading_PrecacheBegin( void );
@@ -184,10 +185,10 @@ index 62ac3eb..ae75255 100644
  
 diff --git a/engine/client/czm_loading.c b/engine/client/czm_loading.c
 new file mode 100644
-index 0000000..d42a656
+index 0000000..f89d226
 --- /dev/null
 +++ b/engine/client/czm_loading.c
-@@ -0,0 +1,516 @@
+@@ -0,0 +1,574 @@
 +/*
 +czm_loading.c - Counter Zombie Mobile loading screen state
 +Copyright (C) 2026 Counter Zombie Mobile authors
@@ -212,6 +213,7 @@ index 0000000..d42a656
 +#include "net_api.h"
 +
 +#define CZM_INFO_CONTEXT 0x435a4d01 // 'CZM' + 1, NetAPI context for the server details query
++#define CZM_QUERY_CONTEXT 0x435a4d10 // NetAPI contexts for the menu server tiles
 +
 +enum
 +{
@@ -243,7 +245,10 @@ index 0000000..d42a656
 +	qboolean seen_loading;  // client went through a connecting state in this session
 +	qboolean spawn_sent;
 +	qboolean precache;
-+	qboolean info_sent;
++	qboolean serverdata;    // server data parsed: map, max players and player slots are valid
++	int      info_requests;
++	double   info_time;
++	qboolean info_answered;
 +	qboolean cancelled;
 +	qboolean reopen_menu;
 +	qboolean had_downloads;
@@ -302,6 +307,7 @@ index 0000000..d42a656
 +		return;
 +
 +	s = (const char *)response->response;
++	czm.info_answered = true;
 +
 +	czm.info_players = Q_atoi( Info_ValueForKey( s, "current" ));
 +	czm.info_max = Q_atoi( Info_ValueForKey( s, "max" ));
@@ -393,15 +399,21 @@ index 0000000..d42a656
 +static void CZM_RequestInfo( void )
 +{
 +	netadr_t adr = cls.serveradr;
++	double now = Platform_DoubleTime();
 +
-+	if( czm.info_sent || cls.state != ca_connecting )
++	// UDP may lose the query, ask up to three times while connecting
++	if( czm.info_answered || czm.info_requests >= 3 || now - czm.info_time < 2.0 )
++		return;
++
++	if( cls.state != ca_connecting && cls.state != ca_connected && cls.state != ca_validate )
 +		return;
 +
 +	if( NET_NetadrType( &adr ) == NA_UNDEFINED || NET_IsLocalAddress( adr ))
 +		return;
 +
-+	czm.info_sent = true;
-+	gNetApi.SendRequest( CZM_INFO_CONTEXT, NETAPI_REQUEST_DETAILS, 0, 5.0, &adr, CZM_InfoResponse );
++	czm.info_requests++;
++	czm.info_time = now;
++	gNetApi.SendRequest( CZM_INFO_CONTEXT, NETAPI_REQUEST_DETAILS, 0, 4.0, &adr, CZM_InfoResponse );
 +}
 +
 +static void CZM_UpdateInfo( void )
@@ -420,14 +432,15 @@ index 0000000..d42a656
 +	else host = cls.servername;
 +	CZM_SetString( &czm_loading_host, host ? host : "" );
 +
-+	if( !COM_StringEmpty( clgame.mapname ))
++	// before the server data arrives, map name and slots in the client state are stale
++	if( czm.serverdata && !COM_StringEmpty( clgame.mapname ))
 +		CZM_SetString( &czm_loading_map, clgame.mapname );
 +	else CZM_SetString( &czm_loading_map, czm.info_map );
 +
-+	players = CZM_CountPlayers();
++	players = czm.serverdata ? CZM_CountPlayers() : 0;
 +	if( players <= 0 )
 +		players = czm.info_players;
-+	maxplayers = cl.maxclients > 0 ? cl.maxclients : czm.info_max;
++	maxplayers = czm.serverdata && cl.maxclients > 1 ? cl.maxclients : czm.info_max;
 +
 +	if( maxplayers > 0 )
 +		Q_snprintf( buf, sizeof( buf ), "%d/%d", Q_max( players, 0 ), maxplayers );
@@ -574,6 +587,11 @@ index 0000000..d42a656
 +	CZM_Loading_Frame();
 +}
 +
++void CZM_Loading_ServerData( void )
++{
++	czm.serverdata = true;
++}
++
 +void CZM_Loading_SetHostname( const char *hostname )
 +{
 +	if( hostname )
@@ -690,8 +708,49 @@ index 0000000..d42a656
 +	CZM_End( false );
 +}
 +
++static void CZM_QueryDetailsResponse( net_response_t *response )
++{
++	// nothing to do: the engine already passed the server info to the menu
++}
++
++static void CZM_QueryPingResponse( net_response_t *response )
++{
++	char info[64];
++
++	if( response->error != NET_SUCCESS )
++		return;
++
++	Q_snprintf( info, sizeof( info ), "\\czmping\\%d", (int)( response->ping * 1000.0 ));
++	UI_AddServerToList( response->remote_address, info );
++}
++
++// czm_queryserver <address>: ask a server for its info and ping, answers go to the menu
++static void CZM_QueryServer_f( void )
++{
++	netadr_t adr;
++
++	if( Cmd_Argc() != 2 )
++	{
++		Con_Printf( S_USAGE "czm_queryserver <address>\n" );
++		return;
++	}
++
++	NET_Config( true, false );
++
++	if( !NET_StringToAdr( Cmd_Argv( 1 ), &adr ))
++		return;
++
++	if( adr.port == 0 )
++		adr.port = MSG_BigShort( PORT_SERVER );
++
++	gNetApi.SendRequest( CZM_QUERY_CONTEXT, NETAPI_REQUEST_DETAILS, 0, 4.0, &adr, CZM_QueryDetailsResponse );
++	gNetApi.SendRequest( CZM_QUERY_CONTEXT + 1, NETAPI_REQUEST_PING, 0, 4.0, &adr, CZM_QueryPingResponse );
++}
++
 +void CZM_Loading_Init( void )
 +{
++	Cmd_AddRestrictedCommand( "czm_queryserver", CZM_QueryServer_f, "query a server for the menu tiles" );
++
 +	Cvar_RegisterVariable( &czm_loading_enable );
 +	Cvar_RegisterVariable( &czm_loading_pump );
 +	Cvar_RegisterVariable( &czm_loading );
@@ -774,7 +833,7 @@ index 4b444ad..8d54c09 100644
  	// simulate menu mouse click
  	if( cls.key_dest != key_game && !touch_in_menu.value )
 diff --git a/engine/client/parse/cl_parse.c b/engine/client/parse/cl_parse.c
-index 29acaf7..915ea58 100644
+index 29acaf7..4fe6e06 100644
 --- a/engine/client/parse/cl_parse.c
 +++ b/engine/client/parse/cl_parse.c
 @@ -821,7 +821,9 @@ static void CL_ParseServerData( sizebuf_t *msg, connprotocol_t proto )
@@ -788,7 +847,16 @@ index 29acaf7..915ea58 100644
  		// map name is sent as maps/<name>.bsp, only strip the maps/ prefix to keep subdirectories intact
  		s = MSG_ReadString( msg );
  		if( !Q_strnicmp( s, "maps/", 5 ))
-@@ -1737,6 +1739,8 @@ void CL_RegisterResources( sizebuf_t *msg, connprotocol_t proto )
+@@ -875,6 +877,8 @@ static void CL_ParseServerData( sizebuf_t *msg, connprotocol_t proto )
+ 		return;
+ 	}
+ 
++	CZM_Loading_ServerData();
++
+ 	Q_snprintf( mapfile, sizeof( mapfile ), "maps/%s.bsp", clgame.mapname );
+ 	if( CRC32_MapFile( &cl.worldmapCRC, mapfile, cl.maxclients > 1 ))
+ 	{
+@@ -1737,6 +1741,8 @@ void CL_RegisterResources( sizebuf_t *msg, connprotocol_t proto )
  				MSG_WriteStringf( msg, "spawn %i %i", cl.servercount, crc );
  			}
  			else MSG_WriteStringf( msg, "spawn %i", cl.servercount );

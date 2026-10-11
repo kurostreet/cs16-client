@@ -18,16 +18,9 @@ def brand_background(source):
         source,
         "\tif( FBitSet( ui_prefer_won_background->flags, FCVAR_CHANGED ))",
         '''\t// Owner-supplied art fills the screen, a dark fade keeps the menu readable.
+\t// The version is shown in the About panel of the main screen.
 \tif( CZM_DrawMenuBackground( m_scPos, m_scSize ))
-\t{
-\t\tchar version[128];
-\t\tint stringLen, charH;
-\t\tsnprintf( version, sizeof( version ), "Counter Zombie Mobile 32 players build %s", EngFuncs::GetCvarString( "cscl_ver" ) );
-\t\tEngFuncs::DrawSetTextColor( 160, 170, 180 );
-\t\tEngFuncs::engfuncs.pfnDrawConsoleStringLen( version, &stringLen, &charH );
-\t\tEngFuncs::engfuncs.pfnDrawConsoleString( 12, ScreenHeight - charH * 1.5f, version );
 \t\treturn;
-\t}
 
 \tif( FBitSet( ui_prefer_won_background->flags, FCVAR_CHANGED ))''',
         filename,
@@ -99,8 +92,40 @@ def brand_main_menu(source):
 \t}'''
     source = replace_once(source, old_banner, "\t// The background draws our logo instead of the external cache title movie.", filename)
     source = replace_once(source, "\tAddItem( readme );", "\t// Upstream readme button has no action; project information is available below.", filename)
+    # Our main screen (czm/menu/CzmMain.cpp) owns UI_Main_Menu, the stock one stays for debugging.
+    source = replace_once(
+        source,
+        "ADD_MENU( menu_main, CMenuMain, UI_Main_Menu );",
+        "ADD_MENU( menu_stockmain, CMenuMain, UI_StockMain_Menu );",
+        filename,
+    )
     # The upstream menu draws all help text over the logo when QMF_NOTIFY is set.
     return source.replace(".iFlags |= QMF_NOTIFY;", ".iFlags &= ~QMF_NOTIFY;")
+
+
+def brand_server_browser(source):
+    filename = "menus/ServerBrowser.cpp"
+    source = replace_once(source, '#include "DropDown.h"\n', '#include "DropDown.h"\n#include "CzmMenu.h"\n', filename)
+    # server info for the mode tiles goes to the main screen first
+    return replace_once(
+        source,
+        "void UI_AddServerToList( netadr_t adr, const char *info )\n{\n",
+        "void UI_AddServerToList( netadr_t adr, const char *info )\n{\n"
+        "\tif( CZM_OnServerInfo( adr, info ))\n\t\treturn;\n\n",
+        filename,
+    )
+
+
+def brand_connection_progress(source):
+    filename = "menus/ConnectionProgress.cpp"
+    # after a failed connection go back to the main screen, the game has no server browser
+    return replace_once(
+        source,
+        "\t\t\tUI_Main_Menu();\n\t\t\tUI_ServerBrowser_Menu();\n"
+        "\t\t\tif( m_iSource == SOURCE_CREATEGAME )\n\t\t\t\tUI_CreateGame_Menu();\n",
+        "\t\t\tUI_Main_Menu();\n",
+        filename,
+    )
 
 
 def main():
@@ -113,6 +138,8 @@ def main():
         "controls/BackgroundBitmap.cpp": brand_background,
         "menus/Main.cpp": brand_main_menu,
         "font/FontManager.cpp": brand_font_manager,
+        "menus/ServerBrowser.cpp": brand_server_browser,
+        "menus/ConnectionProgress.cpp": brand_connection_progress,
     }
     for filename, transform in transforms.items():
         content = transform((args.upstream / filename).read_text())

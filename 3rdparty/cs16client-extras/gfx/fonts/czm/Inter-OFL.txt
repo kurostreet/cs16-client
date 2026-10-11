@@ -1,4 +1,4 @@
-Inter font family (InterDisplay-Black, InterDisplay-Bold, Inter-SemiBold, Inter-Medium)
+Inter font family (InterDisplay-Black, InterDisplay-BlackItalic, InterDisplay-Bold, Inter-SemiBold, Inter-Medium)
 Copyright 2016-2023 The Inter Project Authors (https://github.com/rsms/inter)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

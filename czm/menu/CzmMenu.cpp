@@ -1,5 +1,5 @@
 /*
-CzmMenu.cpp - Counter Zombie Mobile main menu art and loading screen
+CzmMenu.cpp - Counter Zombie Mobile menu: shared drawing, language, servers, loading screen
 Copyright (C) 2026 Counter Zombie Mobile authors
 
 This program is free software: you can redistribute it and/or modify
@@ -46,56 +46,144 @@ enum
 #define CZM_CANCEL_Y1 0.898f
 
 #define CZM_LOADING_IMAGES 5
-
-static HIMAGE s_hMenuArt, s_hTitle, s_hFadeLeft, s_hFadeBottom;
-static HIMAGE s_hLoading[CZM_LOADING_IMAGES];
-static bool s_bImagesLoaded;
-
-static HFont s_hFontHost, s_hFontPercent, s_hFontInfo, s_hFontStatus, s_hFontTip, s_hFontButton;
-
-static const char *s_szTips[] =
-{
-	"Совет: зомби быстрее людей — держись ближе к своим и прикрывай спину.",
-	"Совет: в узком проходе толпу зомби сдерживать намного проще.",
-	"Совет: перезаряжайся заранее, пока зомби далеко.",
-	"Совет: не стой на открытом месте — ищи укрытие и высоту.",
-	"Совет: дробовик и пулемёт хорошо останавливают зомби вблизи.",
-	"Совет: граната помогает отбросить толпу и выиграть пару секунд.",
-	"Совет: целься в голову — так зомби падают быстрее.",
-	"Совет: стал зомби — нападай вместе с другими, по одному не ходи.",
-	"Совет: с друзьями выживать проще — зови их на свой сервер.",
-	"Совет: потренируйся с ботами, чтобы привыкнуть к управлению.",
-};
+#define CZM_TIPS 10
 
 /*
 =================
-images and fonts
+language
 =================
 */
-static void CZM_LoadImages( void )
+static const struct { const char *key, *ru, *en; } s_strings[] =
 {
-	if( s_bImagesLoaded )
+	// loading screen
+	{ "tip1", "Совет: зомби быстрее людей — держись ближе к своим и прикрывай спину.", "Tip: zombies are faster than humans — stay close to your team." },
+	{ "tip2", "Совет: в узком проходе толпу зомби сдерживать намного проще.", "Tip: a narrow corridor makes a zombie horde much easier to hold." },
+	{ "tip3", "Совет: перезаряжайся заранее, пока зомби далеко.", "Tip: reload early, while the zombies are still far away." },
+	{ "tip4", "Совет: не стой на открытом месте — ищи укрытие и высоту.", "Tip: don't stand in the open — find cover and high ground." },
+	{ "tip5", "Совет: дробовик и пулемёт хорошо останавливают зомби вблизи.", "Tip: shotguns and machine guns stop zombies up close." },
+	{ "tip6", "Совет: граната помогает отбросить толпу и выиграть пару секунд.", "Tip: a grenade pushes the horde back and buys you a few seconds." },
+	{ "tip7", "Совет: целься в голову — так зомби падают быстрее.", "Tip: aim for the head — zombies go down faster." },
+	{ "tip8", "Совет: стал зомби — нападай вместе с другими, по одному не ходи.", "Tip: turned into a zombie? Attack together, never alone." },
+	{ "tip9", "Совет: с друзьями выживать проще — зови их в игру.", "Tip: surviving is easier with friends — invite them to play." },
+	{ "tip10", "Совет: настрой управление под себя в разделе «Управление».", "Tip: tune your controls in the Controls section." },
+	{ "st_local", "Запуск игры…", "Starting the game…" },
+	{ "st_connect", "Подключение к серверу…", "Connecting to the server…" },
+	{ "st_handshake", "Получение данных сервера…", "Receiving server data…" },
+	{ "st_download", "Скачивание файлов сервера", "Downloading server files" },
+	{ "st_precache", "Загрузка карты и моделей…", "Loading the map and models…" },
+	{ "st_enter", "Вход в игру…", "Entering the game…" },
+	{ "of", "из", "of" },
+	{ "mb", "МБ", "MB" },
+	{ "mbps", "МБ/с", "MB/s" },
+	{ "kbps", "КБ/с", "KB/s" },
+	{ "lbl_map", "Карта", "Map" },
+	{ "lbl_players", "Игроки", "Players" },
+	{ "lbl_ping", "Пинг", "Ping" },
+	{ "ms", "мс", "ms" },
+	{ "cancel", "Отмена", "Cancel" },
+	// connection errors
+	{ "err_connect", "Не удалось подключиться к серверу.\nПроверь интернет или попробуй позже.", "Could not connect to the server.\nCheck your connection or try again later." },
+	{ "err_full", "Сервер заполнен.\nПопробуй позже или выбери другой режим.", "The server is full.\nTry again later or pick another mode." },
+	{ "err_password", "Неверный пароль сервера.", "Wrong server password." },
+	{ "err_banned", "Доступ на этот сервер закрыт.", "You are not allowed on this server." },
+	{ "err_kicked", "Сервер отключил тебя.", "The server disconnected you." },
+	{ "err_generic", "Не удалось подключиться к серверу.", "Could not connect to the server." },
+	// main screen
+	{ "nick_hint", "Нажми, чтобы сменить ник", "Tap to change your nickname" },
+	{ "in_game", "в игре", "playing" },
+	{ "querying", "Опрашиваем сервер…", "Checking the server…" },
+	{ "offline", "Сервер не отвечает", "Server is not responding" },
+	{ "full", "Сервер полон", "Server is full" },
+	{ "nav_profile", "Профиль", "Profile" },
+	{ "nav_controls", "Управление", "Controls" },
+	{ "nav_settings", "Настройки", "Settings" },
+	{ "nav_about", "Об игре", "About" },
+	{ "bell_title", "Уведомления", "Notifications" },
+	{ "bell_empty", "Пока нет уведомлений", "No notifications yet" },
+	{ "about_title", "Об игре", "About" },
+	{ "about_version", "Версия", "Version" },
+	{ "about_engine", "Движок Xash3D FWGS и клиент CS16Client — свободное ПО (GPL).", "Xash3D FWGS engine and CS16Client — free software (GPL)." },
+	{ "about_source", "Исходный код: github.com/kurostreet/cs16-client", "Source code: github.com/kurostreet/cs16-client" },
+	{ "about_fonts", "Шрифты Inter — SIL Open Font License 1.1.", "Inter fonts — SIL Open Font License 1.1." },
+	{ "quit_title", "Выйти из игры?", "Quit the game?" },
+	{ "quit_yes", "Выйти", "Quit" },
+	{ "pause", "ПАУЗА", "PAUSED" },
+	{ "resume", "Продолжить", "Resume" },
+	{ "settings", "Настройки", "Settings" },
+	{ "to_menu", "Выйти в меню", "Leave to menu" },
+};
+
+static bool s_bInitialized;
+
+void CZM_Init( void )
+{
+	if( s_bInitialized )
 		return;
 
-	s_bImagesLoaded = true;
-	s_hMenuArt = EngFuncs::PIC_Load( "gfx/czm/menu_bg.png" );
-	s_hTitle = EngFuncs::PIC_Load( "gfx/czm/title.png" );
-	s_hFadeLeft = EngFuncs::PIC_Load( "gfx/czm/fade_left.png" );
-	s_hFadeBottom = EngFuncs::PIC_Load( "gfx/czm/fade_bottom.png" );
-
-	for( int i = 0; i < CZM_LOADING_IMAGES; i++ )
-	{
-		char path[64];
-		snprintf( path, sizeof( path ), "gfx/czm/loading_%d.png", i + 1 );
-		s_hLoading[i] = EngFuncs::PIC_Load( path );
-	}
+	s_bInitialized = true;
+	EngFuncs::CvarRegister( "czm_lang", "", FCVAR_ARCHIVE );
+	EngFuncs::CvarRegister( "czm_connect_name", "", 0 );
+	EngFuncs::CvarRegister( "czm_connect_adr", "", 0 );
 }
+
+// the phone language, passed by the launcher
+static bool CZM_LocaleIsRussian( void )
+{
+	const char *locale = getenv( "CZM_LOCALE" );
+
+	return !locale || !locale[0] || !strncmp( locale, "ru", 2 ) || !strncmp( locale, "uk", 2 )
+		|| !strncmp( locale, "be", 2 ) || !strncmp( locale, "kk", 2 );
+}
+
+bool CZM_IsRussian( void )
+{
+	const char *lang;
+
+	CZM_Init();
+
+	// the player's choice, saved in config.cfg, wins over the phone language
+	lang = EngFuncs::GetCvarString( "czm_lang" );
+	if( lang && lang[0] )
+		return !strcmp( lang, "ru" );
+
+	return CZM_LocaleIsRussian();
+}
+
+const char *CZM_T( const char *key )
+{
+	bool russian = CZM_IsRussian();
+
+	for( size_t i = 0; i < sizeof( s_strings ) / sizeof( s_strings[0] ); i++ )
+	{
+		if( !strcmp( s_strings[i].key, key ))
+			return russian ? s_strings[i].ru : s_strings[i].en;
+	}
+
+	return key;
+}
+
+void CZM_SetLanguage( bool russian )
+{
+	CZM_Init();
+	EngFuncs::CvarSetString( "czm_lang", russian ? "ru" : "en" );
+	// the stock menus read their translations from ui_language on the next start
+	EngFuncs::CvarSetString( "ui_language", russian ? "russian" : "english" );
+	EngFuncs::ClientCmd( false, "host_writeconfig\n" );
+}
+
+/*
+=================
+fonts
+=================
+*/
+static HFont s_hFonts[CZMF_COUNT];
 
 bool CZM_FindFontFile( const char *name, char *dataFile, size_t dataFileChars )
 {
 	static const struct { const char *name, *file; } fonts[] =
 	{
 		{ "CZM Black", "gfx/fonts/czm/InterDisplay-Black.otf" },
+		{ "CZM BlackItalic", "gfx/fonts/czm/InterDisplay-BlackItalic.otf" },
 		{ "CZM Bold", "gfx/fonts/czm/InterDisplay-Bold.otf" },
 		{ "CZM Semibold", "gfx/fonts/czm/Inter-SemiBold.otf" },
 		{ "CZM Medium", "gfx/fonts/czm/Inter-Medium.otf" },
@@ -115,21 +203,184 @@ bool CZM_FindFontFile( const char *name, char *dataFile, size_t dataFileChars )
 
 void CZM_CreateFonts( float scale )
 {
-	// sizes are in 768-line units, like the rest of the menu
-	s_hFontHost = CFontBuilder( "CZM Black", 46 * scale, 900 ).Create();
-	s_hFontPercent = CFontBuilder( "CZM Black", 40 * scale, 900 ).Create();
-	s_hFontInfo = CFontBuilder( "CZM Semibold", 25 * scale, 600 ).Create();
-	s_hFontStatus = CFontBuilder( "CZM Semibold", 23 * scale, 600 ).Create();
-	s_hFontTip = CFontBuilder( "CZM Medium", 21 * scale, 500 ).Create();
-	s_hFontButton = CFontBuilder( "CZM Semibold", 25 * scale, 600 ).Create();
+	CZM_Init();
+
+	static const struct { const char *name; int tall, weight; } specs[CZMF_COUNT] =
+	{
+		// sizes are in 768-line units, like the rest of the menu
+		{ "CZM Black", 46, 900 },       // CZMF_LOAD_HOST
+		{ "CZM Black", 40, 900 },       // CZMF_LOAD_PERCENT
+		{ "CZM Semibold", 25, 600 },    // CZMF_LOAD_INFO
+		{ "CZM Semibold", 23, 600 },    // CZMF_LOAD_STATUS
+		{ "CZM Medium", 21, 500 },      // CZMF_LOAD_TIP
+		{ "CZM Semibold", 26, 600 },    // CZMF_BUTTON
+		{ "CZM BlackItalic", 42, 900 }, // CZMF_TILE_TITLE
+		{ "CZM Medium", 19, 500 },      // CZMF_TILE_TEXT
+		{ "CZM Semibold", 21, 600 },    // CZMF_TILE_STATUS
+		{ "CZM Semibold", 29, 600 },    // CZMF_NICK
+		{ "CZM Medium", 17, 500 },      // CZMF_SMALL
+		{ "CZM Semibold", 20, 600 },    // CZMF_NAV
+		{ "CZM Semibold", 24, 600 },    // CZMF_LANG
+		{ "CZM BlackItalic", 42, 900 }, // CZMF_PANEL_TITLE
+		{ "CZM Medium", 21, 500 },      // CZMF_PANEL_TEXT
+	};
+
+	for( int i = 0; i < CZMF_COUNT; i++ )
+		s_hFonts[i] = CFontBuilder( specs[i].name, specs[i].tall * scale, specs[i].weight ).Create();
+}
+
+HFont CZM_Font( int id )
+{
+	return ( id >= 0 && id < CZMF_COUNT ) ? s_hFonts[id] : uiStatic.hDefaultFont;
+}
+
+int CZM_FontHeight( HFont font )
+{
+	return g_FontMgr->GetFontTall( font );
+}
+
+int CZM_TextWidth( HFont font, const char *text )
+{
+	if( !text || !text[0] )
+		return 0;
+	return g_FontMgr->GetTextWideScaled( font, text, CZM_FontHeight( font ));
+}
+
+void CZM_DrawText( HFont font, int x, int y, int w, const char *text, unsigned int color, unsigned int justify )
+{
+	int h = CZM_FontHeight( font );
+
+	if( !text || !text[0] || w <= 0 )
+		return;
+
+	UI_DrawString( font, x, y, w, h, text, color, h, justify | QM_TOP, ETF_NO_WRAP | ETF_FORCECOL );
 }
 
 /*
 =================
-drawing helpers
+images
 =================
 */
-static void CZM_DrawCover( HIMAGE image, int x, int y, int w, int h )
+static struct { char path[64]; HIMAGE handle; } s_images[64];
+static int s_numImages;
+
+HIMAGE CZM_Image( const char *path )
+{
+	for( int i = 0; i < s_numImages; i++ )
+	{
+		if( !strcmp( s_images[i].path, path ))
+			return s_images[i].handle;
+	}
+
+	HIMAGE handle = EngFuncs::PIC_Load( path );
+	if( s_numImages < (int)( sizeof( s_images ) / sizeof( s_images[0] )))
+	{
+		Q_strncpy( s_images[s_numImages].path, path, sizeof( s_images[0].path ));
+		s_images[s_numImages].handle = handle;
+		s_numImages++;
+	}
+
+	return handle;
+}
+
+void CZM_DrawImage( const char *path, int x, int y, int w, int h, unsigned int color, bool transparent )
+{
+	HIMAGE image = CZM_Image( path );
+	int r, g, b, a;
+
+	if( !image || w <= 0 || h <= 0 )
+		return;
+
+	UnpackRGBA( r, g, b, a, color );
+	EngFuncs::PIC_Set( image, r, g, b, a );
+	if( transparent )
+		EngFuncs::PIC_DrawTrans( x, y, w, h );
+	else
+		EngFuncs::PIC_Draw( x, y, w, h );
+}
+
+void CZM_DrawSliced( const char *path, int x, int y, int w, int h, int imageBorder, int screenBorder, unsigned int color )
+{
+	HIMAGE image = CZM_Image( path );
+	int iw, ih, r, g, b, a;
+
+	if( !image || w <= 0 || h <= 0 )
+		return;
+
+	iw = EngFuncs::PIC_Width( image );
+	ih = EngFuncs::PIC_Height( image );
+	imageBorder = Q_min( imageBorder, Q_min( iw, ih ) / 2 - 1 );
+	screenBorder = Q_min( screenBorder, Q_min( w, h ) / 2 );
+	UnpackRGBA( r, g, b, a, color );
+
+	const int xs[4] = { x, x + screenBorder, x + w - screenBorder, x + w };
+	const int ys[4] = { y, y + screenBorder, y + h - screenBorder, y + h };
+	const int us[4] = { 0, imageBorder, iw - imageBorder, iw };
+	const int vs[4] = { 0, imageBorder, ih - imageBorder, ih };
+
+	for( int j = 0; j < 3; j++ )
+	{
+		for( int i = 0; i < 3; i++ )
+		{
+			wrect_t rc;
+
+			if( xs[i + 1] <= xs[i] || ys[j + 1] <= ys[j] )
+				continue;
+
+			rc.left = us[i];
+			rc.right = us[i + 1];
+			rc.top = vs[j];
+			rc.bottom = vs[j + 1];
+			// the engine resets the colour after every picture
+			EngFuncs::PIC_Set( image, r, g, b, a );
+			EngFuncs::PIC_DrawTrans( xs[i], ys[j], xs[i + 1] - xs[i], ys[j + 1] - ys[j], &rc );
+		}
+	}
+}
+
+void CZM_DrawPill( const char *path, int x, int y, int w, int h, unsigned int color )
+{
+	HIMAGE image = CZM_Image( path );
+	int iw, ih, cap, icap, r, g, b, a;
+
+	if( !image || w <= 0 || h <= 0 )
+		return;
+
+	iw = EngFuncs::PIC_Width( image );
+	ih = EngFuncs::PIC_Height( image );
+	cap = Q_min( h / 2, w / 2 );
+	icap = Q_min( ih / 2, iw / 2 );
+	UnpackRGBA( r, g, b, a, color );
+
+	const int xs[4] = { x, x + cap, x + w - cap, x + w };
+	const int us[4] = { 0, icap, iw - icap, iw };
+
+	for( int i = 0; i < 3; i++ )
+	{
+		wrect_t rc;
+
+		if( xs[i + 1] <= xs[i] )
+			continue;
+
+		rc.left = us[i];
+		rc.right = us[i + 1];
+		rc.top = 0;
+		rc.bottom = ih;
+		EngFuncs::PIC_Set( image, r, g, b, a );
+		EngFuncs::PIC_DrawTrans( xs[i], y, xs[i + 1] - xs[i], h, &rc );
+	}
+}
+
+int CZM_ImageAspect1000( const char *path )
+{
+	HIMAGE image = CZM_Image( path );
+	int w = image ? EngFuncs::PIC_Width( image ) : 0;
+	int h = image ? EngFuncs::PIC_Height( image ) : 0;
+
+	return ( w > 0 && h > 0 ) ? w * 1000 / h : 0;
+}
+
+void CZM_DrawCover( HIMAGE image, int x, int y, int w, int h )
 {
 	int iw = image ? EngFuncs::PIC_Width( image ) : 0;
 	int ih = image ? EngFuncs::PIC_Height( image ) : 0;
@@ -148,60 +399,178 @@ static void CZM_DrawCover( HIMAGE image, int x, int y, int w, int h )
 	EngFuncs::PIC_Draw( x + ( w - dw ) / 2, y + ( h - dh ) / 2, dw, dh );
 }
 
-static void CZM_DrawFade( HIMAGE image, int x, int y, int w, int h, int alpha )
+unsigned int CZM_PingColor( int ping )
 {
-	if( !image )
-		return;
-
-	EngFuncs::PIC_Set( image, 255, 255, 255, alpha );
-	EngFuncs::PIC_DrawTrans( x, y, w, h );
+	if( ping < 80 )
+		return PackRGBA( 74, 222, 128, 255 );
+	if( ping < 150 )
+		return PackRGBA( 250, 204, 21, 255 );
+	return PackRGBA( 248, 113, 113, 255 );
 }
 
-static void CZM_DrawTitle( int x, int y, int h, int alpha = 255 )
+void CZM_CleanName( const char *in, char *out, size_t size )
 {
-	int iw, ih;
+	size_t len = 0;
 
-	if( !s_hTitle )
-		return;
-
-	iw = EngFuncs::PIC_Width( s_hTitle );
-	ih = EngFuncs::PIC_Height( s_hTitle );
-	if( iw <= 0 || ih <= 0 )
-		return;
-
-	EngFuncs::PIC_Set( s_hTitle, 255, 255, 255, alpha );
-	EngFuncs::PIC_DrawTrans( x, y, h * iw / ih, h );
-}
-
-static int CZM_FontHeight( HFont font )
-{
-	return g_FontMgr->GetFontTall( font );
-}
-
-static int CZM_TextWidth( HFont font, const char *text )
-{
-	return g_FontMgr->GetTextWideScaled( font, text, CZM_FontHeight( font ));
-}
-
-// single line, cut with an ellipsis when it does not fit into w
-static void CZM_DrawText( HFont font, int x, int y, int w, const char *text, unsigned int color, uint justify = QM_LEFT )
-{
-	int h = CZM_FontHeight( font );
-
-	if( !text || !text[0] )
-		return;
-
-	UI_DrawString( font, x, y, w, h, text, color, h, justify | QM_TOP, ETF_NO_WRAP | ETF_FORCECOL );
-}
-
-static void CZM_FormatMegabytes( char *buf, size_t size, int bytes )
-{
-	snprintf( buf, size, "%.1f", bytes / ( 1024.0f * 1024.0f ));
-	for( char *p = buf; *p; p++ )
+	for( const char *s = in ? in : ""; *s && len + 1 < size; s++ )
 	{
-		if( *p == '.' )
-			*p = ',';
+		// colour codes like ^1
+		if( s[0] == '^' && s[1] >= '0' && s[1] <= '9' )
+		{
+			s++;
+			continue;
+		}
+		out[len++] = *s;
 	}
+
+	out[len] = 0;
+}
+
+bool CZM_CursorIn( int x, int y, int w, int h )
+{
+	return uiStatic.cursorX >= x && uiStatic.cursorX < x + w && uiStatic.cursorY >= y && uiStatic.cursorY < y + h;
+}
+
+const char *CZM_Version( void )
+{
+	return EngFuncs::GetCvarString( "cscl_ver" );
+}
+
+void CZM_OpenConsole( void )
+{
+	EngFuncs::ClientCmd( true, "ui_allowconsole\n" );
+	UI_SetActiveMenu( false );
+	EngFuncs::KEY_SetDest( KEY_CONSOLE );
+}
+
+static void CZM_DrawFade( const char *path, int x, int y, int w, int h, int alpha )
+{
+	CZM_DrawImage( path, x, y, w, h, PackRGBA( 255, 255, 255, alpha ));
+}
+
+static void CZM_DrawTitle( int x, int y, int h )
+{
+	int aspect = CZM_ImageAspect1000( "gfx/czm/title.png" );
+
+	if( aspect > 0 )
+		CZM_DrawImage( "gfx/czm/title.png", x, y, h * aspect / 1000, h );
+}
+
+/*
+=================
+servers
+
+Temporary list for development; later it comes from kontrafps.ru.
+=================
+*/
+static CzmServer s_servers[] =
+{
+	{ "ZOMBIE ATTACK", "131.196.199.248:27015", "gfx/czm/ui/tile_attack.png", 0xFFFF3B2F },
+	{ "ZOMBIE ESCAPE", "131.196.196.196:27020", "gfx/czm/ui/tile_escape.png", 0xFF22D3EE },
+	{ "ZOMBIE BOSS", "104.234.65.245:27300", "gfx/czm/ui/tile_boss.png", 0xFFA855F7 },
+};
+
+int CZM_ServerCount( void )
+{
+	return sizeof( s_servers ) / sizeof( s_servers[0] );
+}
+
+CzmServer *CZM_Server( int index )
+{
+	static bool initialized = false;
+
+	if( !initialized )
+	{
+		for( int i = 0; i < CZM_ServerCount(); i++ )
+		{
+			s_servers[i].ping = -1;
+			s_servers[i].map[0] = 0;
+		}
+		initialized = true;
+	}
+
+	return ( index >= 0 && index < CZM_ServerCount()) ? &s_servers[index] : NULL;
+}
+
+void CZM_QueryServers( bool force )
+{
+	double now = EngFuncs::DoubleTime();
+
+	for( int i = 0; i < CZM_ServerCount(); i++ )
+	{
+		CzmServer *server = CZM_Server( i );
+
+		if( !force && now - server->queryTime < 6.0 )
+			continue;
+
+		// the previous query got no answer
+		if( server->queryTime > 0.0 && server->answerTime < server->queryTime && now - server->queryTime > 3.0 )
+			server->misses++;
+
+		server->queryTime = now;
+		EngFuncs::ClientCmdF( false, "czm_queryserver \"%s\"\n", server->address );
+	}
+}
+
+bool CZM_OnServerInfo( netadr_t adr, const char *info )
+{
+	const char *address = EngFuncs::NET_AdrToString( adr );
+	const char *value;
+
+	for( int i = 0; i < CZM_ServerCount(); i++ )
+	{
+		CzmServer *server = CZM_Server( i );
+
+		if( strcmp( server->address, address ))
+			continue;
+
+		value = Info_ValueForKey( info, "czmping" );
+		if( value && value[0] )
+		{
+			server->ping = atoi( value );
+			return true; // our own message, not a server entry
+		}
+
+		value = Info_ValueForKey( info, "map" );
+		if( value )
+			Q_strncpy( server->map, value, sizeof( server->map ));
+		value = Info_ValueForKey( info, "numcl" );
+		server->players = value ? atoi( value ) : 0;
+		value = Info_ValueForKey( info, "maxcl" );
+		server->maxplayers = value ? atoi( value ) : 0;
+		server->answerTime = EngFuncs::DoubleTime();
+		server->misses = 0;
+
+		// rough ping until the real one arrives
+		if( server->ping < 0 )
+			server->ping = (int)(( server->answerTime - server->queryTime ) * 1000.0 );
+		return false;
+	}
+
+	value = Info_ValueForKey( info, "czmping" );
+	return value && value[0];
+}
+
+void CZM_ConnectToServer( int index )
+{
+	CzmServer *server = CZM_Server( index );
+
+	if( !server )
+		return;
+
+	EngFuncs::CvarSetString( "czm_connect_name", server->title );
+	EngFuncs::CvarSetString( "czm_connect_adr", server->address );
+	EngFuncs::ClientCmdF( false, "connect \"%s\" gs\n", server->address );
+}
+
+static CzmServer *CZM_ServerByAddress( const char *address )
+{
+	for( int i = 0; address && address[0] && i < CZM_ServerCount(); i++ )
+	{
+		if( !strcmp( CZM_Server( i )->address, address ))
+			return CZM_Server( i );
+	}
+	return NULL;
 }
 
 /*
@@ -263,17 +632,17 @@ static void CZM_ShowPendingError( void )
 	CZM_CleanReason( error, reason, sizeof( reason ));
 
 	if( !strcmp( reason, "#connect_failed" ))
-		snprintf( text, sizeof( text ), "Не удалось подключиться к серверу.\nПроверь интернет или попробуй позже." );
+		snprintf( text, sizeof( text ), "%s", CZM_T( "err_connect" ));
 	else if( CZM_Contains( reason, "full" ))
-		snprintf( text, sizeof( text ), "Сервер заполнен.\nПопробуй позже или выбери другой сервер." );
+		snprintf( text, sizeof( text ), "%s", CZM_T( "err_full" ));
 	else if( CZM_Contains( reason, "password" ))
-		snprintf( text, sizeof( text ), "Неверный пароль сервера." );
+		snprintf( text, sizeof( text ), "%s", CZM_T( "err_password" ));
 	else if( CZM_Contains( reason, "ban" ))
-		snprintf( text, sizeof( text ), "Доступ на этот сервер закрыт.\n%s", reason );
+		snprintf( text, sizeof( text ), "%s\n%s", CZM_T( "err_banned" ), reason );
 	else if( CZM_Contains( reason, "kick" ))
-		snprintf( text, sizeof( text ), "Сервер отключил тебя.\n%s", reason );
+		snprintf( text, sizeof( text ), "%s\n%s", CZM_T( "err_kicked" ), reason );
 	else
-		snprintf( text, sizeof( text ), "Не удалось подключиться к серверу.\n%s", reason );
+		snprintf( text, sizeof( text ), "%s\n%s", CZM_T( "err_generic" ), reason );
 
 	EngFuncs::CvarSetString( "czm_loading_error", "" );
 	UI_ShowMessageBox( text );
@@ -281,27 +650,26 @@ static void CZM_ShowPendingError( void )
 
 /*
 =================
-main menu background
+menu background
 =================
 */
 bool CZM_DrawMenuBackground( Point pos, Size size )
 {
-	CMenuBaseWindow *current;
+	HIMAGE art = CZM_Image( "gfx/czm/menu_bg.png" );
 
-	CZM_LoadImages();
-
-	if( !s_hMenuArt )
+	if( !art )
 		return false;
 
-	CZM_DrawCover( s_hMenuArt, pos.x, pos.y, size.w, size.h );
-	CZM_DrawFade( s_hFadeLeft, pos.x, pos.y, size.w * 0.58f, size.h, 225 );
-	CZM_DrawFade( s_hFadeBottom, pos.x, pos.y + size.h * 0.62f, size.w, size.h * 0.38f + 1, 140 );
+	// in the game, keep the world visible behind the pause window and settings
+	if( CL_IsActive( ))
+	{
+		UI_FillRect( pos.x, pos.y, size.w, size.h, PackRGBA( 0, 0, 0, 150 ));
+		return true;
+	}
 
-	// the title belongs to the main menu only, other windows have their own headers
-	current = uiStatic.menu.Current();
-	if( current && current->szName && !strcmp( current->szName, "CMenuMain" ))
-		CZM_DrawTitle( pos.x + size.w * 0.06f, pos.y + size.h * 0.075f, size.h * 0.16f );
-
+	CZM_DrawCover( art, pos.x, pos.y, size.w, size.h );
+	CZM_DrawFade( "gfx/czm/fade_left.png", pos.x, pos.y, size.w * 0.58f, size.h, 200 );
+	CZM_DrawFade( "gfx/czm/fade_bottom.png", pos.x, pos.y + size.h * 0.62f, size.w, size.h * 0.38f + 1, 140 );
 	return true;
 }
 
@@ -310,40 +678,75 @@ bool CZM_DrawMenuBackground( Point pos, Size size )
 loading screen
 =================
 */
-static void CZM_DrawInfoRow( int x, int y, int w )
+static void CZM_DrawInfoRow( int x, int y, int w, CzmServer *cached )
 {
+	HFont font = CZM_Font( CZMF_LOAD_INFO );
 	const char *map = EngFuncs::GetCvarString( "czm_loading_map" );
 	const char *players = EngFuncs::GetCvarString( "czm_loading_players" );
 	const char *ping = EngFuncs::GetCvarString( "czm_loading_ping" );
 	const unsigned int label = PackRGBA( 160, 168, 178, 255 );
 	const unsigned int value = PackRGBA( 240, 240, 240, 255 );
 	const char *separator = "   ·   ";
-	char pingText[32];
+	char mapText[64], playersText[32], pingText[32];
 	struct { const char *label, *value; } parts[3];
 	int count = 0, right = x + w;
 
+	// what the menu already knows about our server fills the gaps
+	if(( !map || !map[0] ) && cached && cached->map[0] )
+		map = cached->map;
+	if(( !players || !players[0] ) && cached && cached->maxplayers > 0 )
+	{
+		snprintf( playersText, sizeof( playersText ), "%d/%d", cached->players, cached->maxplayers );
+		players = playersText;
+	}
+	if(( !ping || !ping[0] ) && cached && cached->ping > 0 )
+	{
+		snprintf( pingText, sizeof( pingText ), "%d", cached->ping );
+		ping = pingText;
+	}
+
 	if( map && map[0] )
-		parts[count].label = "Карта  ", parts[count++].value = map;
+	{
+		Q_strncpy( mapText, map, sizeof( mapText ));
+		parts[count].label = CZM_T( "lbl_map" ), parts[count++].value = mapText;
+	}
 	if( players && players[0] )
-		parts[count].label = "Игроки  ", parts[count++].value = players;
+		parts[count].label = CZM_T( "lbl_players" ), parts[count++].value = players;
 	if( ping && ping[0] )
 	{
-		snprintf( pingText, sizeof( pingText ), "%s мс", ping );
-		parts[count].label = "Пинг  ", parts[count++].value = pingText;
+		static char pingValue[32];
+		snprintf( pingValue, sizeof( pingValue ), "%s %s", ping, CZM_T( "ms" ));
+		parts[count].label = CZM_T( "lbl_ping" ), parts[count++].value = pingValue;
 	}
 
 	for( int i = 0; i < count && x < right; i++ )
 	{
+		char label_text[64];
+
 		if( i > 0 )
 		{
-			CZM_DrawText( s_hFontInfo, x, y, right - x, separator, label );
-			x += CZM_TextWidth( s_hFontInfo, separator );
+			CZM_DrawText( font, x, y, right - x, separator, label );
+			x += CZM_TextWidth( font, separator );
 		}
 
-		CZM_DrawText( s_hFontInfo, x, y, right - x, parts[i].label, label );
-		x += CZM_TextWidth( s_hFontInfo, parts[i].label );
-		CZM_DrawText( s_hFontInfo, x, y, right - x, parts[i].value, value );
-		x += CZM_TextWidth( s_hFontInfo, parts[i].value );
+		snprintf( label_text, sizeof( label_text ), "%s  ", parts[i].label );
+		CZM_DrawText( font, x, y, right - x, label_text, label );
+		x += CZM_TextWidth( font, label_text );
+		CZM_DrawText( font, x, y, right - x, parts[i].value, value );
+		x += CZM_TextWidth( font, parts[i].value );
+	}
+}
+
+static void CZM_FormatMegabytes( char *buf, size_t size, int bytes )
+{
+	snprintf( buf, size, "%.1f", bytes / ( 1024.0f * 1024.0f ));
+	if( CZM_IsRussian( ))
+	{
+		for( char *p = buf; *p; p++ )
+		{
+			if( *p == '.' )
+				*p = ',';
+		}
 	}
 }
 
@@ -352,22 +755,23 @@ static void CZM_StageText( int stage, char *buf, size_t size )
 	switch( stage )
 	{
 	case CZM_STAGE_LOCAL:
-		snprintf( buf, size, "Запуск игры…" );
+		snprintf( buf, size, "%s", CZM_T( "st_local" ));
 		break;
 	case CZM_STAGE_HANDSHAKE:
-		snprintf( buf, size, "Получение данных сервера…" );
+		snprintf( buf, size, "%s", CZM_T( "st_handshake" ));
 		break;
 	case CZM_STAGE_DOWNLOAD:
 	{
 		int files_done = 0, files_total = 0, bytes_done = 0, bytes_total = 0, speed = 0;
-		char done[32], total[32], rate[32];
+		char done[32], total[32], rate[48];
+		const char *sep = "   ·   ";
 
 		sscanf( EngFuncs::GetCvarString( "czm_loading_dl" ), "%d %d %d %d %d",
 			&files_done, &files_total, &bytes_done, &bytes_total, &speed );
 
 		if( files_total <= 0 )
 		{
-			snprintf( buf, size, "Скачивание файлов сервера…" );
+			snprintf( buf, size, "%s…", CZM_T( "st_download" ));
 			break;
 		}
 
@@ -377,35 +781,34 @@ static void CZM_StageText( int stage, char *buf, size_t size )
 		{
 			char mb[32];
 			CZM_FormatMegabytes( mb, sizeof( mb ), speed );
-			snprintf( rate, sizeof( rate ), "%s МБ/с", mb );
+			snprintf( rate, sizeof( rate ), "%s%s %s", sep, mb, CZM_T( "mbps" ));
 		}
 		else if( speed > 0 )
-			snprintf( rate, sizeof( rate ), "%d КБ/с", Q_max( 1, speed / 1024 ));
+			snprintf( rate, sizeof( rate ), "%s%d %s", sep, Q_max( 1, speed / 1024 ), CZM_T( "kbps" ));
 		else rate[0] = 0;
 
 		if( bytes_total > 0 )
 		{
 			CZM_FormatMegabytes( done, sizeof( done ), bytes_done );
 			CZM_FormatMegabytes( total, sizeof( total ), bytes_total );
-			snprintf( buf, size, "Скачивание файлов сервера   ·   %d из %d   ·   %s из %s МБ%s%s",
-				files_done, files_total, done, total, rate[0] ? "   ·   " : "", rate );
+			snprintf( buf, size, "%s%s%d %s %d%s%s %s %s %s%s", CZM_T( "st_download" ), sep, files_done, CZM_T( "of" ),
+				files_total, sep, done, CZM_T( "of" ), total, CZM_T( "mb" ), rate );
 		}
 		else
 		{
-			snprintf( buf, size, "Скачивание файлов сервера   ·   %d из %d%s%s",
-				files_done, files_total, rate[0] ? "   ·   " : "", rate );
+			snprintf( buf, size, "%s%s%d %s %d%s", CZM_T( "st_download" ), sep, files_done, CZM_T( "of" ), files_total, rate );
 		}
 		break;
 	}
 	case CZM_STAGE_PRECACHE:
-		snprintf( buf, size, "Загрузка карты и моделей…" );
+		snprintf( buf, size, "%s", CZM_T( "st_precache" ));
 		break;
 	case CZM_STAGE_ENTER:
-		snprintf( buf, size, "Вход в игру…" );
+		snprintf( buf, size, "%s", CZM_T( "st_enter" ));
 		break;
 	case CZM_STAGE_CONNECT:
 	default:
-		snprintf( buf, size, "Подключение к серверу…" );
+		snprintf( buf, size, "%s", CZM_T( "st_connect" ));
 		break;
 	}
 }
@@ -436,31 +839,34 @@ static void CZM_DrawProgressBar( int x0, int x1, int y, int h, float percent )
 
 static void CZM_DrawCancelButton( void )
 {
+	HFont font = CZM_Font( CZMF_BUTTON );
 	int x0 = ScreenWidth * CZM_CANCEL_X0, x1 = ScreenWidth * CZM_CANCEL_X1;
 	int y0 = ScreenHeight * CZM_CANCEL_Y0, y1 = ScreenHeight * CZM_CANCEL_Y1;
 	int border = Q_max( 2, ScreenHeight / 400 );
-	int th = CZM_FontHeight( s_hFontButton );
+	int th = CZM_FontHeight( font );
 
 	UI_FillRect( x0, y0, x1 - x0, y1 - y0, PackRGBA( 0, 0, 0, 110 ));
 	UI_DrawRectangleExt( x0, y0, x1 - x0, y1 - y0, PackRGBA( 255, 255, 255, 170 ), border );
-	CZM_DrawText( s_hFontButton, x0, y0 + ( y1 - y0 - th ) / 2, x1 - x0, "Отмена", PackRGBA( 255, 255, 255, 255 ), QM_CENTER );
+	CZM_DrawText( font, x0, y0 + ( y1 - y0 - th ) / 2, x1 - x0, CZM_T( "cancel" ), PackRGBA( 255, 255, 255, 255 ), QM_CENTER );
 }
 
 bool CZM_DrawLoadingScreen( void )
 {
-	static int lastSession = -1, image = -1, tip = 0;
+	static int lastSession = -1, image = 0, tip = 0;
 	const int W = ScreenWidth, H = ScreenHeight;
 	int session, stage, x0, x1, percentTop;
 	float percent;
 	char text[256];
+	const char *title;
+	CzmServer *cached;
+
+	CZM_Init();
 
 	if( EngFuncs::GetCvarFloat( "czm_loading" ) == 0.0f )
 	{
 		CZM_ShowPendingError();
 		return false;
 	}
-
-	CZM_LoadImages();
 
 	// new picture and tip for every loading
 	session = (int)EngFuncs::GetCvarFloat( "czm_loading_session" );
@@ -476,34 +882,42 @@ bool CZM_DrawLoadingScreen( void )
 		}
 
 		do next = rand() % CZM_LOADING_IMAGES;
-		while( next == image && CZM_LOADING_IMAGES > 1 );
+		while( next == image && lastSession >= 0 && CZM_LOADING_IMAGES > 1 );
 
 		image = next;
-		tip = rand() % (int)( sizeof( s_szTips ) / sizeof( s_szTips[0] ));
+		tip = rand() % CZM_TIPS;
 		lastSession = session;
 	}
 
 	stage = (int)EngFuncs::GetCvarFloat( "czm_loading_stage" );
 	percent = EngFuncs::GetCvarFloat( "scr_loading" );
+	cached = CZM_ServerByAddress( EngFuncs::GetCvarString( "czm_connect_adr" ));
 
-	CZM_DrawCover( s_hLoading[image], 0, 0, W, H );
-	CZM_DrawFade( s_hFadeLeft, 0, 0, W * 0.62f, H, 150 );
-	CZM_DrawFade( s_hFadeBottom, 0, H * 0.36f, W, H * 0.64f + 1, 240 );
+	snprintf( text, sizeof( text ), "gfx/czm/loading_%d.png", image + 1 );
+	CZM_DrawCover( CZM_Image( text ), 0, 0, W, H );
+	CZM_DrawFade( "gfx/czm/fade_left.png", 0, 0, W * 0.62f, H, 150 );
+	CZM_DrawFade( "gfx/czm/fade_bottom.png", 0, H * 0.36f, W, H * 0.64f + 1, 240 );
 	CZM_DrawTitle( W * 0.045f, H * 0.06f, H * 0.07f );
 
 	x0 = W * 0.045f;
 	x1 = W * 0.775f;
 
-	CZM_DrawText( s_hFontHost, x0, H * 0.56f, x1 - x0, EngFuncs::GetCvarString( "czm_loading_host" ), PackRGBA( 255, 255, 255, 255 ));
-	CZM_DrawInfoRow( x0, H * 0.655f, x1 - x0 );
-	CZM_DrawText( s_hFontTip, x0, H * 0.712f, x1 - x0, s_szTips[tip], PackRGBA( 205, 205, 205, 255 ));
+	// our mode name, the server's own name only if we connect somewhere else
+	title = EngFuncs::GetCvarString( "czm_connect_name" );
+	if( !cached || !title || !title[0] )
+		title = EngFuncs::GetCvarString( "czm_loading_host" );
+
+	CZM_DrawText( CZM_Font( CZMF_LOAD_HOST ), x0, H * 0.56f, x1 - x0, title, PackRGBA( 255, 255, 255, 255 ));
+	CZM_DrawInfoRow( x0, H * 0.655f, x1 - x0, cached );
+	snprintf( text, sizeof( text ), "tip%d", tip + 1 );
+	CZM_DrawText( CZM_Font( CZMF_LOAD_TIP ), x0, H * 0.712f, x1 - x0, CZM_T( text ), PackRGBA( 205, 205, 205, 255 ));
 
 	CZM_StageText( stage, text, sizeof( text ));
-	percentTop = H * 0.845f - CZM_FontHeight( s_hFontPercent );
-	CZM_DrawText( s_hFontStatus, x0, H * 0.795f, ( x1 - x0 ) * 0.8f, text, PackRGBA( 235, 235, 235, 255 ));
+	percentTop = H * 0.845f - CZM_FontHeight( CZM_Font( CZMF_LOAD_PERCENT ));
+	CZM_DrawText( CZM_Font( CZMF_LOAD_STATUS ), x0, H * 0.795f, ( x1 - x0 ) * 0.8f, text, PackRGBA( 235, 235, 235, 255 ));
 
 	snprintf( text, sizeof( text ), "%d%%", (int)percent );
-	CZM_DrawText( s_hFontPercent, x0, percentTop, x1 - x0, text, PackRGBA( 255, 255, 255, 255 ), QM_RIGHT );
+	CZM_DrawText( CZM_Font( CZMF_LOAD_PERCENT ), x0, percentTop, x1 - x0, text, PackRGBA( 255, 255, 255, 255 ), QM_RIGHT );
 
 	CZM_DrawProgressBar( x0, x1, H * 0.852f, Q_max( 4, (int)( H * 0.024f )), percent );
 	CZM_DrawCancelButton();

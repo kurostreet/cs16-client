@@ -110,7 +110,10 @@ public class MainActivity extends Activity {
                 .putExtra("gamelibdir", getApplicationInfo().nativeLibraryDir)
                 .putExtra("basedir", installation.writable.getAbsolutePath())
                 .putExtra("package", getPackageName())
-                .putExtra("env", new String[]{"XASH3D_RODIR", installation.data.getAbsolutePath()})
+                .putExtra("env", new String[]{
+                        "XASH3D_RODIR", installation.data.getAbsolutePath(),
+                        // the game menu picks Russian or English from the phone language on the first start
+                        "CZM_LOCALE", java.util.Locale.getDefault().getLanguage()})
                 .putExtra("argv", launchArguments()));
         finish();
     }

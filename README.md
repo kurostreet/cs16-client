@@ -57,3 +57,4 @@ SDL — `98d1f3a45aae568ccd6ed5fec179330f47d4d356` (2.32.8).
 План: [MOBILE_LAUNCHER_PLAN_RU.md](docs/MOBILE_LAUNCHER_PLAN_RU.md).
 Оформление: [BRANDING_RU.md](docs/BRANDING_RU.md).
 Меню и экран загрузки: [LOADING_SCREEN_RU.md](docs/LOADING_SCREEN_RU.md).
+Новое главное меню: [MAIN_SCREEN_RU.md](docs/MAIN_SCREEN_RU.md).
