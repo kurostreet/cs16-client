@@ -1,0 +1,54 @@
+# Counter Zombie Mobile on kontrafps.ru (imported by /etc/caddy/Caddyfile from /etc/caddy/sites/*.caddy).
+# No access log: requests carry the players' keys in a header.
+kontrafps.ru {
+	encode gzip
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+
+	handle /api/* {
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy 127.0.0.1:8200
+	}
+
+	# players' own avatars, 192 px PNG
+	handle_path /avatars/* {
+		root * /var/lib/czm/avatars
+		header Cache-Control "public, max-age=86400"
+		file_server
+	}
+
+	# APK of the updates, downloads continue after a break (Range)
+	handle_path /dl/* {
+		root * /var/lib/czm/apk
+		file_server
+	}
+
+	handle_path /server-list/* {
+		root * /var/lib/czm/server-list
+		file_server
+	}
+
+	handle {
+		respond "Counter Zombie Mobile" 200
+	}
+}
+
+www.kontrafps.ru {
+	redir https://kontrafps.ru{uri} permanent
+}
+
+# the engine fetches the server list over plain HTTP
+http://kontrafps.ru {
+	handle_path /server-list/* {
+		root * /var/lib/czm/server-list
+		file_server
+	}
+	handle {
+		redir https://kontrafps.ru{uri} permanent
+	}
+}

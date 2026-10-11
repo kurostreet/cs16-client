@@ -1,0 +1,324 @@
+"""Telegram bot of the owner: complaints with ban buttons, news, releases, bans.
+
+Only the owners (CZM_BOT_OWNER_IDS) are served. Telegram is blocked from the server,
+the Bot API goes through the owner's relay (CZM_BOT_API_URL).
+"""
+import asyncio
+import html
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Any, Callable
+
+from aiogram import Bot, Dispatcher, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
+from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramAPIError
+from aiogram.filters import Command, CommandObject, CommandStart
+from aiogram.types import (BotCommand, BufferedInputFile, CallbackQuery, InlineKeyboardButton,
+                           InlineKeyboardMarkup, Message)
+
+from . import service
+from .config import Settings, get_settings
+from .db import db
+
+log = logging.getLogger("czm.bot")
+MSK = timezone(timedelta(hours=3))
+LENGTHS = {"w": "week", "m": "month", "f": "forever"}
+LENGTH_NAMES = {"week": "неделю", "month": "месяц", "forever": "навсегда"}
+
+HELP = (
+    "<b>Counter Zombie Mobile — бот владельца</b>\n\n"
+    "Жалобы из игрового чата приходят сюда с кнопками бана.\n\n"
+    "/news <i>текст</i> — новость в колокольчик всем игрокам\n"
+    "/news — последние новости, /delnews <i>номер</i> — убрать новость\n"
+    "/release — загруженная сборка, /release <i>что нового</i> — выпустить обновление\n"
+    "/ban <i>ID</i> week|month|forever <i>причина</i> — бан игрока\n"
+    "/unban <i>ID</i> — разбан, /bans — кто забанен\n"
+    "/stats — сводка"
+)
+
+
+class RelaySession(AiohttpSession):
+    """HTTPS relays need fresh connections instead of reusing a stale edge connection."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._connector_init["force_close"] = True
+
+    async def create_session(self):
+        session = await super().create_session()
+        session.headers["User-Agent"] = "CounterZombieMobileBot/1.0 (+https://kontrafps.ru)"
+        return session
+
+
+async def in_db(fn: Callable, *args: Any) -> Any:
+    def run():
+        with db() as conn:
+            return fn(conn, *args)
+    return await asyncio.to_thread(run)
+
+
+def when(ts: int | None) -> str:
+    if not ts:
+        return "навсегда"
+    return datetime.fromtimestamp(ts, MSK).strftime("до %d.%m.%Y %H:%M")
+
+
+def report_text(info: dict, result: str = "") -> str:
+    target = f"<b>{html.escape(info['nick'])}</b> (ID {info['target']})"
+    lines = [f"⚠️ <b>Жалоба #{info['id']}</b>"]
+    if info["message"] is not None:
+        lines.append(f"На сообщение в комнате {info['room'].upper()}:")
+        lines.append(f"«{html.escape(info['message'])}»")
+    else:
+        lines.append("На аватар.")
+    lines.append(f"Автор: {target}, жалоб за неделю: {info['reports_week']}")
+    lines.append(f"Пожаловался: {html.escape(info['reporter_nick'])} (ID {info['reporter']})")
+    if result:
+        lines.append("")
+        lines.append(result)
+    return "\n".join(lines)
+
+
+def report_keyboard(info: dict) -> InlineKeyboardMarkup:
+    r = info["id"]
+    rows = [[
+        InlineKeyboardButton(text="🚫 Неделя", callback_data=f"b:{r}:w"),
+        InlineKeyboardButton(text="🚫 Месяц", callback_data=f"b:{r}:m"),
+        InlineKeyboardButton(text="🚫 Навсегда", callback_data=f"b:{r}:f"),
+    ]]
+    second = []
+    if info["message"] is not None:
+        second.append(InlineKeyboardButton(text="🗑 Удалить сообщение", callback_data=f"d:{r}"))
+    second.append(InlineKeyboardButton(text="✅ Не нарушение", callback_data=f"k:{r}"))
+    rows.append(second)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+class OwnerBot:
+    def __init__(self, bot: Bot, settings: Settings):
+        self.bot = bot
+        self.settings = settings
+        self.owners = settings.owner_ids
+
+    def allowed(self, user_id: int | None) -> bool:
+        return user_id is not None and user_id in self.owners
+
+    async def notify_report(self, info: dict) -> None:
+        for owner in self.owners:
+            try:
+                photo = self.settings.avatar_dir / f"{info['target']}.png"
+                if info["message"] is None and info["avatar"] == "photo" and photo.exists():
+                    await self.bot.send_photo(owner, BufferedInputFile(photo.read_bytes(), "avatar.png"),
+                                              caption=report_text(info), reply_markup=report_keyboard(info))
+                else:
+                    text = report_text(info)
+                    if info["message"] is None:
+                        text += f"\nАватар: {'свой' if info['avatar'] == 'photo' else ('№' + info['avatar'] if info['avatar'] else 'логотип игры')}"
+                    await self.bot.send_message(owner, text, reply_markup=report_keyboard(info))
+            except TelegramAPIError as e:
+                log.warning("could not send report %s to %s: %s", info["id"], owner, e)
+
+    # commands -------------------------------------------------------------
+
+    async def on_start(self, message: Message) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            await message.answer("Это служебный бот Counter Zombie Mobile.")
+            return
+        await message.answer(HELP)
+
+    async def on_stats(self, message: Message) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            return
+        s = await in_db(service.stats)
+        await message.answer(
+            f"Игроков всего: {s['players']}\nЗаходили за сутки: {s['players_day']} (новых {s['players_new_day']})\n"
+            f"Сообщений за сутки: {s['messages_day']}\nОткрытых жалоб: {s['reports_open']}\nБанов сейчас: {s['bans_active']}"
+        )
+
+    async def on_news(self, message: Message, command: CommandObject) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            return
+        text = (command.args or "").strip()
+        if not text:
+            items = await in_db(service.news, 0, 10)
+            if not items:
+                await message.answer("Новостей пока нет. Напиши /news и текст.")
+                return
+            lines = [f"#{n['id']} · {datetime.fromtimestamp(n['ts'], MSK):%d.%m %H:%M}\n{html.escape(n['text'])}" for n in items]
+            await message.answer("\n\n".join(lines))
+            return
+        news_id = await in_db(service.add_news, text)
+        await message.answer(f"✅ Новость #{news_id} в колокольчике у всех игроков.")
+
+    async def on_delnews(self, message: Message, command: CommandObject) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            return
+        arg = (command.args or "").strip().lstrip("#")
+        ok = arg.isdigit() and await in_db(service.delete_news, int(arg))
+        await message.answer("Новость убрана." if ok else "Нет такой новости. Номер — в списке /news.")
+
+    async def on_release(self, message: Message, command: CommandObject) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            return
+        release = await in_db(service.latest_release, False)
+        if release is None:
+            await message.answer("Сборок пока нет: загружу на сервер, когда будет новая.")
+            return
+        size = f"{release['size'] / 1024 / 1024:.0f} МБ"
+        notes = (command.args or "").strip()
+        if release["published"] and not notes:
+            await message.answer(f"Последняя сборка {release['version']} ({size}) уже выпущена.\n{html.escape(release['notes'])}")
+            return
+        if not notes:
+            await message.answer(
+                f"Готова сборка <b>{release['version']}</b> ({size}), ещё не выпущена.\n"
+                "Выпустить: /release и что нового, например:\n<code>/release Новый список серверов и аватары</code>"
+            )
+            return
+        await in_db(service.publish_release, release["id"], notes)
+        await message.answer(f"✅ Обновление {release['version']} выпущено, игроки увидят его в игре.")
+
+    async def on_ban(self, message: Message, command: CommandObject) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            return
+        parts = (command.args or "").split(maxsplit=2)
+        if len(parts) < 2 or not parts[0].isdigit() or parts[1] not in service.BAN_LENGTHS:
+            await message.answer("Так: /ban ID week|month|forever причина")
+            return
+        result = await in_db(service.ban, int(parts[0]), parts[1], parts[2] if len(parts) > 2 else "")
+        if result is None:
+            await message.answer("Нет такого игрока.")
+            return
+        await message.answer(f"🚫 {html.escape(result['nick'])} (ID {result['player']}) забанен {LENGTH_NAMES[parts[1]]}.")
+
+    async def on_unban(self, message: Message, command: CommandObject) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            return
+        arg = (command.args or "").strip()
+        if not arg.isdigit():
+            await message.answer("Так: /unban ID (ID — в жалобе или в /bans)")
+            return
+        count = await in_db(service.unban, int(arg))
+        await message.answer("✅ Разбанен." if count else "У этого игрока нет бана.")
+
+    async def on_bans(self, message: Message) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            return
+        bans = await in_db(service.active_bans)
+        if not bans:
+            await message.answer("Банов нет.")
+            return
+        lines = [f"{html.escape(b['nick'])} (ID {b['player']}) — {when(b['until'])}"
+                 + (f", {html.escape(b['reason'])}" if b["reason"] else "") for b in bans]
+        await message.answer("\n".join(lines))
+
+    async def on_message(self, message: Message) -> None:
+        if not self.allowed(message.from_user and message.from_user.id):
+            await message.answer("Это служебный бот Counter Zombie Mobile.")
+            return
+        await message.answer(HELP)
+
+    # complaint buttons ----------------------------------------------------
+
+    async def on_callback(self, query: CallbackQuery) -> None:
+        if not self.allowed(query.from_user and query.from_user.id):
+            await query.answer()
+            return
+        parts = (query.data or "").split(":")
+        if len(parts) < 2 or not parts[1].isdigit():
+            await query.answer()
+            return
+        report_id = int(parts[1])
+
+        def act(conn):
+            info = service.report_info(conn, report_id)
+            if info is None:
+                return None, ""
+            if info["status"] != "open":
+                return info, "Уже решено."
+            if parts[0] == "b" and len(parts) == 3 and parts[2] in LENGTHS:
+                length = LENGTHS[parts[2]]
+                service.ban(conn, info["target"], length, f"жалоба #{report_id}")
+                if info["message_id"]:
+                    service.delete_message(conn, info["message_id"])
+                else:
+                    service.reset_avatar(conn, info["target"])
+                # the other complaints about this player are answered too
+                conn.execute("UPDATE reports SET status = 'banned', resolved = strftime('%s','now') WHERE target = ? AND status = 'open'",
+                             (info["target"],))
+                return info, f"🚫 Забанен {LENGTH_NAMES[length]}" + (", сообщение удалено." if info["message_id"] else ", аватар сброшен.")
+            if parts[0] == "d" and info["message_id"]:
+                service.delete_message(conn, info["message_id"])
+                service.resolve_report(conn, report_id, "deleted")
+                return info, "🗑 Сообщение удалено."
+            if parts[0] == "k":
+                service.resolve_report(conn, report_id, "dismissed")
+                return info, "✅ Не нарушение."
+            return info, ""
+
+        info, result = await in_db(act)
+        await query.answer(result or "Готово")
+        if info and result:
+            try:
+                if query.message and query.message.photo:
+                    await query.message.edit_caption(caption=report_text(info, result), reply_markup=None)
+                elif query.message:
+                    await query.message.edit_text(report_text(info, result), reply_markup=None)
+            except TelegramAPIError as e:
+                log.warning("could not edit report message: %s", e)
+
+    async def on_startup(self) -> None:
+        try:
+            await self.bot.set_my_commands([
+                BotCommand(command="news", description="Новость в колокольчик"),
+                BotCommand(command="release", description="Выпустить обновление"),
+                BotCommand(command="bans", description="Кто забанен"),
+                BotCommand(command="unban", description="Разбан игрока"),
+                BotCommand(command="stats", description="Сводка"),
+                BotCommand(command="help", description="Как пользоваться"),
+            ])
+        except TelegramAPIError as e:
+            log.warning("set_my_commands failed: %s", e)
+
+
+def build(settings: Settings) -> tuple[Bot, Dispatcher, OwnerBot]:
+    kwargs: dict[str, Any] = {}
+    if settings.bot_api_url:
+        kwargs["api"] = TelegramAPIServer.from_base(settings.bot_api_url)
+    session = RelaySession(**kwargs) if settings.bot_api_url.startswith("https://") else AiohttpSession(**kwargs)
+    bot = Bot(settings.bot_token, session=session, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    owner = OwnerBot(bot, settings)
+    router = Router()
+    router.message.register(owner.on_start, CommandStart())
+    router.message.register(owner.on_start, Command("help"))
+    router.message.register(owner.on_stats, Command("stats"))
+    router.message.register(owner.on_news, Command("news"))
+    router.message.register(owner.on_delnews, Command("delnews"))
+    router.message.register(owner.on_release, Command("release"))
+    router.message.register(owner.on_ban, Command("ban"))
+    router.message.register(owner.on_unban, Command("unban"))
+    router.message.register(owner.on_bans, Command("bans"))
+    router.message.register(owner.on_message)
+    router.callback_query.register(owner.on_callback)
+    dispatcher = Dispatcher()
+    dispatcher.include_router(router)
+    dispatcher.startup.register(owner.on_startup)
+    return bot, dispatcher, owner
+
+
+async def run_bot(bot: Bot, dispatcher: Dispatcher) -> None:
+    """Polling that survives relay hiccups."""
+    settings = get_settings()
+    while True:
+        try:
+            await dispatcher.start_polling(bot, polling_timeout=settings.bot_polling_timeout_seconds,
+                                           allowed_updates=["message", "callback_query"], handle_signals=False)
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # keep the API alive whatever the bot does
+            log.warning("bot stopped: %s, restarting in 30 s", e)
+            await asyncio.sleep(30)

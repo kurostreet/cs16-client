@@ -1,0 +1,22 @@
+[Unit]
+Description=Counter Zombie Mobile service: game API, owner bot, world server list
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=czm
+Group=czm
+WorkingDirectory=/opt/czm/current
+EnvironmentFile=/etc/czm/env
+ExecStart=/opt/czm/venv/bin/uvicorn czm.main:app --host 127.0.0.1 --port 8200 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-access-log --workers 1
+Restart=always
+RestartSec=5
+MemoryMax=220M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/czm
+
+[Install]
+WantedBy=multi-user.target
