@@ -66,7 +66,8 @@ jobs:
                            "gfx/czm/ui/tile_escape.png", "gfx/czm/ui/tile_boss.png", "gfx/czm/ui/panel.png",
                            "gfx/czm/ui/dot.png", "gfx/czm/ui/avatar.png", "gfx/czm/ui/tab_on.png",
                            "logos/czm_logo.png", "logos/czm_zm.png", "gfx/czm/touch/fire.png",
-                           "gfx/czm/touch/jump.png", "gfx/czm/touch/ddrun.png", "gfx/czm/ui/editor_bg.png", "touch_presets/czm_scheme1.cfg",
+                           "gfx/czm/touch/jump.png", "gfx/czm/touch/ddrun.png",
+                           "gfx/czm/shop/wheel1.png", "gfx/czm/shop/wheel6.png", "gfx/czm/shop/wheel8_7.png", "gfx/czm/ui/editor_bg.png", "touch_presets/czm_scheme1.cfg",
                            "touch_presets/czm_scheme2.cfg", "touch_presets/czm_scheme3.cfg",
                            "userconfig.d/czm_touch.cfg"]:
                   assert apk.read("assets/" + name) == Path("3rdparty/cs16client-extras", name).read_bytes(), name
@@ -82,11 +83,12 @@ jobs:
                   assert b"menu_czmmain" in menu and b"czm_queryserver" in menu, abi
                   assert b"menu_czmsettings" in menu and b"czm_zoom_sens" in menu, abi
                   assert b"menu_czmtouch" in menu and b"czm_touch_scheme" in menu, abi
+                  assert b"menu_czmshop" in menu and b"czm_menu_cards" in menu and b"czm_shop_auto" in menu, abi
                   engine = apk.read("lib/" + abi + "/libxash.so")
                   assert b"czm_loading_enable" in engine and b"czm_loading_error" in engine, abi
                   assert b"czm_queryserver" in engine and b"czm_mictest" in engine, abi
                   client = apk.read("lib/" + abi + "/libclient_android_" + suffix + ".so")
-                  assert b"czm_autorun" in client, abi
+                  assert b"czm_autorun" in client and b"czm_buy_state" in client and b"czm_menu" in client, abi
               for name in ["engine-resources", "client-resources"]:
                   metadata = json.loads(apk.read("assets/bundled/" + name + ".json"))
                   assert hashlib.sha256(apk.read("assets/bundled/" + name + ".zip")).hexdigest() == metadata["sha256"]

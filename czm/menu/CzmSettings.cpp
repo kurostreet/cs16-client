@@ -235,8 +235,26 @@ void SetAutoSwitch( float v ) { SetCvar( "_cl_autowepswitch", v ); }
 float GetScheme( void ) { return CZM_TouchScheme() - 1; }
 void SetScheme( float v ) { CZM_SetTouchScheme( (int)v + 1, false ); }
 
-float GetBuyMenu( void ) { return GetCvar( "_vgui_menus" ) != 0.0f ? 0 : 1; }
-void SetBuyMenu( float v ) { SetCvar( "_vgui_menus", v == 0.0f ? 1.0f : 0.0f ); }
+// shop: our wheel or grid, or the server's classic text menu (shown as cards)
+float GetShop( void )
+{
+	if( GetCvar( "_vgui_menus" ) == 0.0f )
+		return 2;
+	return GetCvar( "czm_shop" ) == 2.0f ? 1 : 0;
+}
+void SetShop( float v )
+{
+	int style = (int)v;
+
+	SetCvar( "_vgui_menus", style == 2 ? 0.0f : 1.0f );
+	if( style < 2 )
+		SetCvar( "czm_shop", style + 1.0f );
+}
+
+float GetShopAuto( void ) { return GetCvar( "czm_shop_auto" ) != 0.0f; }
+void SetShopAuto( float v ) { SetCvar( "czm_shop_auto", v ); }
+float GetMenuCards( void ) { return GetCvar( "czm_menu_cards" ) != 0.0f; }
+void SetMenuCards( float v ) { SetCvar( "czm_menu_cards", v ); }
 
 /*
 =================
@@ -323,7 +341,9 @@ const CzmRow s_game[] =
 	{ ROW_SWITCH, "s_xhair_trans", NULL, GetXhairTrans, SetXhairTrans, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_CHOICE, "s_hand", NULL, GetHand, SetHand, NULL, 0, 1, 1, 0, { "opt_right", "opt_left" }, 2 },
 	{ ROW_SWITCH, "s_autoswitch", "s_autoswitch_hint", GetAutoSwitch, SetAutoSwitch, NULL, 0, 1, 1, 0, {}, 0 },
-	{ ROW_CHOICE, "s_buymenu", NULL, GetBuyMenu, SetBuyMenu, NULL, 0, 1, 1, 0, { "opt_new", "opt_classic" }, 2 },
+	{ ROW_CHOICE, "s_shop", "s_shop_hint", GetShop, SetShop, NULL, 0, 2, 1, 0, { "opt_wheel", "opt_grid", "opt_classic" }, 3 },
+	{ ROW_SWITCH, "s_shop_auto", "s_shop_auto_hint", GetShopAuto, SetShopAuto, NULL, 0, 1, 1, 0, {}, 0 },
+	{ ROW_SWITCH, "s_menucards", "s_menucards_hint", GetMenuCards, SetMenuCards, NULL, 0, 1, 1, 0, {}, 0 },
 };
 
 const CzmRow s_profile[] =

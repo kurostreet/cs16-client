@@ -43,7 +43,9 @@ def brand_base_menu(source):
         "\t// advance global time\n\tuiStatic.realTime = flTime * 1000;\n",
         "\t// advance global time\n\tuiStatic.realTime = flTime * 1000;\n\n"
         "\t// our loading screen replaces the console while the engine connects\n"
-        "\tif( CZM_DrawLoadingScreen( ))\n\t\treturn;\n",
+        "\tif( CZM_DrawLoadingScreen( ))\n\t\treturn;\n\n"
+        "\t// server menus as cards over the game\n"
+        "\tCZM_DrawGameOverlay();\n",
         filename,
     )
     return replace_once(
@@ -128,6 +130,20 @@ def brand_connection_progress(source):
     )
 
 
+def brand_udll_int(source):
+    filename = "udll_int.cpp"
+    source = replace_once(source, '#include "Utils.h"\n', '#include "Utils.h"\n#include "CzmMenu.h"\n', filename)
+    # buy menus open our shop (wheel or grid), the stock ones stay for "czm_shop 0"
+    return replace_once(
+        source,
+        "\t\tEngFuncs::KEY_ClearStates();\n\n\t\tswitch( menuType )\n",
+        "\t\tEngFuncs::KEY_ClearStates();\n\n"
+        "\t\tif( CZM_ShopShow( menuType, param2 ))\n\t\t\treturn;\n\n"
+        "\t\tswitch( menuType )\n",
+        filename,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("upstream", type=Path)
@@ -140,6 +156,7 @@ def main():
         "font/FontManager.cpp": brand_font_manager,
         "menus/ServerBrowser.cpp": brand_server_browser,
         "menus/ConnectionProgress.cpp": brand_connection_progress,
+        "udll_int.cpp": brand_udll_int,
     }
     for filename, transform in transforms.items():
         content = transform((args.upstream / filename).read_text())

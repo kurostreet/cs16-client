@@ -81,6 +81,8 @@ int CHudStatusIcons::Draw( float flTime )
 //		byte   : red
 //		byte   : green
 //		byte   : blue
+void CZM_OnBuyZone( void ); // hud_msg.cpp
+
 int CHudStatusIcons::MsgFunc_StatusIcon( const char *pszName, int iSize, void *pbuf )
 {
 	BufferReader reader( pszName, pbuf, iSize );
@@ -95,6 +97,9 @@ int CHudStatusIcons::MsgFunc_StatusIcon( const char *pszName, int iSize, void *p
 		int b = reader.ReadByte();
 		EnableIcon( pszIconName, r, g, b );
 		m_iFlags |= HUD_DRAW;
+
+		if( !stricmp( pszIconName, "buyzone" ))
+			CZM_OnBuyZone();
 	}
 	else
 	{

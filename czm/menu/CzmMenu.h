@@ -39,6 +39,13 @@ enum CzmFontId
 	CZMF_LANG,
 	CZMF_PANEL_TITLE,
 	CZMF_PANEL_TEXT,
+	CZMF_SHOP_MONEY,
+	CZMF_SHOP_NAME,
+	CZMF_SHOP_PRICE,
+	CZMF_SHOP_BIG,
+	CZMF_SHOP_CARD,
+	CZMF_SHOP_CARD_PRICE,
+	CZMF_MENU_TITLE,
 	CZMF_COUNT
 };
 
@@ -200,5 +207,13 @@ void CZM_SetTouchScheme( int scheme, bool fromPreset );
 void CZM_TouchStartup( void ); // first start of this version: our layout replaces the stock one
 void CZM_SaveTouchConfig( void ); // writes the current buttons and touch settings to the layout file
 void CZM_OpenTouchEditor( void );
+
+/*
+ * shop (buy menu) and server menus as cards
+ */
+// the client asks for a buy menu; true if our shop took it
+bool CZM_ShopShow( int menuType, int team );
+// in a match: server menus (plugins, votes) drawn as cards over the game
+void CZM_DrawGameOverlay( void );
 
 #endif // CZM_MENU_H

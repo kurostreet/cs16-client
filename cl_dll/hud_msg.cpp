@@ -28,6 +28,19 @@
 #include "GameStudioModelRenderer.h"
 
 void IN_StopAutoRun( void ); // input_xash3d.cpp
+bool CL_IsDead( void );
+
+// Counter Zombie Mobile: open the shop once a round when the buy zone appears, if the player wants it
+static bool s_bShopOpenedThisRound;
+
+void CZM_OnBuyZone( void )
+{
+	if( s_bShopOpenedThisRound || CL_IsDead() || gEngfuncs.pfnGetCvarFloat( "czm_shop_auto" ) == 0.0f )
+		return;
+
+	s_bShopOpenedThisRound = true;
+	gEngfuncs.pfnClientCmd( "buy\n" );
+}
 #include "com_weapons.h"
 
 #include <cstring>
@@ -55,8 +68,9 @@ int CHud :: MsgFunc_ResetHUD(const char *pszName, int iSize, void *pbuf )
 	// reset sensitivity
 	m_flMouseSensitivity = 0;
 
-	// a new round or a respawn stops auto run
+	// a new round or a respawn stops auto run and may open the shop again
 	IN_StopAutoRun();
+	s_bShopOpenedThisRound = false;
 
 	// reset concussion effect
 	m_iConcussionEffect = 0;

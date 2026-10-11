@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "draw_util.h"
+#include "strl.h"
 
 #define MAX_LOGO_FRAMES 56
 
@@ -83,6 +84,23 @@ void CHud::Think(void)
 // step through the local data,  placing the appropriate graphics & text as appropriate
 // returns 1 if they've changed, 0 otherwise
 bool IN_AutoRunActive( void ); // input_xash3d.cpp
+bool CL_IsDead( void );
+
+// Counter Zombie Mobile: the shop in the menu library shows money, owned weapons and armor
+static void CZM_UpdateShopState( void )
+{
+	static char last[96];
+	char state[96];
+
+	snprintf( state, sizeof( state ), "%d %d %u %d %d %d", gHUD.m_Money.GetMoney(), g_iTeamNumber,
+		(unsigned int)gHUD.m_iWeaponBits, gHUD.m_Battery.GetArmor(), gHUD.m_Battery.HasHelmet() ? 1 : 0, CL_IsDead() ? 0 : 1 );
+
+	if( strcmp( state, last ))
+	{
+		strlcpy( last, state, sizeof( last ));
+		gEngfuncs.Cvar_Set( "czm_buy_state", state );
+	}
+}
 
 // Counter Zombie Mobile: label in the middle of the screen while auto run is on
 static void CZM_DrawAutoRunLabel( float flTime )
@@ -127,6 +145,7 @@ int CHud :: Redraw( float flTime, int intermission )
 	m_iIntermission = intermission;
 
 	UpdateDefaultHUDColor();
+	CZM_UpdateShopState();
 
 	if ( m_pCvarDraw->value && (intermission || !(m_iHideHUDDisplay & HIDEHUD_ALL) ) )
 	{

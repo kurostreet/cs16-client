@@ -333,6 +333,10 @@ void CHud :: Init( void )
 	hud_colored  = CVAR_CREATE( "hud_colored", "0", FCVAR_ARCHIVE );
 	cl_righthand = CVAR_CREATE( "cl_righthand", "1", FCVAR_ARCHIVE );
 	cl_weather   = CVAR_CREATE( "cl_weather", "1", FCVAR_ARCHIVE );
+
+	// Counter Zombie Mobile: what the shop and the server menu cards in the menu library need
+	CVAR_CREATE( "czm_buy_state", "", 0 ); // money team weaponbits armor helmet alive
+	CVAR_CREATE( "czm_menu", "", 0 );      // serial validslots, then the server menu text
 	cl_minmodels = CVAR_CREATE( "cl_minmodels", "0", FCVAR_ARCHIVE );
 	cl_min_t     = CVAR_CREATE( "cl_min_t", "1", FCVAR_ARCHIVE );
 	cl_min_ct    = CVAR_CREATE( "cl_min_ct", "2", FCVAR_ARCHIVE );

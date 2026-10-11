@@ -542,6 +542,10 @@ public:
 
 	void SelectMenuItem( int menu_item );
 
+	// Counter Zombie Mobile: server menus drawn as cards by the menu library
+	bool CardsEnabled( void );
+	void PublishCards( bool open );
+
 	int m_fMenuDisplayed;
 	bool m_bAllowSpec;
 	cvar_t *_extended_menus;
@@ -585,6 +589,10 @@ public:
 	int Draw(float flTime);
 	CHudMsgFunc(Battery);
 	CHudMsgFunc(ArmorType);
+
+	// Counter Zombie Mobile shop reads what the player wears
+	int GetArmor( void ) const { return m_iBat; }
+	bool HasHelmet( void ) const { return m_enArmorType == VestHelm; }
 	
 private:
 	enum armortype_t {
@@ -763,6 +771,8 @@ public:
 	int Draw( float flTime );
 	CHudMsgFunc(Money);
 	CHudMsgFunc(BlinkAcct);
+
+	int GetMoney( void ) const { return m_iMoneyCount; } // Counter Zombie Mobile shop
 
 private:
 	int m_iMoneyCount;

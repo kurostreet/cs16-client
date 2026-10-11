@@ -189,6 +189,14 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "s_autoswitch", "Брать лучшее оружие", "Switch to better weapons" },
 	{ "s_autoswitch_hint", "Подобрал оружие мощнее — оно сразу в руке", "A stronger weapon you pick up is used at once" },
 	{ "s_buymenu", "Меню покупки", "Buy menu" },
+	{ "s_shop", "Магазин", "Shop" },
+	{ "s_shop_hint", "Колесо или сетка. Классика — текстовое меню сервера", "Wheel or grid. Classic is the server's text menu" },
+	{ "opt_wheel", "Колесо", "Wheel" },
+	{ "opt_grid", "Сетка", "Grid" },
+	{ "s_shop_auto", "Автооткрытие магазина", "Open the shop automatically" },
+	{ "s_shop_auto_hint", "В начале каждого раунда", "At the start of every round" },
+	{ "s_menucards", "Меню сервера карточками", "Server menus as cards" },
+	{ "s_menucards_hint", "Крупные кнопки вместо цифр", "Big buttons instead of digits" },
 	{ "opt_new", "Новое", "New" },
 	{ "opt_classic", "Классика", "Classic" },
 	{ "s_nick", "Ник", "Nickname" },
@@ -220,6 +228,9 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_connect_adr", "", 0 );
 	EngFuncs::CvarRegister( "czm_touch_scheme", "1", FCVAR_ARCHIVE );
 	EngFuncs::CvarRegister( "czm_touch_version", "0", FCVAR_ARCHIVE );
+	EngFuncs::CvarRegister( "czm_shop", "1", FCVAR_ARCHIVE );       // 1 wheel, 2 grid
+	EngFuncs::CvarRegister( "czm_shop_auto", "0", FCVAR_ARCHIVE );  // open the shop when a round starts
+	EngFuncs::CvarRegister( "czm_menu_cards", "1", FCVAR_ARCHIVE ); // server menus as cards
 }
 
 // the phone language, passed by the launcher
@@ -319,6 +330,13 @@ void CZM_CreateFonts( float scale )
 		{ "CZM Semibold", 24, 600 },    // CZMF_LANG
 		{ "CZM BlackItalic", 42, 900 }, // CZMF_PANEL_TITLE
 		{ "CZM Medium", 21, 500 },      // CZMF_PANEL_TEXT
+		{ "CZM Black", 38, 900 },       // CZMF_SHOP_MONEY
+		{ "CZM Bold", 21, 700 },        // CZMF_SHOP_NAME
+		{ "CZM Black", 20, 900 },       // CZMF_SHOP_PRICE
+		{ "CZM BlackItalic", 43, 900 }, // CZMF_SHOP_BIG
+		{ "CZM Black", 28, 900 },       // CZMF_SHOP_CARD
+		{ "CZM Black", 25, 900 },       // CZMF_SHOP_CARD_PRICE
+		{ "CZM BlackItalic", 36, 900 }, // CZMF_MENU_TITLE
 	};
 
 	for( int i = 0; i < CZMF_COUNT; i++ )

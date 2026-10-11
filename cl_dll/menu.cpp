@@ -36,6 +36,36 @@ char g_szPrelocalisedMenuString[MAX_MENU_STRING];
 
 int KB_ConvertString( char *in, char **ppout );
 
+/*
+Counter Zombie Mobile: server menus (plugins, votes, the classic buy menu) are drawn
+by the menu library as big cards with touch buttons. The client hands the menu over
+in the czm_menu cvar: "serial validslots", a new line, then the menu text.
+*/
+static bool s_bCardsShown;
+static int s_iCardsSerial;
+
+bool CHudMenu::CardsEnabled( void )
+{
+	return g_pMenu && gEngfuncs.pfnGetCvarFloat( "czm_menu_cards" ) != 0.0f;
+}
+
+void CHudMenu::PublishCards( bool open )
+{
+	char buf[MAX_MENU_STRING + 32];
+
+	if( !open )
+	{
+		if( s_bCardsShown )
+			gEngfuncs.Cvar_Set( "czm_menu", "" );
+		s_bCardsShown = false;
+		return;
+	}
+
+	snprintf( buf, sizeof( buf ), "%d %d\n%s", ++s_iCardsSerial, m_bitsValidSlots, g_szMenuString );
+	gEngfuncs.Cvar_Set( "czm_menu", buf );
+	s_bCardsShown = true;
+}
+
 void Touch_CloseMenu()
 {
 	gMobileAPI.pfnTouchRemoveButton( "_menu_*" );
@@ -96,6 +126,10 @@ int CHudMenu :: Draw( float flTime )
 	// don't draw the menu if the scoreboard is being shown
 	//if ( gViewPort && gViewPort->IsScoreBoardVisible() )
 		//return 1;
+
+	// the menu library draws it as cards
+	if( s_bCardsShown )
+		return 1;
 
 	// draw the menu, along the left-hand side of the screen
 
@@ -190,11 +224,14 @@ int CHudMenu :: MsgFunc_ShowMenu( const char *pszName, int iSize, void *pbuf )
 			{
 				ShowVGUIMenu(MENU_RADIOC); return 1;
 			}
-			else ShowVGUIMenu( MENU_NUMERICAL_MENU ); // we just show touch screen numbers
+			else if( !CardsEnabled( ))
+				ShowVGUIMenu( MENU_NUMERICAL_MENU ); // we just show touch screen numbers
 		}
-		else ShowVGUIMenu(MENU_NUMERICAL_MENU);
+		else if( !CardsEnabled( ))
+			ShowVGUIMenu(MENU_NUMERICAL_MENU);
 	}
-	else ShowVGUIMenu(MENU_NUMERICAL_MENU);
+	else if( !CardsEnabled( ))
+		ShowVGUIMenu(MENU_NUMERICAL_MENU);
 
 	if ( !m_fWaitingForMore ) // this is the start of a new menu
 	{
@@ -220,6 +257,10 @@ int CHudMenu :: MsgFunc_ShowMenu( const char *pszName, int iSize, void *pbuf )
 	m_iFlags |= HUD_DRAW;
 
 	m_fWaitingForMore = NeedMore;
+
+	// the whole menu arrived: give it to the cards
+	if( !NeedMore && CardsEnabled( ))
+		PublishCards( true );
 
 	return 1;
 }
@@ -266,6 +307,7 @@ void CHudMenu::UserCmd_OldStyleMenuClose()
 	m_iFlags &= ~HUD_DRAW;
 
 	Touch_CloseMenu();
+	PublishCards( false );
 }
 
 // lol, no real VGUI here

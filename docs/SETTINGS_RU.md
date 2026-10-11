@@ -15,7 +15,7 @@
 | Управление | обзор, в прицеле, ходьба, гироскоп и его сила, схема кнопок, кнопки на экране (изменить, сбросить) | `sensitivity`, `czm_zoom_sens` → `zoom_sensitivity_ratio`, `touch_forwardzone`/`touch_sidezone`, `gyro_enable`, `gyro_yaw`/`gyro_pitch`, `czm_touch_scheme` |
 | Графика | яркость, лимит FPS (30/60/90/120), размер текста, размер HUD, FPS и пинг на экране, эффекты (мало/средне/много), тени игроков, погода, прозрачный радар | `brightness`, `fps_max`, `con_fontscale` (1/2/3), `hud_scale` (0/1.5/2, со следующей карты), `cl_showfps`, `net_graph 3`, `cl_corpsestay`, `max_shells`, `max_smokepuffs`, `fastsprites`, `cl_shadows`, `cl_weather`, `cl_radartype` |
 | Звук | громкость, музыка в меню, голосовой чат, громкость голосов и микрофона, проверка микрофона | `volume`, `MP3Volume`, `voice_enable`, `voice_scale`, `voice_transmit_scale`, `czm_mictest`/`czm_miclevel` |
-| Игра | язык, прицел (превью, размер, цвет, динамический, прозрачность), рука, лучшее оружие, меню покупки | `czm_lang`, `cl_crosshair_size`, `cl_crosshair_color`, `cl_dynamiccrosshair`, `cl_crosshair_translucent`, `cl_righthand`, `_cl_autowepswitch`, `_vgui_menus` |
+| Игра | язык, прицел (превью, размер, цвет, динамический, прозрачность), рука, лучшее оружие, магазин (колесо/сетка/классика), автооткрытие магазина, меню сервера карточками | `czm_lang`, `cl_crosshair_size`, `cl_crosshair_color`, `cl_dynamiccrosshair`, `cl_crosshair_translucent`, `cl_righthand`, `_cl_autowepswitch`, `czm_shop`, `_vgui_menus`, `czm_shop_auto`, `czm_menu_cards` |
 | Профиль | ник, спрей | `name`, `cl_logofile` |
 
 Откуда открывается:

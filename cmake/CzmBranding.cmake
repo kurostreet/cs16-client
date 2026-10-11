@@ -13,7 +13,7 @@ endif()
 
 get_target_property(CZM_MENU_SOURCES menu SOURCES)
 foreach(CZM_MENU_FILE BaseMenu.cpp controls/BackgroundBitmap.cpp menus/Main.cpp font/FontManager.cpp
-        menus/ServerBrowser.cpp menus/ConnectionProgress.cpp)
+        menus/ServerBrowser.cpp menus/ConnectionProgress.cpp udll_int.cpp)
     set(CZM_UPSTREAM_MENU_FILE "${CZM_MENU_SOURCE_DIR}/${CZM_MENU_FILE}")
     list(FIND CZM_MENU_SOURCES "${CZM_UPSTREAM_MENU_FILE}" CZM_MENU_SOURCE_INDEX)
     if(CZM_MENU_SOURCE_INDEX EQUAL -1)
@@ -30,6 +30,8 @@ target_sources(menu PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmMain.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmSettings.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmTouch.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmShop.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmServerMenu.cpp"
 )
 target_include_directories(menu PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu")
 
@@ -41,4 +43,5 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CZM_MENU_SOURCE_DIR}/font/FontManager.cpp"
     "${CZM_MENU_SOURCE_DIR}/menus/ServerBrowser.cpp"
     "${CZM_MENU_SOURCE_DIR}/menus/ConnectionProgress.cpp"
+    "${CZM_MENU_SOURCE_DIR}/udll_int.cpp"
 )

@@ -130,6 +130,24 @@ index 6c550c7..30fc6e1 100644
  	Cvar_RegisterVariable( &scr_download );
  	Cvar_RegisterVariable( &cl_testlights );
  	Cvar_RegisterVariable( &cl_envshot_size );
+diff --git a/engine/client/cl_view.c b/engine/client/cl_view.c
+index c1b3ef1..607e615 100644
+--- a/engine/client/cl_view.c
++++ b/engine/client/cl_view.c
+@@ -568,11 +568,12 @@ void V_PostRender( void )
+ 		CL_DrawHUD( CL_CHANGELEVEL );
+ 		ref.dllFuncs.R_ShowTextures();
+ 		R_ShowTree();
++		// czm: game buttons first, the menu library draws over them (server menu cards, shop)
++		Touch_Draw();
+ 		UI_UpdateMenu( host.realtime );
+ 		Con_DrawVersion();
+ 		Con_DrawConsole();
+ 		Con_DrawDebug(); // must be last
+-		Touch_Draw();
+ 		OSK_Draw();
+ 
+ 		S_ExtraUpdate();
 diff --git a/engine/client/client.h b/engine/client/client.h
 index 2d6faf7..c248c11 100644
 --- a/engine/client/client.h
