@@ -39,6 +39,9 @@ install -m 644 "$DEST/deploy/czm.service" /etc/systemd/system/czm.service
 systemctl daemon-reload
 systemctl enable --quiet czm
 systemctl restart czm
-sleep 3
+for i in $(seq 1 20); do
+  curl -fsS http://127.0.0.1:8200/api/v1/ping >/dev/null 2>&1 && break
+  sleep 1
+done
 systemctl is-active czm
 curl -fsS http://127.0.0.1:8200/api/v1/ping && echo

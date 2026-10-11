@@ -38,7 +38,9 @@ target_sources(menu PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmOnline.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmChat.cpp"
 )
-# the menu reaches the Android side (CzmNet.java) through SDL's JNIEnv, found with dlopen
+# the menu reaches the Android side (CzmNet.java) through SDL's JNIEnv, found with dlopen;
+# menu is defined in the mainui directory, linking it from here needs CMP0079
+cmake_policy(SET CMP0079 NEW)
 target_link_libraries(menu ${CMAKE_DL_LIBS})
 target_include_directories(menu PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu")
 
