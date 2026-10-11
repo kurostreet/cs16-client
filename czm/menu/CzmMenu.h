@@ -192,6 +192,18 @@ const char *CZM_SprayImage( int index ); // logos/<name>.png
 int CZM_CurrentSpray( void );            // -1 if the player uses a stock spray
 void CZM_SetSpray( int index );
 
+// avatars: the game logo, our pictures, the player's own photo from the gallery
+#define CZM_AVATAR_LOGO -1
+#define CZM_AVATAR_PHOTO 100
+int CZM_AvatarCount( void );
+const char *CZM_AvatarImage( int index );  // our picture, the logo for CZM_AVATAR_LOGO
+const char *CZM_AvatarPhoto( void );       // the photo file, "" if there is none
+int CZM_CurrentAvatar( void );             // CZM_AVATAR_LOGO, 0..count-1 or CZM_AVATAR_PHOTO
+const char *CZM_CurrentAvatarImage( void );
+void CZM_SetAvatar( int index );
+void CZM_PickAvatarPhoto( void );          // opens the gallery
+bool CZM_AvatarPending( void );            // waiting for the gallery; call while the avatar is on the screen
+
 // first start: language and nickname window, good network settings once
 bool CZM_FirstStart( void );
 void CZM_FinishFirstStart( void );

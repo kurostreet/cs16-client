@@ -22,6 +22,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- the player's own avatar from the gallery, the menu opens czmavatar://pick?file=... -->
+        <activity
+            android:name=".AvatarPickerActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="czmavatar" />
+            </intent-filter>
+        </activity>
         <activity
             android:name="su.xash.engine.XashActivity"
             android:exported="false"

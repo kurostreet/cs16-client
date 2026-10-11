@@ -19,6 +19,7 @@
   - Об игре.
 - **Об игре** — только:
   - связь с разработчиком: Telegram @blackmodru (нажатие открывает Telegram);
+  - группа игры: t.me/counter_zombie_mobile (нажатие открывает Telegram);
   - сайт проекта: «Скоро!»;
   - исходный код: github.com/kurostreet/cs16-client (нажатие открывает GitHub);
   - версия приложения;

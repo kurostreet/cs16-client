@@ -24,6 +24,7 @@ GNU General Public License for more details.
 #include "Framework.h"
 #include "Scissor.h"
 #include "keydefs.h"
+#include "utlstring.h"
 #include "CzmMenu.h"
 
 #define UI_DIR "gfx/czm/ui/"
@@ -47,6 +48,12 @@ float GetCvar( const char *name )
 void SetCvar( const char *name, float value )
 {
 	EngFuncs::CvarSetValue( name, value );
+}
+
+// avatars: the photo card, the game logo, our pictures
+int AvatarCards( void )
+{
+	return 2 + CZM_AvatarCount();
 }
 
 // controls
@@ -116,6 +123,53 @@ void SetShowFps( float v ) { SetCvar( "cl_showfps", v ); }
 
 float GetShowPing( void ) { return GetCvar( "net_graph" ) != 0.0f; }
 void SetShowPing( float v ) { SetCvar( "net_graph", v ? 3.0f : 0.0f ); }
+
+// how the game draws: some phones show a black world with one renderer and work with another.
+// The engine reads r_refdll from video.cfg at start and saves that file only on a clean exit,
+// Android often just stops the app, so the line is written into video.cfg at once.
+const char *s_renderers[3] = { "gles1", "gl4es", "gles3compat" };
+float GetRenderer( void )
+{
+	const char *name = EngFuncs::GetCvarString( "r_refdll" );
+
+	if( !name || !name[0] )
+		name = EngFuncs::GetCvarString( "r_refdll_loaded" );
+	for( int i = 0; i < 3; i++ )
+	{
+		if( name && !stricmp( name, s_renderers[i] ))
+			return i;
+	}
+	return 0;
+}
+void SetRenderer( float v )
+{
+	const char *name = s_renderers[bound( 0, (int)v, 2 )];
+	byte *old = EngFuncs::COM_LoadFile( "video.cfg" );
+	CUtlString text;
+
+	EngFuncs::CvarSetString( "r_refdll", name );
+
+	// keep every other line of video.cfg
+	for( const char *p = old ? (const char *)old : ""; *p; )
+	{
+		const char *end = strchr( p, '\n' );
+		size_t len = end ? (size_t)( end - p + 1 ) : strlen( p );
+		const char *q = p;
+
+		while( *q == ' ' || *q == '\t' )
+			q++;
+		if( strncmp( q, "r_refdll ", 9 ) && strncmp( q, "r_refdll\t", 9 ))
+			text.AppendFormat( "%.*s", (int)len, p );
+		p += len;
+	}
+	if( text.Length() && text.Get()[text.Length() - 1] != '\n' )
+		text.Append( "\n" );
+	text.AppendFormat( "r_refdll \"%s\"\n", name );
+
+	if( old )
+		EngFuncs::COM_FreeFile( old );
+	EngFuncs::COM_SaveFile( "video.cfg", text.Get(), text.Length());
+}
 
 // effects presets: corpse time, shells, smoke puffs, smoke sprite quality
 const float s_effects[3][4] = { { 5, 10, 5, 2 }, { 60, 40, 20, 1 }, { 600, 120, 60, 0 } };
@@ -270,6 +324,7 @@ enum ERowType
 	ROW_COLORS,   // crosshair colours
 	ROW_XHAIR,    // crosshair preview
 	ROW_NICK,
+	ROW_AVATARS,
 	ROW_SPRAYS,
 	ROW_MIC,      // microphone test: level meter and a start/stop button
 };
@@ -311,6 +366,7 @@ const CzmRow s_graphics[] =
 {
 	{ ROW_SLIDER, "s_brightness", NULL, GetBrightness, SetBrightness, NULL, 0.0f, 3.0f, 0.05f, FMT_RANGE, {}, 0 },
 	{ ROW_CHOICE, "s_fps", "s_fps_hint", GetFps, SetFps, NULL, 0, 3, 1, 0, { "30", "60", "90", "120" }, 4 },
+	{ ROW_CHOICE, "s_render", "s_render_hint", GetRenderer, SetRenderer, NULL, 0, 2, 1, 0, { "GLES1", "GL4ES", "GLES3" }, 3 },
 	{ ROW_CHOICE, "s_textsize", "s_textsize_hint", GetTextSize, SetTextSize, NULL, 0, 2, 1, 0, { "opt_small", "opt_medium", "opt_large" }, 3 },
 	{ ROW_CHOICE, "s_hudsize", "s_hudsize_hint", GetHudSize, SetHudSize, NULL, 0, 2, 1, 0, { "opt_small", "opt_medium", "opt_large" }, 3 },
 	{ ROW_SWITCH, "s_showfps", NULL, GetShowFps, SetShowFps, NULL, 0, 1, 1, 0, {}, 0 },
@@ -349,6 +405,7 @@ const CzmRow s_game[] =
 const CzmRow s_profile[] =
 {
 	{ ROW_NICK, "s_nick", "s_nick_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
+	{ ROW_AVATARS, "s_avatar", "s_avatar_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_SPRAYS, "s_spray", "s_spray_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 };
 
@@ -444,7 +501,7 @@ private:
 	{
 		CzmRect rect;      // whole row
 		CzmRect control;   // slider track, switch, choice, field
-		CzmRect parts[10]; // choice segments, buttons, colours, sprays
+		CzmRect parts[16]; // choice segments, buttons, colours, avatars, sprays
 		int numParts;
 	};
 
@@ -620,13 +677,14 @@ void CCzmSettings::Layout( void )
 
 		if( row.type == ROW_XHAIR )
 			h = rowH * 1.6f;
-		else if( row.type == ROW_SPRAYS )
+		else if( row.type == ROW_SPRAYS || row.type == ROW_AVATARS )
 		{
 			int card = H * 0.13f, cardGap = H * 0.022f;
 			int columns = Q_max( 1, ( m_panel.w - pad * 2 + cardGap ) / ( card + cardGap ));
-			int lines = ( CZM_SprayCount() + columns - 1 ) / columns;
+			int count = row.type == ROW_SPRAYS ? CZM_SprayCount() : AvatarCards();
+			int lines = ( count + columns - 1 ) / columns;
 
-			h = H * 0.11f + lines * ( card + cardGap );
+			h = H * 0.13f + lines * ( card + cardGap );
 		}
 
 		l.rect = CZM_Rect( m_panel.x + pad, contentY + total - m_iScroll, m_panel.w - pad * 2, h );
@@ -697,13 +755,16 @@ void CCzmSettings::Layout( void )
 			break;
 		}
 		case ROW_SPRAYS:
+		case ROW_AVATARS:
 		{
 			int card = H * 0.13f, cardGap = H * 0.022f;
 			int columns = Q_max( 1, ( l.rect.w + cardGap ) / ( card + cardGap ));
-			for( int k = 0; k < CZM_SprayCount() && k < 10; k++ )
+			int count = Q_min( row.type == ROW_SPRAYS ? CZM_SprayCount() : AvatarCards(), 16 );
+
+			for( int k = 0; k < count; k++ )
 				l.parts[k] = CZM_Rect( l.rect.x + ( k % columns ) * ( card + cardGap ),
-					l.rect.y + H * 0.11f + ( k / columns ) * ( card + cardGap ), card, card );
-			l.numParts = Q_min( CZM_SprayCount(), 10 );
+					l.rect.y + H * 0.13f + ( k / columns ) * ( card + cardGap ), card, card );
+			l.numParts = count;
 			break;
 		}
 		}
@@ -856,7 +917,13 @@ void CCzmSettings::Activate( int hit )
 		case ROW_CHOICE:
 		case ROW_COLORS:
 			if( part >= 0 )
+			{
+				bool changed = row.set == SetRenderer && (int)row.get() != part;
+
 				row.set( part );
+				if( changed )
+					Toast( "s_render_restart" );
+			}
 			break;
 		case ROW_MIC:
 			if( part != 0 )
@@ -887,6 +954,23 @@ void CCzmSettings::Activate( int hit )
 		case ROW_SPRAYS:
 			if( part >= 0 )
 				CZM_SetSpray( part );
+			break;
+		case ROW_AVATARS:
+			// the photo card: choose the photo, a second tap (or no photo yet) opens the gallery
+			if( part == 0 )
+			{
+				if( CZM_AvatarPhoto()[0] && CZM_CurrentAvatar() != CZM_AVATAR_PHOTO )
+					CZM_SetAvatar( CZM_AVATAR_PHOTO );
+				else
+				{
+					CZM_PickAvatarPhoto();
+					Toast( "s_avatar_wait" );
+				}
+			}
+			else if( part == 1 )
+				CZM_SetAvatar( CZM_AVATAR_LOGO );
+			else if( part >= 2 )
+				CZM_SetAvatar( part - 2 );
 			break;
 		}
 	}
@@ -1128,12 +1212,13 @@ void CCzmSettings::DrawRow( int i )
 	HFont hintFont = CZM_Font( CZMF_SMALL );
 	bool dim = !RowActive( i );
 	const char *hint = row.hint ? CZM_T( row.hint ) : NULL;
-	int labelW = ( row.type == ROW_SPRAYS ? l.rect.w : l.control.x - l.rect.x - H * 0.03f );
+	bool cards = row.type == ROW_SPRAYS || row.type == ROW_AVATARS;
+	int labelW = ( cards ? l.rect.w : l.control.x - l.rect.x - H * 0.03f );
 	int labelH = CZM_FontHeight( labelFont ), hintH = CZM_FontHeight( hintFont );
 	int blockH = labelH + ( hint ? hintH + H * 0.008f : 0 );
 	int labelY;
 
-	if( row.type == ROW_SPRAYS )
+	if( cards )
 		labelY = l.rect.y + H * 0.03f;
 	else
 		labelY = l.rect.y + ( l.rect.h - blockH ) / 2;
@@ -1215,6 +1300,59 @@ void CCzmSettings::DrawRow( int i )
 		char clean[64];
 		CZM_CleanName( EngFuncs::GetCvarString( "name" ), clean, sizeof( clean ));
 		CZM_DrawField( l.control, m_nick, clean, CZM_T( "nick_placeholder" ), IsPressed( HIT_ROW + i * 20 ));
+		break;
+	}
+	case ROW_AVATARS:
+	{
+		int current = CZM_CurrentAvatar();
+		bool pending = CZM_AvatarPending();
+		const char *photo = CZM_AvatarPhoto();
+		int corner = H * 0.02f;
+
+		for( int k = 0; k < l.numParts; k++ )
+		{
+			const CzmRect &p = l.parts[k];
+			bool pressed = IsPressed( HIT_ROW + i * 20 + 1 + k );
+			int index = k == 0 ? CZM_AVATAR_PHOTO : k == 1 ? CZM_AVATAR_LOGO : k - 2;
+			bool selected = index == current;
+			int inset = p.w * 0.10f;
+
+			CZM_DrawSliced( selected ? UI_DIR "card_on.png" : UI_DIR "card.png", p.x, p.y, p.w, p.h, 30, corner,
+				pressed ? PackRGBA( 200, 200, 200, 255 ) : CZM_White());
+
+			if( k == 0 && !photo[0] )
+			{
+				// no photo yet: a plus and the word
+				HFont font = CZM_Font( CZMF_SMALL );
+				int icon = p.w * 0.34f;
+				unsigned int color = pending ? PackRGBA( 239, 68, 68, 255 ) : PackRGBA( 200, 205, 215, 255 );
+
+				CZM_DrawImage( UI_DIR "icon_plus.png", p.x + ( p.w - icon ) / 2, p.y + p.h * 0.22f, icon, icon, color );
+				CZM_DrawText( font, p.x, p.y + p.h * 0.66f, p.w, CZM_T( "s_avatar_photo" ), color, QM_CENTER );
+			}
+			else
+			{
+				CZM_DrawImage( k == 0 ? photo : CZM_AvatarImage( index ), p.x + inset, p.y + inset, p.w - inset * 2, p.h - inset * 2 );
+
+				// the photo card can be changed: a small plus in the corner
+				if( k == 0 )
+				{
+					int badge = p.w * 0.28f;
+					CZM_DrawImage( UI_DIR "dot.png", p.x - badge / 4, p.y + p.h - badge * 3 / 4, badge, badge,
+						pending ? PackRGBA( 239, 68, 68, 255 ) : PackRGBA( 40, 44, 54, 255 ));
+					CZM_DrawImage( UI_DIR "icon_plus.png", p.x - badge / 4 + badge / 4, p.y + p.h - badge * 3 / 4 + badge / 4,
+						badge / 2, badge / 2 );
+				}
+			}
+
+			if( selected )
+			{
+				int check = p.w * 0.26f;
+				CZM_DrawImage( UI_DIR "dot.png", p.x + p.w - check * 3 / 4, p.y - check / 4, check, check, PackRGBA( 239, 68, 68, 255 ));
+				CZM_DrawImage( UI_DIR "icon_check.png", p.x + p.w - check * 3 / 4 + check / 5, p.y - check / 4 + check / 5,
+					check * 3 / 5, check * 3 / 5 );
+			}
+		}
 		break;
 	}
 	case ROW_SPRAYS:

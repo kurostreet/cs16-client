@@ -26,9 +26,10 @@ GNU General Public License for more details.
 
 #define UI_DIR "gfx/czm/ui/"
 #define CZM_MAX_TILES 8
-#define CZM_ABOUT_ROWS 5
+#define CZM_ABOUT_ROWS 6
 
 #define CZM_TELEGRAM_URL "https://t.me/blackmodru"
+#define CZM_GROUP_URL "https://t.me/counter_zombie_mobile"
 #define CZM_SOURCE_URL "https://github.com/kurostreet/cs16-client"
 
 namespace
@@ -102,6 +103,7 @@ private:
 		HIT_SETUP_NICK,
 		HIT_SETUP_GO,
 		HIT_ABOUT_TELEGRAM,
+		HIT_ABOUT_GROUP,
 		HIT_ABOUT_SOURCE,
 		HIT_NAV,                    // 4 navigation items
 		HIT_TILE = HIT_NAV + 4,     // one per server
@@ -279,21 +281,21 @@ void CCzmMainMenu::Layout( void )
 	{
 		bool about = m_overlay == OV_ABOUT;
 		int pw = about ? Q_min( (int)( H * 1.16f ), (int)( W * 0.80f )) : Q_min( (int)( H * 1.0f ), (int)( W * 0.62f ));
-		int ph = about ? H * 0.82f : H * 0.62f;
+		int ph = about ? H * 0.86f : H * 0.62f;
 		int pad = H * 0.045f;
 		int closeSize = H * 0.09f;
-		int rowH = H * 0.076f, y;
+		int rowH = H * 0.07f, y;
 
 		m_panel = CZM_Rect(( W - pw ) / 2, ( H - ph ) / 2, pw, ph );
 		m_close = CZM_Rect( m_panel.x + pw - closeSize - H * 0.015f, m_panel.y + H * 0.015f, closeSize, closeSize );
 		m_iPanelLineY = m_panel.y + pad * 0.8f + CZM_FontHeight( CZM_Font( CZMF_PANEL_TITLE )) + H * 0.02f;
 
-		// About: logo, then Telegram, website, source code, version (five taps open the console), last update
-		m_aboutLogo = CZM_Rect( m_panel.x + pad, m_iPanelLineY + H * 0.03f, pw - pad * 2, H * 0.09f );
-		y = m_aboutLogo.y + m_aboutLogo.h + H * 0.025f;
+		// About: logo, then the developer, the group, website, source code, version (five taps open the console), last update
+		m_aboutLogo = CZM_Rect( m_panel.x + pad, m_iPanelLineY + H * 0.025f, pw - pad * 2, H * 0.085f );
+		y = m_aboutLogo.y + m_aboutLogo.h + H * 0.02f;
 		for( int i = 0; i < CZM_ABOUT_ROWS; i++ )
 			m_aboutRows[i] = CZM_Rect( m_panel.x + pad, y + i * rowH, pw - pad * 2, rowH );
-		m_version = m_aboutRows[3];
+		m_version = m_aboutRows[4];
 	}
 }
 
@@ -329,7 +331,9 @@ int CCzmMainMenu::HitTest( void ) const
 				return HIT_VERSION;
 			if( m_overlay == OV_ABOUT && m_aboutRows[0].HasCursor( ))
 				return HIT_ABOUT_TELEGRAM;
-			if( m_overlay == OV_ABOUT && m_aboutRows[2].HasCursor( ))
+			if( m_overlay == OV_ABOUT && m_aboutRows[1].HasCursor( ))
+				return HIT_ABOUT_GROUP;
+			if( m_overlay == OV_ABOUT && m_aboutRows[3].HasCursor( ))
 				return HIT_ABOUT_SOURCE;
 		}
 
@@ -382,6 +386,9 @@ void CCzmMainMenu::Activate( int hit )
 		break;
 	case HIT_ABOUT_TELEGRAM:
 		EngFuncs::ShellExecute( CZM_TELEGRAM_URL, NULL, false );
+		break;
+	case HIT_ABOUT_GROUP:
+		EngFuncs::ShellExecute( CZM_GROUP_URL, NULL, false );
 		break;
 	case HIT_ABOUT_SOURCE:
 		EngFuncs::ShellExecute( CZM_SOURCE_URL, NULL, false );
@@ -546,7 +553,8 @@ void CCzmMainMenu::DrawHeader( void )
 	bool russian = CZM_IsRussian();
 
 	// avatar, nick, hint
-	CZM_DrawImage( UI_DIR "avatar.png", m_avatar.x, m_avatar.y, m_avatar.w, m_avatar.h, profilePressed ? PackRGBA( 190, 190, 190, 255 ) : CZM_White());
+	CZM_AvatarPending(); // a photo from the gallery may have just arrived
+	CZM_DrawImage( CZM_CurrentAvatarImage(), m_avatar.x, m_avatar.y, m_avatar.w, m_avatar.h, profilePressed ? PackRGBA( 190, 190, 190, 255 ) : CZM_White());
 	nickY = m_avatar.y + m_avatar.h * 0.04f;
 	CZM_DrawText( nickFont, m_iNickX, nickY, m_iNickW, m_szNick, profilePressed ? CZM_Grey() : CZM_White());
 	pencil = H * 0.028f;
@@ -682,8 +690,9 @@ void CCzmMainMenu::DrawNav( void )
 
 void CCzmMainMenu::DrawAbout( void )
 {
-	static const char *icons[CZM_ABOUT_ROWS] = { UI_DIR "icon_send.png", UI_DIR "icon_globe.png", UI_DIR "icon_code.png", UI_DIR "icon_tag.png", UI_DIR "icon_calendar.png" };
-	static const char *labels[CZM_ABOUT_ROWS] = { "about_tg", "about_site", "about_source", "about_version", "about_updated" };
+	static const char *icons[CZM_ABOUT_ROWS] = { UI_DIR "icon_send.png", UI_DIR "icon_users.png", UI_DIR "icon_globe.png", UI_DIR "icon_code.png",
+		UI_DIR "icon_tag.png", UI_DIR "icon_calendar.png" };
+	static const char *labels[CZM_ABOUT_ROWS] = { "about_tg", "about_group", "about_site", "about_source", "about_version", "about_updated" };
 	HFont labelFont = CZM_Font( CZMF_PANEL_TEXT );
 	HFont valueFont = CZM_Font( CZMF_TILE_STATUS );
 	const CzmRect &logoRow = m_aboutLogo;
@@ -700,8 +709,8 @@ void CCzmMainMenu::DrawAbout( void )
 	for( int i = 0; i < CZM_ABOUT_ROWS; i++ )
 	{
 		const CzmRect &r = m_aboutRows[i];
-		bool link = i == 0 || i == 2;
-		bool pressed = ( i == 0 && IsPressed( HIT_ABOUT_TELEGRAM )) || ( i == 2 && IsPressed( HIT_ABOUT_SOURCE ));
+		bool link = i <= 1 || i == 3;
+		bool pressed = ( i == 0 && IsPressed( HIT_ABOUT_TELEGRAM )) || ( i == 1 && IsPressed( HIT_ABOUT_GROUP )) || ( i == 3 && IsPressed( HIT_ABOUT_SOURCE ));
 		int chip = r.h * 0.62f, icon = chip * 0.52f, chevron = r.h * 0.30f;
 		int labelX = r.x + chip + H * 0.022f, valueRight = r.x + r.w - ( link ? chevron + H * 0.012f : 0 );
 		const char *value;
@@ -711,9 +720,10 @@ void CCzmMainMenu::DrawAbout( void )
 		switch( i )
 		{
 		case 0: value = "Telegram @blackmodru"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
-		case 1: value = CZM_T( "about_site_soon" ); valueColor = PackRGBA( 250, 204, 21, 255 ); break;
-		case 2: value = "github.com/kurostreet/cs16-client"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
-		case 3: value = CZM_Version(); break;
+		case 1: value = "t.me/counter_zombie_mobile"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
+		case 2: value = CZM_T( "about_site_soon" ); valueColor = PackRGBA( 250, 204, 21, 255 ); break;
+		case 3: value = "github.com/kurostreet/cs16-client"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
+		case 4: value = CZM_Version(); break;
 		default: value = date; break;
 		}
 

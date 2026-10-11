@@ -391,6 +391,10 @@ static HIMAGE LoadOverview( const char *map )
 							pixel( sx, sy, c );
 						else
 							c[0] = bg[0], c[1] = bg[1], c[2] = bg[2];
+
+						// the background (bright green in CS overviews) becomes our dark blue
+						if( abs( c[0] - bg[0] ) + abs( c[1] - bg[1] ) + abs( c[2] - bg[2] ) <= 40 )
+							c[0] = 14, c[1] = 18, c[2] = 26;
 						sum[0] += c[0]; sum[1] += c[1]; sum[2] += c[2];
 						count++;
 					}

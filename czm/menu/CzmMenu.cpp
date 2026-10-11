@@ -104,6 +104,7 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "chat_soon", "Скоро! Общий чат и комнаты RU и EN.", "Coming soon: a global chat with RU and EN rooms." },
 	{ "about_title", "Об игре", "About" },
 	{ "about_tg", "Связь с разработчиком", "Contact the developer" },
+	{ "about_group", "Группа игры", "Game community" },
 	{ "about_site", "Сайт проекта", "Project website" },
 	{ "about_site_soon", "Скоро!", "Coming soon!" },
 	{ "about_source", "Исходный код", "Source code" },
@@ -147,6 +148,9 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "s_brightness", "Яркость", "Brightness" },
 	{ "s_fps", "Лимит FPS", "FPS limit" },
 	{ "s_fps_hint", "Больше — плавнее, но телефон греется", "Higher is smoother but warms the phone" },
+	{ "s_render", "Режим графики", "Renderer" },
+	{ "s_render_hint", "Чёрный экран в игре — попробуй другой", "Black screen in a match? Try another one" },
+	{ "s_render_restart", "Включится после перезапуска игры", "Takes effect after restarting the game" },
 	{ "s_showfps", "FPS на экране", "Show FPS" },
 	{ "s_showping", "Пинг на экране", "Show ping" },
 	{ "s_textsize", "Размер текста", "Text size" },
@@ -207,6 +211,10 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "s_nick_hint", "Так тебя видят другие игроки", "How other players see you" },
 	{ "nick_placeholder", "Твой ник", "Your nickname" },
 	{ "nick_bad", "Введи свой ник, от 2 символов", "Enter your nickname, 2 characters or more" },
+	{ "s_avatar", "Аватар", "Avatar" },
+	{ "s_avatar_hint", "Нажми «Фото», чтобы взять картинку из галереи. В чате его увидят все", "Tap Photo to use a picture from your gallery. Everyone sees it in the chat" },
+	{ "s_avatar_photo", "Фото", "Photo" },
+	{ "s_avatar_wait", "Выбери картинку в галерее", "Pick a picture in the gallery" },
 	{ "s_spray", "Спрей", "Spray" },
 	{ "s_spray_hint", "Рисуется кнопкой спрея в игре", "Drawn with the spray button in the game" },
 	// server list
@@ -285,6 +293,8 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_shop", "1", FCVAR_ARCHIVE );       // 1 wheel, 2 grid
 	EngFuncs::CvarRegister( "czm_shop_auto", "0", FCVAR_ARCHIVE );  // open the shop when a round starts
 	EngFuncs::CvarRegister( "czm_menu_cards", "1", FCVAR_ARCHIVE ); // server menus as cards
+	EngFuncs::CvarRegister( "czm_avatar", "", FCVAR_ARCHIVE );       // "", "1".."10" or "photo"
+	EngFuncs::CvarRegister( "czm_avatar_photo", "", FCVAR_ARCHIVE ); // the player's own photo file
 	EngFuncs::CvarRegister( "czm_srv_filters", "0", FCVAR_ARCHIVE ); // server list filters, bits
 	EngFuncs::CvarRegister( "czm_srv_sort", "0", FCVAR_ARCHIVE );    // 0 players, 1 ping, 2 name
 }
@@ -1373,6 +1383,137 @@ void CZM_SetSpray( int index )
 	EngFuncs::CvarSetString( "cl_logoext", "png" );
 	EngFuncs::CvarSetString( "cl_logofile", s_sprays[index] );
 	EngFuncs::CvarSetValue( "@cl_logoupdate", !EngFuncs::GetCvarFloat( "@cl_logoupdate" ));
+}
+
+/*
+=================
+avatars
+
+czm_avatar: "" the game logo, "1".."10" our pictures, "photo:czm_avatar_N.png" the player's
+own photo. The photo comes from the gallery through AvatarPickerActivity.java: the menu
+picks a new file name, opens czmavatar://pick?file=<name> and waits for the file to appear
+in the game folder. A new name every time, so the engine never shows an old picture.
+=================
+*/
+#define CZM_AVATARS 10
+#define CZM_AVATAR_WAIT 300.0 // seconds the gallery may stay open
+
+static char s_avatarPending[64];
+static double s_avatarPendingTime;
+
+int CZM_AvatarCount( void )
+{
+	return CZM_AVATARS;
+}
+
+const char *CZM_AvatarImage( int index )
+{
+	static char path[64];
+
+	if( index < 0 || index >= CZM_AVATARS )
+		return "gfx/czm/ui/avatar.png";
+
+	snprintf( path, sizeof( path ), "gfx/czm/avatars/avatar_%02d.png", index + 1 );
+	return path;
+}
+
+// the photo file, "" if there is none
+const char *CZM_AvatarPhoto( void )
+{
+	static char checked[64];
+	static bool exists;
+	const char *value = EngFuncs::GetCvarString( "czm_avatar_photo" );
+
+	if( !value || !value[0] )
+		return "";
+
+	// the file is checked once per name
+	if( strcmp( checked, value ))
+	{
+		Q_strncpy( checked, value, sizeof( checked ));
+		exists = EngFuncs::FileExists( value, true ) != 0;
+	}
+
+	return exists ? value : "";
+}
+
+int CZM_CurrentAvatar( void )
+{
+	const char *value = EngFuncs::GetCvarString( "czm_avatar" );
+	int index;
+
+	if( !value || !value[0] )
+		return CZM_AVATAR_LOGO;
+	if( !strcmp( value, "photo" ))
+		return CZM_AvatarPhoto()[0] ? CZM_AVATAR_PHOTO : CZM_AVATAR_LOGO;
+
+	index = atoi( value ) - 1;
+	return ( index >= 0 && index < CZM_AVATARS ) ? index : CZM_AVATAR_LOGO;
+}
+
+const char *CZM_CurrentAvatarImage( void )
+{
+	int current = CZM_CurrentAvatar();
+
+	if( current == CZM_AVATAR_PHOTO )
+		return CZM_AvatarPhoto();
+	return CZM_AvatarImage( current );
+}
+
+void CZM_SetAvatar( int index )
+{
+	char value[16];
+
+	CZM_Init();
+	if( index == CZM_AVATAR_PHOTO )
+		Q_strncpy( value, CZM_AvatarPhoto()[0] ? "photo" : "", sizeof( value ));
+	else if( index >= 0 && index < CZM_AVATARS )
+		snprintf( value, sizeof( value ), "%d", index + 1 );
+	else
+		value[0] = 0;
+
+	EngFuncs::CvarSetString( "czm_avatar", value );
+	EngFuncs::ClientCmd( false, "host_writeconfig\n" );
+}
+
+void CZM_PickAvatarPhoto( void )
+{
+	char url[128];
+
+	snprintf( s_avatarPending, sizeof( s_avatarPending ), "czm_avatar_%d.png", EngFuncs::RandomLong( 100000, 999999 ));
+	s_avatarPendingTime = EngFuncs::DoubleTime();
+	snprintf( url, sizeof( url ), "czmavatar://pick?file=%s", s_avatarPending );
+	EngFuncs::ShellExecute( url, NULL, false );
+}
+
+bool CZM_AvatarPending( void )
+{
+	static double lastCheck;
+	double now = EngFuncs::DoubleTime();
+
+	if( !s_avatarPending[0] )
+		return false;
+
+	if( now - s_avatarPendingTime > CZM_AVATAR_WAIT )
+	{
+		s_avatarPending[0] = 0;
+		return false;
+	}
+
+	// the gallery wrote the photo: it becomes the avatar
+	if( now - lastCheck > 0.5 )
+	{
+		lastCheck = now;
+		if( EngFuncs::FileExists( s_avatarPending, true ))
+		{
+			EngFuncs::CvarSetString( "czm_avatar_photo", s_avatarPending );
+			s_avatarPending[0] = 0;
+			CZM_SetAvatar( CZM_AVATAR_PHOTO );
+			return false;
+		}
+	}
+
+	return true;
 }
 
 /*

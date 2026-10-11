@@ -238,10 +238,10 @@ index 62ac3eb..ae75255 100644
  
 diff --git a/engine/client/czm_loading.c b/engine/client/czm_loading.c
 new file mode 100644
-index 0000000..cf8c8b2
+index 0000000..c1fa3aa
 --- /dev/null
 +++ b/engine/client/czm_loading.c
-@@ -0,0 +1,847 @@
+@@ -0,0 +1,852 @@
 +/*
 +czm_loading.c - Counter Zombie Mobile loading screen state
 +Copyright (C) 2026 Counter Zombie Mobile authors
@@ -425,6 +425,11 @@ index 0000000..cf8c8b2
 +
 +		if( q->sent > 0.0 && NET_CompareAdr( q->adr, adr ))
 +		{
++			// a query that is still on its way keeps its time: the answer to it
++			// may come right after this one is sent and would show a ping of 0
++			if( now - q->sent < 2.0 && !q->challenged )
++				return;
++
 +			slot = q;
 +			break;
 +		}
