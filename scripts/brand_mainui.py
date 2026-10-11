@@ -108,12 +108,19 @@ def brand_main_menu(source):
 def brand_server_browser(source):
     filename = "menus/ServerBrowser.cpp"
     source = replace_once(source, '#include "DropDown.h"\n', '#include "DropDown.h"\n#include "CzmMenu.h"\n', filename)
-    # server info for the mode tiles goes to the main screen first
-    return replace_once(
+    # server info goes to the mode tiles and our server list first
+    source = replace_once(
         source,
         "void UI_AddServerToList( netadr_t adr, const char *info )\n{\n",
         "void UI_AddServerToList( netadr_t adr, const char *info )\n{\n"
         "\tif( CZM_OnServerInfo( adr, info ))\n\t\treturn;\n\n",
+        filename,
+    )
+    # the engine sent the queries for the master list: pings count from now
+    return replace_once(
+        source,
+        "void UI_MenuResetPing_f( void )\n{\n",
+        "void UI_MenuResetPing_f( void )\n{\n\tCZM_ServerListResetPing();\n\n",
         filename,
     )
 

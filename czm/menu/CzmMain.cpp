@@ -14,6 +14,7 @@ GNU General Public License for more details.
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "extdll_menu.h"
@@ -25,6 +26,10 @@ GNU General Public License for more details.
 
 #define UI_DIR "gfx/czm/ui/"
 #define CZM_MAX_TILES 8
+#define CZM_ABOUT_ROWS 5
+
+#define CZM_TELEGRAM_URL "https://t.me/blackmodru"
+#define CZM_SOURCE_URL "https://github.com/kurostreet/cs16-client"
 
 namespace
 {
@@ -33,6 +38,17 @@ namespace
 int UnreadNotifications( void )
 {
 	return 0;
+}
+
+// the day this build was made, 11.10.2026
+void BuildDate( char *out, size_t size )
+{
+	static const char *months = "JanFebMarAprMayJunJulAugSepOctNovDec";
+	const char *date = __DATE__; // "Oct 11 2026"
+	char month[4] = { date[0], date[1], date[2], 0 };
+	const char *m = strstr( months, month );
+
+	snprintf( out, size, "%02d.%02d.%s", atoi( date + 4 ), m ? (int)( m - months ) / 3 + 1 : 0, date + 7 );
 }
 
 } // namespace
@@ -64,6 +80,7 @@ private:
 		OV_QUIT,
 		OV_BELL,
 		OV_ABOUT,
+		OV_CHAT,
 		OV_SETUP, // first start: language and nickname
 	};
 
@@ -84,6 +101,8 @@ private:
 		HIT_SETUP_EN,
 		HIT_SETUP_NICK,
 		HIT_SETUP_GO,
+		HIT_ABOUT_TELEGRAM,
+		HIT_ABOUT_SOURCE,
 		HIT_NAV,                    // 4 navigation items
 		HIT_TILE = HIT_NAV + 4,     // one per server
 		HIT_LAST = HIT_TILE + CZM_MAX_TILES
@@ -117,6 +136,7 @@ private:
 	CzmRect m_avatar, m_profile, m_bell, m_lang;
 	CzmRect m_tiles[CZM_MAX_TILES], m_nav[4];
 	CzmRect m_panel, m_close, m_quitYes, m_quitNo, m_version;
+	CzmRect m_aboutLogo, m_aboutRows[CZM_ABOUT_ROWS];
 	CzmRect m_setupLang, m_setupNick, m_setupGo;
 	CzmTextEdit m_nick;
 	bool m_bNickWarning;
@@ -154,6 +174,10 @@ void CCzmMainMenu::Show()
 
 	// the engine build string would sit on the navigation bar, the version is in About
 	EngFuncs::CvarSetValue( "scr_drawversion", 0.0f );
+
+	// a game started from the server list ended: back to the list
+	if( m_overlay == OV_NONE )
+		CZM_ServerListReturn();
 }
 
 void CCzmMainMenu::Think()
@@ -253,20 +277,23 @@ void CCzmMainMenu::Layout( void )
 	}
 	else
 	{
-		int pw = Q_min( (int)( H * 1.0f ), (int)( W * 0.62f ));
-		int ph = H * 0.62f;
+		bool about = m_overlay == OV_ABOUT;
+		int pw = about ? Q_min( (int)( H * 1.16f ), (int)( W * 0.80f )) : Q_min( (int)( H * 1.0f ), (int)( W * 0.62f ));
+		int ph = about ? H * 0.82f : H * 0.62f;
 		int pad = H * 0.045f;
 		int closeSize = H * 0.09f;
-		int lineStep, aboutTop;
+		int rowH = H * 0.076f, y;
 
 		m_panel = CZM_Rect(( W - pw ) / 2, ( H - ph ) / 2, pw, ph );
 		m_close = CZM_Rect( m_panel.x + pw - closeSize - H * 0.015f, m_panel.y + H * 0.015f, closeSize, closeSize );
 		m_iPanelLineY = m_panel.y + pad * 0.8f + CZM_FontHeight( CZM_Font( CZMF_PANEL_TITLE )) + H * 0.02f;
 
-		// About: logo row, then the version line (five taps open the console)
-		aboutTop = m_iPanelLineY + H * 0.035f;
-		lineStep = CZM_FontHeight( CZM_Font( CZMF_PANEL_TEXT )) * 17 / 10;
-		m_version = CZM_Rect( m_panel.x + pad, aboutTop + H * 0.11f + H * 0.035f, pw - pad * 2, lineStep );
+		// About: logo, then Telegram, website, source code, version (five taps open the console), last update
+		m_aboutLogo = CZM_Rect( m_panel.x + pad, m_iPanelLineY + H * 0.03f, pw - pad * 2, H * 0.09f );
+		y = m_aboutLogo.y + m_aboutLogo.h + H * 0.025f;
+		for( int i = 0; i < CZM_ABOUT_ROWS; i++ )
+			m_aboutRows[i] = CZM_Rect( m_panel.x + pad, y + i * rowH, pw - pad * 2, rowH );
+		m_version = m_aboutRows[3];
 	}
 }
 
@@ -300,6 +327,10 @@ int CCzmMainMenu::HitTest( void ) const
 				return HIT_CLOSE;
 			if( m_overlay == OV_ABOUT && m_version.HasCursor( ))
 				return HIT_VERSION;
+			if( m_overlay == OV_ABOUT && m_aboutRows[0].HasCursor( ))
+				return HIT_ABOUT_TELEGRAM;
+			if( m_overlay == OV_ABOUT && m_aboutRows[2].HasCursor( ))
+				return HIT_ABOUT_SOURCE;
 		}
 
 		return m_panel.HasCursor() ? HIT_PANEL : HIT_BACKDROP;
@@ -338,14 +369,22 @@ void CCzmMainMenu::Activate( int hit )
 	switch( hit )
 	{
 	case HIT_PROFILE:
-	case HIT_NAV + 0:
 		CZM_OpenSettings( CZM_TAB_PROFILE );
 		break;
+	case HIT_NAV + 0:
+		m_overlay = OV_CHAT;
+		break;
 	case HIT_NAV + 1:
-		CZM_OpenSettings( CZM_TAB_CONTROLS );
+		CZM_OpenServerList();
 		break;
 	case HIT_NAV + 2:
-		CZM_OpenSettings( CZM_TAB_GRAPHICS );
+		CZM_OpenSettings( CZM_TAB_LAST );
+		break;
+	case HIT_ABOUT_TELEGRAM:
+		EngFuncs::ShellExecute( CZM_TELEGRAM_URL, NULL, false );
+		break;
+	case HIT_ABOUT_SOURCE:
+		EngFuncs::ShellExecute( CZM_SOURCE_URL, NULL, false );
 		break;
 	case HIT_SETUP_RU:
 	case HIT_SETUP_EN:
@@ -615,8 +654,8 @@ void CCzmMainMenu::DrawTile( int index, CzmRect r )
 
 void CCzmMainMenu::DrawNav( void )
 {
-	static const char *icons[4] = { UI_DIR "icon_user.png", UI_DIR "icon_stick.png", UI_DIR "icon_gear.png", UI_DIR "icon_info.png" };
-	static const char *labels[4] = { "nav_profile", "nav_controls", "nav_settings", "nav_about" };
+	static const char *icons[4] = { UI_DIR "icon_chat.png", UI_DIR "icon_globe.png", UI_DIR "icon_gear.png", UI_DIR "icon_info.png" };
+	static const char *labels[4] = { "nav_chat", "nav_servers", "nav_settings", "nav_about" };
 	HFont font = CZM_Font( CZMF_NAV );
 	int top = m_nav[0].y;
 	int iconSize = H * 0.042f;
@@ -643,35 +682,65 @@ void CCzmMainMenu::DrawNav( void )
 
 void CCzmMainMenu::DrawAbout( void )
 {
-	HFont textFont = CZM_Font( CZMF_PANEL_TEXT );
-	const unsigned int textColor = PackRGBA( 200, 205, 215, 255 );
-	int pad = H * 0.045f;
-	int x = m_panel.x + pad, w = m_panel.w - pad * 2;
-	int top = m_iPanelLineY + H * 0.035f;
-	int logo = H * 0.11f;
-	int textX = x + logo + H * 0.03f;
-	int y, step;
-	char text[128];
+	static const char *icons[CZM_ABOUT_ROWS] = { UI_DIR "icon_send.png", UI_DIR "icon_globe.png", UI_DIR "icon_code.png", UI_DIR "icon_tag.png", UI_DIR "icon_calendar.png" };
+	static const char *labels[CZM_ABOUT_ROWS] = { "about_tg", "about_site", "about_source", "about_version", "about_updated" };
+	HFont labelFont = CZM_Font( CZMF_PANEL_TEXT );
+	HFont valueFont = CZM_Font( CZMF_TILE_STATUS );
+	const CzmRect &logoRow = m_aboutLogo;
+	int logo = logoRow.h;
+	int textX = logoRow.x + logo + H * 0.03f;
+	char date[32];
 
-	CZM_DrawImage( UI_DIR "avatar.png", x, top, logo, logo );
-	CZM_DrawText( CZM_Font( CZMF_NICK ), textX, top + logo * 0.14f, x + w - textX, "Counter Zombie Mobile", CZM_White());
-	CZM_DrawText( CZM_Font( CZMF_SMALL ), textX, top + logo * 0.58f, x + w - textX, "32 players", CZM_Grey());
+	CZM_DrawImage( UI_DIR "avatar.png", logoRow.x, logoRow.y, logo, logo );
+	CZM_DrawText( CZM_Font( CZMF_NICK ), textX, logoRow.y + logo * 0.10f, logoRow.x + logoRow.w - textX, "Counter Zombie Mobile", CZM_White());
+	CZM_DrawText( CZM_Font( CZMF_SMALL ), textX, logoRow.y + logo * 0.58f, logoRow.x + logoRow.w - textX, "32 players", CZM_Grey());
 
-	// version: label and value
-	y = m_version.y + ( m_version.h - CZM_FontHeight( textFont )) / 2;
-	snprintf( text, sizeof( text ), "%s  ", CZM_T( "about_version" ));
-	CZM_DrawText( textFont, x, y, w, text, CZM_Grey());
-	CZM_DrawText( textFont, x + CZM_TextWidth( textFont, text ), y, w - CZM_TextWidth( textFont, text ), CZM_Version(), CZM_White());
+	BuildDate( date, sizeof( date ));
 
-	step = m_version.h;
-	y += step;
-	CZM_DrawText( textFont, x, y, w, CZM_T( "about_engine" ), textColor );
-	y += step;
-	CZM_DrawText( textFont, x, y, w, CZM_T( "about_source" ), textColor );
-	y += step;
-	CZM_DrawText( textFont, x, y, w, CZM_T( "about_fonts" ), textColor );
-	y += step;
-	CZM_DrawText( textFont, x, y, w, CZM_T( "about_icons" ), textColor );
+	for( int i = 0; i < CZM_ABOUT_ROWS; i++ )
+	{
+		const CzmRect &r = m_aboutRows[i];
+		bool link = i == 0 || i == 2;
+		bool pressed = ( i == 0 && IsPressed( HIT_ABOUT_TELEGRAM )) || ( i == 2 && IsPressed( HIT_ABOUT_SOURCE ));
+		int chip = r.h * 0.62f, icon = chip * 0.52f, chevron = r.h * 0.30f;
+		int labelX = r.x + chip + H * 0.022f, valueRight = r.x + r.w - ( link ? chevron + H * 0.012f : 0 );
+		const char *value;
+		unsigned int valueColor = CZM_White();
+		int valueW;
+
+		switch( i )
+		{
+		case 0: value = "Telegram @blackmodru"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
+		case 1: value = CZM_T( "about_site_soon" ); valueColor = PackRGBA( 250, 204, 21, 255 ); break;
+		case 2: value = "github.com/kurostreet/cs16-client"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
+		case 3: value = CZM_Version(); break;
+		default: value = date; break;
+		}
+
+		if( pressed )
+			CZM_DrawSliced( UI_DIR "card.png", r.x - H * 0.012f, r.y + H * 0.004f, r.w + H * 0.024f, r.h - H * 0.008f, 30, (int)( H * 0.02f ));
+		if( i > 0 )
+			UI_FillRect( labelX, r.y, r.x + r.w - labelX, CZM_LineWidth(), CZM_White( 24 ));
+
+		CZM_DrawImage( UI_DIR "chip_round.png", r.x, r.y + ( r.h - chip ) / 2, chip, chip );
+		CZM_DrawImage( icons[i], r.x + ( chip - icon ) / 2, r.y + ( r.h - icon ) / 2, icon, icon, PackRGBA( 220, 224, 232, 255 ));
+
+		// the value keeps its full width, the label gives way
+		valueW = Q_min( CZM_TextWidth( valueFont, value ), ( valueRight - labelX ) * 3 / 5 );
+		CZM_DrawText( labelFont, labelX, r.y + ( r.h - CZM_FontHeight( labelFont )) / 2, valueRight - valueW - H * 0.02f - labelX,
+			CZM_T( labels[i] ), PackRGBA( 165, 172, 182, 255 ));
+		CZM_DrawText( valueFont, valueRight - valueW, r.y + ( r.h - CZM_FontHeight( valueFont )) / 2, valueW + 2, value, valueColor, QM_RIGHT );
+
+		if( link )
+			CZM_DrawImage( UI_DIR "icon_chevron.png", r.x + r.w - chevron, r.y + ( r.h - chevron ) / 2, chevron, chevron, PackRGBA( 150, 156, 166, 255 ));
+	}
+
+	{
+		const CzmRect &last = m_aboutRows[CZM_ABOUT_ROWS - 1];
+		HFont small = CZM_Font( CZMF_SMALL );
+
+		CZM_DrawText( small, m_panel.x, last.y + last.h + H * 0.022f, m_panel.w, CZM_T( "about_more" ), PackRGBA( 120, 126, 136, 255 ), QM_CENTER );
+	}
 }
 
 void CCzmMainMenu::DrawSetup( void )
@@ -734,20 +803,22 @@ void CCzmMainMenu::DrawOverlay( void )
 
 	// title, close button and a thin line under them
 	CZM_DrawText( titleFont, m_panel.x + pad, m_panel.y + pad * 0.8f, m_close.x - m_panel.x - pad,
-		CZM_T( m_overlay == OV_BELL ? "bell_title" : "about_title" ), CZM_White());
+		CZM_T( m_overlay == OV_BELL ? "bell_title" : m_overlay == OV_CHAT ? "chat_title" : "about_title" ), CZM_White());
 	closeIcon = m_close.h * 0.42f;
 	CZM_DrawImage( UI_DIR "icon_close.png", m_close.x + ( m_close.w - closeIcon ) / 2, m_close.y + ( m_close.h - closeIcon ) / 2,
 		closeIcon, closeIcon, IsPressed( HIT_CLOSE ) ? CZM_White() : PackRGBA( 190, 196, 206, 255 ));
 	UI_FillRect( m_panel.x + pad, m_iPanelLineY, m_panel.w - pad * 2, CZM_LineWidth(), CZM_White( 30 ));
 
-	if( m_overlay == OV_BELL )
+	if( m_overlay == OV_BELL || m_overlay == OV_CHAT )
 	{
 		HFont textFont = CZM_Font( CZMF_PANEL_TEXT );
 		int iconSize = H * 0.10f;
 		int middle = ( m_iPanelLineY + m_panel.y + m_panel.h ) / 2;
+		bool chat = m_overlay == OV_CHAT;
 
-		CZM_DrawImage( UI_DIR "icon_bell.png", m_panel.x + ( m_panel.w - iconSize ) / 2, middle - iconSize, iconSize, iconSize, CZM_White( 60 ));
-		CZM_DrawText( textFont, m_panel.x + pad, middle + H * 0.025f, m_panel.w - pad * 2, CZM_T( "bell_empty" ),
+		CZM_DrawImage( chat ? UI_DIR "icon_chat.png" : UI_DIR "icon_bell.png", m_panel.x + ( m_panel.w - iconSize ) / 2, middle - iconSize,
+			iconSize, iconSize, CZM_White( 60 ));
+		CZM_DrawText( textFont, m_panel.x + pad, middle + H * 0.025f, m_panel.w - pad * 2, CZM_T( chat ? "chat_soon" : "bell_empty" ),
 			PackRGBA( 165, 172, 182, 255 ), QM_CENTER );
 		return;
 	}

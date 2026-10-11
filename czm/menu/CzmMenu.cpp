@@ -65,7 +65,7 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "tip7", "Совет: целься в голову — так зомби падают быстрее.", "Tip: aim for the head — zombies go down faster." },
 	{ "tip8", "Совет: стал зомби — нападай вместе с другими, по одному не ходи.", "Tip: turned into a zombie? Attack together, never alone." },
 	{ "tip9", "Совет: с друзьями выживать проще — зови их в игру.", "Tip: surviving is easier with friends — invite them to play." },
-	{ "tip10", "Совет: настрой управление под себя в разделе «Управление».", "Tip: tune your controls in the Controls section." },
+	{ "tip10", "Совет: настрой кнопки под себя в «Настройках», вкладка «Управление».", "Tip: tune your buttons in Settings, on the Controls tab." },
 	{ "st_local", "Запуск игры…", "Starting the game…" },
 	{ "st_connect", "Подключение к серверу…", "Connecting to the server…" },
 	{ "st_handshake", "Получение данных сервера…", "Receiving server data…" },
@@ -94,18 +94,22 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "querying", "Опрашиваем сервер…", "Checking the server…" },
 	{ "offline", "Сервер не отвечает", "Server is not responding" },
 	{ "full", "Сервер полон", "Server is full" },
-	{ "nav_profile", "Профиль", "Profile" },
-	{ "nav_controls", "Управление", "Controls" },
+	{ "nav_chat", "Чат", "Chat" },
+	{ "nav_servers", "Серверы", "Servers" },
 	{ "nav_settings", "Настройки", "Settings" },
 	{ "nav_about", "Об игре", "About" },
 	{ "bell_title", "Уведомления", "Notifications" },
 	{ "bell_empty", "Пока нет уведомлений", "No notifications yet" },
+	{ "chat_title", "Мировой чат", "World chat" },
+	{ "chat_soon", "Скоро! Общий чат и комнаты RU и EN.", "Coming soon: a global chat with RU and EN rooms." },
 	{ "about_title", "Об игре", "About" },
-	{ "about_version", "Версия", "Version" },
-	{ "about_engine", "Движок Xash3D FWGS и клиент CS16Client — свободное ПО (GPL).", "Xash3D FWGS engine and CS16Client — free software (GPL)." },
-	{ "about_source", "Исходный код: github.com/kurostreet/cs16-client", "Source code: github.com/kurostreet/cs16-client" },
-	{ "about_fonts", "Шрифты Inter — SIL Open Font License 1.1.", "Inter fonts — SIL Open Font License 1.1." },
-	{ "about_icons", "Иконки: game-icons.net (Lorc, Delapouite, Skoll, sbed), CC BY 3.0.", "Icons: game-icons.net (Lorc, Delapouite, Skoll, sbed), CC BY 3.0." },
+	{ "about_tg", "Связь с разработчиком", "Contact the developer" },
+	{ "about_site", "Сайт проекта", "Project website" },
+	{ "about_site_soon", "Скоро!", "Coming soon!" },
+	{ "about_source", "Исходный код", "Source code" },
+	{ "about_version", "Версия приложения", "App version" },
+	{ "about_updated", "Последнее обновление", "Last update" },
+	{ "about_more", "Подробности, лицензии и авторы — на GitHub", "Details, licenses and credits are on GitHub" },
 	{ "quit_title", "Выйти из игры?", "Quit the game?" },
 	{ "quit_yes", "Выйти", "Quit" },
 	{ "pause", "ПАУЗА", "PAUSED" },
@@ -205,6 +209,56 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "nick_bad", "Введи свой ник, от 2 символов", "Enter your nickname, 2 characters or more" },
 	{ "s_spray", "Спрей", "Spray" },
 	{ "s_spray_hint", "Рисуется кнопкой спрея в игре", "Drawn with the spray button in the game" },
+	// server list
+	{ "srv_title", "СЕРВЕРЫ", "SERVERS" },
+	{ "srv_tab_all", "Все", "All" },
+	{ "srv_tab_fav", "Избранное", "Favorites" },
+	{ "srv_tab_hist", "История", "History" },
+	{ "srv_search", "Поиск: название, карта, IP", "Search: name, map, IP" },
+	{ "srv_f_notempty", "Не пустые", "Not empty" },
+	{ "srv_f_notfull", "Есть места", "Free slots" },
+	{ "srv_f_nopass", "Без пароля", "No password" },
+	{ "srv_f_zombie", "Зомби", "Zombie" },
+	{ "srv_sort_players", "По игрокам", "By players" },
+	{ "srv_sort_ping", "По пингу", "By ping" },
+	{ "srv_sort_name", "По названию", "By name" },
+	{ "srv_sort_recent", "Недавние", "Recent" },
+	{ "srv_updating", "  ·  обновляем…", "  ·  refreshing…" },
+	{ "srv_searching", "Ищем серверы", "Looking for servers" },
+	{ "srv_nothing", "Ничего не найдено", "Nothing found" },
+	{ "srv_nothing_hint", "Попробуй другой запрос или сбрось фильтры", "Try another search or clear the filters" },
+	{ "srv_reset", "Сбросить фильтры", "Clear filters" },
+	{ "srv_fav_empty", "Здесь будут избранные серверы", "Your favorite servers live here" },
+	{ "srv_fav_hint", "Нажми на звёздочку у сервера или добавь его по IP", "Tap the star next to a server or add one by IP" },
+	{ "srv_hist_empty", "Здесь будут серверы, где ты играл", "Servers you played on show up here" },
+	{ "srv_hist_hint", "Выбери сервер во вкладке «Все»", "Pick a server on the All tab" },
+	{ "srv_none", "Серверы не ответили", "No servers answered" },
+	{ "srv_none_hint", "Проверь интернет и обнови список", "Check your connection and refresh the list" },
+	{ "srv_refresh", "Обновить", "Refresh" },
+	{ "srv_pick", "Выбери сервер в списке", "Pick a server from the list" },
+	{ "srv_ours", "НАШ", "OURS" },
+	{ "srv_password", "С паролем", "Password" },
+	{ "srv_players", "ИГРОКИ", "PLAYERS" },
+	{ "srv_frags", "Фраги", "Frags" },
+	{ "srv_players_wait", "Загружаем список игроков…", "Loading players…" },
+	{ "srv_players_none", "На сервере пока никого", "Nobody is playing right now" },
+	{ "srv_players_hidden", "Сервер не показывает список игроков", "The server hides its players" },
+	{ "srv_more", "и ещё %d", "and %d more" },
+	{ "srv_play", "ИГРАТЬ", "PLAY" },
+	{ "srv_fav_add", "В избранное", "Favorite" },
+	{ "srv_fav_in", "В избранном", "Favorited" },
+	{ "srv_fav_on", "Добавлено в избранное", "Added to favorites" },
+	{ "srv_fav_off", "Убрано из избранного", "Removed from favorites" },
+	{ "srv_add_title", "Добавить сервер", "Add a server" },
+	{ "srv_add_text", "Адрес сервера, например 1.2.3.4:27015", "Server address, e.g. 1.2.3.4:27015" },
+	{ "srv_add_bad", "Не похоже на адрес сервера", "That does not look like a server address" },
+	{ "srv_add_ok", "Добавить", "Add" },
+	{ "srv_add_done", "Сервер добавлен в избранное", "Server added to favorites" },
+	{ "srv_paste", "Вставить", "Paste" },
+	{ "srv_pass_title", "Пароль сервера", "Server password" },
+	{ "srv_pass_text", "Этот сервер закрыт паролем", "This server needs a password" },
+	{ "srv_pass_hint", "Пароль", "Password" },
+	{ "srv_pass_go", "Войти", "Join" },
 	// first start
 	{ "setup_title", "Добро пожаловать!", "Welcome!" },
 	{ "setup_text", "Выбери язык и придумай ник", "Choose a language and a nickname" },
@@ -231,6 +285,8 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_shop", "1", FCVAR_ARCHIVE );       // 1 wheel, 2 grid
 	EngFuncs::CvarRegister( "czm_shop_auto", "0", FCVAR_ARCHIVE );  // open the shop when a round starts
 	EngFuncs::CvarRegister( "czm_menu_cards", "1", FCVAR_ARCHIVE ); // server menus as cards
+	EngFuncs::CvarRegister( "czm_srv_filters", "0", FCVAR_ARCHIVE ); // server list filters, bits
+	EngFuncs::CvarRegister( "czm_srv_sort", "0", FCVAR_ARCHIVE );    // 0 players, 1 ping, 2 name
 }
 
 // the phone language, passed by the launcher
@@ -375,7 +431,7 @@ void CZM_DrawText( HFont font, int x, int y, int w, const char *text, unsigned i
 images
 =================
 */
-static struct { char path[64]; HIMAGE handle; } s_images[64];
+static struct { char path[64]; HIMAGE handle; } s_images[160];
 static int s_numImages;
 
 HIMAGE CZM_Image( const char *path )
@@ -636,6 +692,9 @@ bool CZM_OnServerInfo( netadr_t adr, const char *info )
 {
 	const char *address = EngFuncs::NET_AdrToString( adr );
 	const char *value;
+
+	// our server list sees every answer
+	CZM_ServerListInfo( adr, info );
 
 	for( int i = 0; i < CZM_ServerCount(); i++ )
 	{

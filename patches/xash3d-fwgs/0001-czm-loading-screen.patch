@@ -1,5 +1,5 @@
 diff --git a/engine/client/cl_main.c b/engine/client/cl_main.c
-index 39e4f9c..6bfffb8 100644
+index 39e4f9c..4d54aa2 100644
 --- a/engine/client/cl_main.c
 +++ b/engine/client/cl_main.c
 @@ -1532,7 +1532,7 @@ static void CL_Connect_f( void )
@@ -29,7 +29,23 @@ index 39e4f9c..6bfffb8 100644
  
  	cls.state = ca_connecting;
  	cls.connect_time = MAX_HEARTBEAT; // CL_CheckForResend() will fire immediately
-@@ -2236,6 +2238,7 @@ static void CL_ParseGoldSrcStatusMessage( netadr_t from, sizebuf_t *msg, qboolea
+@@ -2093,6 +2095,7 @@ static void CL_ParseStatusMessage( netadr_t from, sizebuf_t *msg )
+ 		return;
+ 
+ 	UI_AddServerToList( from, infostring );
++	CZM_Loading_InfoReply( from, infostring );
+ }
+ 
+ static net_request_t *CL_NetRequestFind( netadr_t from, int type )
+@@ -2217,6 +2220,7 @@ static void CL_ParseGoldSrcStatusMessage( netadr_t from, sizebuf_t *msg, qboolea
+ 	Info_SetValueForKeyf( s, "maxcl", sizeof( s ), "%i", maxcl );
+ 	Info_SetValueForKey( s, "gamedir", gamedir, sizeof( s ));
+ 	Info_SetValueForKey( s, "password", password ? "1" : "0", sizeof( s ));
++	Info_SetValueForKeyf( s, "bots", sizeof( s ), "%i", bots ); // for the menu server list
+ 
+ 	// write host last so we can try to cut off too long hostnames
+ 	// TODO: value size limit for infostrings
+@@ -2236,6 +2240,7 @@ static void CL_ParseGoldSrcStatusMessage( netadr_t from, sizebuf_t *msg, qboolea
  
  	// tell mainui about server
  	UI_AddServerToList( from, s );
@@ -37,15 +53,15 @@ index 39e4f9c..6bfffb8 100644
  
  	// now process NetAPI requst
  	net_request_t *nr = CL_NetRequestFind( from, NETAPI_REQUEST_DETAILS );
-@@ -2688,6 +2691,7 @@ static void CL_Challenge( const char *c, netadr_t from, sizebuf_t *msg )
+@@ -2688,6 +2693,7 @@ static void CL_Challenge( const char *c, netadr_t from, sizebuf_t *msg )
  	// query challenge is binary: challenge type byte and the challenge value
  	if( c[0] == S2C_GOLDSRC_CHALLENGE[0] && Q_strcmp( c, S2C_GOLDSRC_CHALLENGE ))
  	{
-+		CZM_Loading_QueryChallenge( from );
++		CZM_Loading_QueryChallenge( from, msg );
  		CL_NetRequestChallenge( from, msg );
  		return;
  	}
-@@ -2762,6 +2766,8 @@ static void CL_ErrorMsg( const char *c, const char *args, netadr_t from, sizebuf
+@@ -2762,6 +2768,8 @@ static void CL_ErrorMsg( const char *c, const char *args, netadr_t from, sizebuf
  			Q_snprintf( formatted_msg, sizeof( formatted_msg ), "^3Server message^7\n%s", args + 1 );
  	}
  
@@ -54,7 +70,7 @@ index 39e4f9c..6bfffb8 100644
  	// in case we're in console or it's classic mainui which doesn't support messageboxes
  	if( !UI_IsVisible() || !UI_ShowMessageBox( formatted_msg ))
  		Msg( "%s\n", formatted_msg );
-@@ -3469,9 +3475,11 @@ qboolean CL_PrecacheResources( void )
+@@ -3469,9 +3477,11 @@ qboolean CL_PrecacheResources( void )
  		if( pRes->type != t_model || pRes->nIndex != WORLD_INDEX )
  			continue;
  
@@ -66,7 +82,7 @@ index 39e4f9c..6bfffb8 100644
  		break;
  	}
  
-@@ -3509,6 +3517,8 @@ qboolean CL_PrecacheResources( void )
+@@ -3509,6 +3519,8 @@ qboolean CL_PrecacheResources( void )
  		if( FBitSet( pRes->ucFlags, RES_PRECACHED ))
  			continue;
  
@@ -75,7 +91,7 @@ index 39e4f9c..6bfffb8 100644
  		switch( pRes->type )
  		{
  		case t_sound:
-@@ -3636,6 +3646,10 @@ void CL_Escape_f( void )
+@@ -3636,6 +3648,10 @@ void CL_Escape_f( void )
  	if( cls.key_dest == key_menu )
  		return;
  
@@ -149,10 +165,10 @@ index c1b3ef1..607e615 100644
  
  		S_ExtraUpdate();
 diff --git a/engine/client/client.h b/engine/client/client.h
-index 2d6faf7..c248c11 100644
+index 2d6faf7..b0ab71d 100644
 --- a/engine/client/client.h
 +++ b/engine/client/client.h
-@@ -804,6 +804,28 @@ void CL_NotifyServerListResponse( void );
+@@ -804,6 +804,29 @@ void CL_NotifyServerListResponse( void );
  qboolean CL_NetRequestSend( net_request_t *nr );
  void CL_Escape_f( void );
  
@@ -166,7 +182,8 @@ index 2d6faf7..c248c11 100644
 +void CZM_Loading_BeginLocal( void );
 +void CZM_Loading_ServerData( void );
 +void CZM_Loading_InfoReply( netadr_t from, const char *info );
-+void CZM_Loading_QueryChallenge( netadr_t from );
++void CZM_Loading_QueryChallenge( netadr_t from, sizebuf_t *msg );
++void CZM_TrackInfoQuery( netadr_t adr );
 +void CZM_Loading_SetHostname( const char *hostname );
 +void CZM_Loading_SetError( const char *reason );
 +void CZM_Loading_PrecacheBegin( void );
@@ -221,10 +238,10 @@ index 62ac3eb..ae75255 100644
  
 diff --git a/engine/client/czm_loading.c b/engine/client/czm_loading.c
 new file mode 100644
-index 0000000..3073d33
+index 0000000..cf8c8b2
 --- /dev/null
 +++ b/engine/client/czm_loading.c
-@@ -0,0 +1,789 @@
+@@ -0,0 +1,847 @@
 +/*
 +czm_loading.c - Counter Zombie Mobile loading screen state
 +Copyright (C) 2026 Counter Zombie Mobile authors
@@ -341,44 +358,93 @@ index 0000000..3073d33
 +server info queries
 +
 +Some GoldSrc servers drop the NetAPI query because it carries a -1 challenge,
-+so we also send the plain query. NetAPI still handles servers that answer with
-+a challenge first. The first answer after a query gives the ping (many servers
-+ignore the ping packet).
++so we also send the plain query. Other servers answer a plain query with a
++challenge first; we send the query again with it. Every info query the client
++sends (menu tiles, server list, favorites) is remembered here: the first answer
++gives the ping (many servers ignore the ping packet), which goes to the menu as
++"\czmping\N". The table is a small hash: the server list asks thousands of
++servers at once.
 +=================
 +*/
-+#define CZM_MAX_QUERIES 16
++#define CZM_MAX_QUERIES 4096 // power of two
++#define CZM_QUERY_PROBE 32
++#define CZM_QUERY_EXPIRE 10.0
 +
-+static struct
++typedef struct
 +{
 +	netadr_t adr;
-+	double   sent;
-+} czm_queries[CZM_MAX_QUERIES];
++	double   sent;       // 0 when the slot is free
++	qboolean challenged; // we already answered a challenge for this query
++} czm_query_t;
 +
-+static void CZM_SendInfoQuery( netadr_t *adr, int context, net_api_response_func_t func )
++static czm_query_t czm_queries[CZM_MAX_QUERIES];
++
++static uint CZM_QueryHash( const netadr_t *adr )
++{
++	uint h = (uint)adr->port * 2654435761u;
++
++	if( NET_NetadrType( adr ) == NA_IP6 )
++	{
++		for( int i = 0; i < 14; i++ )
++			h = ( h ^ adr->ip6_1[i] ) * 16777619u;
++		h ^= adr->ip6_0[0] | ( adr->ip6_0[1] << 8 );
++	}
++	else
++	{
++		h ^= adr->ip4 * 2246822519u;
++	}
++
++	return ( h ^ ( h >> 15 )) & ( CZM_MAX_QUERIES - 1 );
++}
++
++static czm_query_t *CZM_FindQuery( netadr_t adr )
++{
++	uint start = CZM_QueryHash( &adr );
++
++	for( int i = 0; i < CZM_QUERY_PROBE; i++ )
++	{
++		czm_query_t *q = &czm_queries[( start + i ) & ( CZM_MAX_QUERIES - 1 )];
++
++		if( q->sent > 0.0 && NET_CompareAdr( q->adr, adr ))
++			return q;
++	}
++
++	return NULL;
++}
++
++// remembers that an info query went to this server now
++void CZM_TrackInfoQuery( netadr_t adr )
 +{
 +	double now = Platform_DoubleTime();
-+	double oldest = now;
-+	int slot = 0;
-+	byte buf[64];
-+	sizebuf_t msg;
++	uint start = CZM_QueryHash( &adr );
++	czm_query_t *slot = NULL;
 +
-+	for( int i = 0; i < CZM_MAX_QUERIES; i++ )
++	for( int i = 0; i < CZM_QUERY_PROBE; i++ )
 +	{
-+		if( NET_CompareAdr( czm_queries[i].adr, *adr ))
++		czm_query_t *q = &czm_queries[( start + i ) & ( CZM_MAX_QUERIES - 1 )];
++
++		if( q->sent > 0.0 && NET_CompareAdr( q->adr, adr ))
 +		{
-+			slot = i;
++			slot = q;
 +			break;
 +		}
 +
-+		if( czm_queries[i].sent < oldest )
-+		{
-+			oldest = czm_queries[i].sent;
-+			slot = i;
-+		}
++		// a free or forgotten slot, else the oldest one
++		if( !slot || ( slot->sent > 0.0 && ( q->sent <= 0.0 || now - q->sent > CZM_QUERY_EXPIRE || q->sent < slot->sent )))
++			slot = q;
 +	}
 +
-+	czm_queries[slot].adr = *adr;
-+	czm_queries[slot].sent = now;
++	slot->adr = adr;
++	slot->sent = now;
++	slot->challenged = false;
++}
++
++static void CZM_SendInfoQuery( netadr_t *adr, int context, net_api_response_func_t func )
++{
++	byte buf[64];
++	sizebuf_t msg;
++
++	CZM_TrackInfoQuery( *adr );
 +
 +	MSG_Init( &msg, "CZMQuery", buf, sizeof( buf ));
 +	MSG_WriteString( &msg, A2S_GOLDSRC_INFO );
@@ -387,17 +453,29 @@ index 0000000..3073d33
 +	gNetApi.SendRequest( context, NETAPI_REQUEST_DETAILS, 0, 4.0, adr, func );
 +}
 +
-+// the server asked for a challenge, the engine resends the query right away
-+void CZM_Loading_QueryChallenge( netadr_t from )
++// the server wants a challenge: send our info query again with it, once
++void CZM_Loading_QueryChallenge( netadr_t from, sizebuf_t *msg )
 +{
-+	for( int i = 0; i < CZM_MAX_QUERIES; i++ )
-+	{
-+		if( czm_queries[i].sent > 0.0 && NET_CompareAdr( czm_queries[i].adr, from ))
-+		{
-+			czm_queries[i].sent = Platform_DoubleTime();
-+			break;
-+		}
-+	}
++	czm_query_t *q = CZM_FindQuery( from );
++	byte buf[64];
++	sizebuf_t out;
++	int challenge;
++
++	if( !q || q->challenged || Platform_DoubleTime() - q->sent > CZM_QUERY_EXPIRE )
++		return;
++
++	MSG_SeekToBit( msg, ( sizeof( uint32_t ) + sizeof( uint8_t )) << 3, SEEK_SET );
++	challenge = MSG_ReadLong( msg );
++	if( MSG_CheckOverflow( msg ))
++		return;
++
++	q->challenged = true;
++	q->sent = Platform_DoubleTime(); // the ping counts from the second query
++
++	MSG_Init( &out, "CZMQuery", buf, sizeof( buf ));
++	MSG_WriteString( &out, A2S_GOLDSRC_INFO );
++	MSG_WriteLong( &out, challenge );
++	Netchan_OutOfBand( NS_CLIENT, from, MSG_GetNumBytesWritten( &out ), MSG_GetData( &out ));
 +}
 +
 +// any server info answer, info is the infostring the menu gets (host, map, numcl, maxcl)
@@ -405,15 +483,13 @@ index 0000000..3073d33
 +{
 +	double now = Platform_DoubleTime();
 +	qboolean ours = czm.active && NET_CompareAdr( from, cls.serveradr );
++	czm_query_t *q = CZM_FindQuery( from );
 +
-+	for( int i = 0; i < CZM_MAX_QUERIES; i++ )
++	if( q )
 +	{
-+		if( czm_queries[i].sent <= 0.0 || !NET_CompareAdr( czm_queries[i].adr, from ))
-+			continue;
-+
-+		if( now - czm_queries[i].sent < 5.0 )
++		if( now - q->sent < 5.0 )
 +		{
-+			int ping = (int)(( now - czm_queries[i].sent ) * 1000.0 );
++			int ping = (int)(( now - q->sent ) * 1000.0 );
 +			char s[64];
 +
 +			if( ours )
@@ -423,8 +499,7 @@ index 0000000..3073d33
 +			UI_AddServerToList( from, s );
 +		}
 +
-+		czm_queries[i].sent = 0.0; // only the first answer counts
-+		break;
++		q->sent = 0.0; // only the first answer counts
 +	}
 +
 +	if( ours )
@@ -1168,3 +1243,18 @@ index 7103b84..c1af3e3 100644
  			CL_Drop ();
  			Host_AbortCurrentFrame ();
  			break;
+diff --git a/engine/common/masterlist.c b/engine/common/masterlist.c
+index a95b573..d4677ce 100644
+--- a/engine/common/masterlist.c
++++ b/engine/common/masterlist.c
+@@ -219,6 +219,10 @@ NET_QueryServerByAddress
+ */
+ void NET_QueryServerByAddress( netadr_t adr, connprotocol_t proto )
+ {
++#if !XASH_DEDICATED
++	CZM_TrackInfoQuery( adr ); // ping and challenge for the menu server list
++#endif
++
+ 	if( proto == PROTO_GOLDSRC )
+ 		Netchan_OutOfBand( NS_CLIENT, adr, sizeof( A2S_GOLDSRC_INFO ), (const byte *)A2S_GOLDSRC_INFO ); // includes null terminator
+ 	else

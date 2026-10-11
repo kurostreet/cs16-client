@@ -61,3 +61,4 @@ SDL — `98d1f3a45aae568ccd6ed5fec179330f47d4d356` (2.32.8).
 Настройки, спреи, первый запуск: [SETTINGS_RU.md](docs/SETTINGS_RU.md).
 Кнопки на экране и редактор раскладки: [TOUCH_BUTTONS_RU.md](docs/TOUCH_BUTTONS_RU.md).
 Магазин и меню сервера карточками: [SHOP_RU.md](docs/SHOP_RU.md).
+Список серверов: [SERVERS_RU.md](docs/SERVERS_RU.md).

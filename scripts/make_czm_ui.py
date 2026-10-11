@@ -170,6 +170,84 @@ def icon(kind, size=128, color=(255, 255, 255, 255)):
     elif kind == "close":
         d.line([S * .22, S * .22, S * .78, S * .78], fill=c, width=lw)
         d.line([S * .78, S * .22, S * .22, S * .78], fill=c, width=lw)
+    elif kind == "chat":
+        d.rounded_rectangle([S * .08, S * .14, S * .92, S * .72], radius=S * .18, outline=c, width=lw)
+        d.polygon([(S * .24, S * .66), (S * .44, S * .66), (S * .22, S * .90)], fill=c)
+        for x in (.32, .50, .68):
+            d.ellipse([S * (x - .055), S * .38, S * (x + .055), S * .49], fill=c)
+    elif kind == "globe":
+        d.ellipse([S * .08, S * .08, S * .92, S * .92], outline=c, width=lw)
+        d.ellipse([S * .31, S * .08, S * .69, S * .92], outline=c, width=int(lw * .8))
+        d.line([S * .10, S * .50, S * .90, S * .50], fill=c, width=int(lw * .8))
+        d.arc([S * .14, S * .02, S * .86, S * .40], 25, 155, fill=c, width=int(lw * .7))
+        d.arc([S * .14, S * .60, S * .86, S * .98], 205, 335, fill=c, width=int(lw * .7))
+    elif kind == "search":
+        d.ellipse([S * .10, S * .10, S * .66, S * .66], outline=c, width=lw)
+        d.line([S * .60, S * .60, S * .88, S * .88], fill=c, width=int(lw * 1.3))
+        r = lw * .65
+        d.ellipse([S * .88 - r, S * .88 - r, S * .88 + r, S * .88 + r], fill=c)
+    elif kind in ("star", "star_on"):
+        pts = []
+        for i in range(10):
+            a = -math.pi / 2 + i * math.pi / 5
+            rr = .46 if i % 2 == 0 else .20
+            pts.append((S * (.5 + math.cos(a) * rr), S * (.53 + math.sin(a) * rr)))
+        if kind == "star_on":
+            d.polygon(pts, fill=c)
+        else:
+            d.line(pts + [pts[0], pts[1]], fill=c, width=int(lw * .8), joint="curve")
+    elif kind == "refresh":
+        d.arc([S * .14, S * .14, S * .86, S * .86], 300, 250, fill=c, width=lw)
+        a = math.radians(250)
+        tip = (S * (.5 + math.cos(a) * .36), S * (.5 + math.sin(a) * .36))
+        d.polygon([(tip[0] + S * .02, tip[1] - S * .17), (tip[0] + S * .02, tip[1] + S * .17), (tip[0] + S * .22, tip[1])], fill=c)
+    elif kind == "plus":
+        d.rounded_rectangle([S * .44, S * .14, S * .56, S * .86], radius=lw / 2, fill=c)
+        d.rounded_rectangle([S * .14, S * .44, S * .86, S * .56], radius=lw / 2, fill=c)
+    elif kind == "lock":
+        d.rounded_rectangle([S * .16, S * .44, S * .84, S * .92], radius=S * .10, fill=c)
+        d.arc([S * .28, S * .08, S * .72, S * .60], 180, 360, fill=c, width=lw)
+        d.rectangle([S * .28, S * .32, S * .28 + lw, S * .46], fill=c)
+        d.rectangle([S * .72 - lw, S * .32, S * .72, S * .46], fill=c)
+        d.ellipse([S * .44, S * .58, S * .56, S * .70], fill=clear)
+    elif kind == "users":
+        d.ellipse([S * .14, S * .16, S * .46, S * .48], fill=c)
+        d.pieslice([S * .02, S * .54, S * .58, S * 1.10], 180, 360, fill=c)
+        d.ellipse([S * .56, S * .22, S * .82, S * .48], outline=c, width=int(lw * .8))
+        d.arc([S * .50, S * .58, S * .98, S * 1.06], 200, 340, fill=c, width=int(lw * .8))
+    elif kind == "clock":
+        d.ellipse([S * .08, S * .08, S * .92, S * .92], outline=c, width=lw)
+        d.line([S * .50, S * .24, S * .50, S * .52], fill=c, width=lw)
+        d.line([S * .48, S * .52, S * .68, S * .64], fill=c, width=lw)
+    elif kind == "send":
+        d.polygon([(S * .06, S * .46), (S * .92, S * .10), (S * .74, S * .88), (S * .50, S * .66), (S * .38, S * .86),
+                   (S * .36, S * .60)], fill=c)
+        d.line([S * .36, S * .60, S * .80, S * .24], fill=clear, width=int(lw * .5))
+    elif kind == "code":
+        d.line([S * .30, S * .26, S * .08, S * .50], fill=c, width=lw)
+        d.line([S * .08, S * .50, S * .30, S * .74], fill=c, width=lw)
+        d.line([S * .70, S * .26, S * .92, S * .50], fill=c, width=lw)
+        d.line([S * .92, S * .50, S * .70, S * .74], fill=c, width=lw)
+        d.line([S * .58, S * .14, S * .42, S * .86], fill=c, width=lw)
+    elif kind == "calendar":
+        d.rounded_rectangle([S * .10, S * .16, S * .90, S * .90], radius=S * .10, outline=c, width=lw)
+        d.rectangle([S * .10, S * .30, S * .90, S * .40], fill=c)
+        d.rounded_rectangle([S * .28, S * .06, S * .28 + lw, S * .26], radius=lw / 2, fill=c)
+        d.rounded_rectangle([S * .72 - lw, S * .06, S * .72, S * .26], radius=lw / 2, fill=c)
+        for x, y in ((.32, .56), (.50, .56), (.68, .56), (.32, .74), (.50, .74)):
+            d.rectangle([S * (x - .05), S * (y - .05), S * (x + .05), S * (y + .05)], fill=c)
+    elif kind == "chevron":
+        d.line([S * .38, S * .20, S * .66, S * .50], fill=c, width=lw)
+        d.line([S * .66, S * .50, S * .38, S * .80], fill=c, width=lw)
+    elif kind == "sort":
+        d.line([S * .30, S * .14, S * .30, S * .84], fill=c, width=lw)
+        d.polygon([(S * .12, S * .66), (S * .48, S * .66), (S * .30, S * .90)], fill=c)
+        d.line([S * .70, S * .86, S * .70, S * .16], fill=c, width=lw)
+        d.polygon([(S * .52, S * .34), (S * .88, S * .34), (S * .70, S * .10)], fill=c)
+    elif kind == "tag":
+        d.polygon([(S * .10, S * .14), (S * .52, S * .14), (S * .90, S * .52), (S * .52, S * .90), (S * .10, S * .52)],
+                  outline=c, width=lw)
+        d.ellipse([S * .26, S * .30, S * .38, S * .42], fill=c)
     return im.resize((size, size), Image.LANCZOS)
 
 
@@ -191,14 +269,28 @@ def make_avatar(name, size=256):
     save(logo, name)
 
 
+NEW_ICONS = ("chat", "globe", "search", "star", "star_on", "refresh", "plus", "lock", "users", "clock", "send", "code",
+             "calendar", "chevron", "sort", "tag")
+
+
 def main():
+    import sys
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    if "--servers" in sys.argv:
+        # server list and new navigation: only the new pictures, the rest stays as committed
+        for kind in NEW_ICONS:
+            save(icon(kind), f"icon_{kind}.png")
+        save(Image.new("RGBA", (8, 8), (255, 255, 255, 255)), "white.png")
+        return
     for name, (art, focus, accent) in TILES.items():
         make_tile(name, art, focus, accent)
     make_tile_shadow("tile_shadow.png")
     make_dot("dot.png")
     for kind in ("bell", "user", "stick", "gear", "info", "pencil", "close", "back", "display", "sound", "target", "check"):
         save(icon(kind), f"icon_{kind}.png")
+    for kind in NEW_ICONS:
+        save(icon(kind), f"icon_{kind}.png")
+    save(Image.new("RGBA", (8, 8), (255, 255, 255, 255)), "white.png")
     make_avatar("avatar.png")
     # header chips and buttons, drawn at their real aspect by the menu
     save(rounded(128, 128, 64, (10, 12, 16, 160), (255, 255, 255, 64), 2), "chip_round.png")

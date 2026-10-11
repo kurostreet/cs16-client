@@ -89,7 +89,7 @@ bool CZM_IsRussian( void );
 void CZM_SetLanguage( bool russian );
 
 /*
- * our servers (the game has no public server list)
+ * our servers: the mode tiles of the main screen
  */
 struct CzmServer
 {
@@ -215,5 +215,14 @@ void CZM_OpenTouchEditor( void );
 bool CZM_ShopShow( int menuType, int team );
 // in a match: server menus (plugins, votes) drawn as cards over the game
 void CZM_DrawGameOverlay( void );
+
+/*
+ * server list: the game's list of servers in our look (czm/menu/CzmServers.cpp)
+ */
+void CZM_OpenServerList( void );
+void CZM_ServerListInfo( netadr_t adr, const char *info ); // every server answer, "\czmping\N" too
+void CZM_ServerListResetPing( void );                     // the engine sent the queries for the master list
+// the main screen opens: back to the list if the last game was started from it
+bool CZM_ServerListReturn( void );
 
 #endif // CZM_MENU_H
