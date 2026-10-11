@@ -16,6 +16,7 @@ GNU General Public License for more details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "extdll_menu.h"
 #include "BaseMenu.h"
@@ -35,10 +36,10 @@ GNU General Public License for more details.
 namespace
 {
 
-// notifications come from the kontrafps.ru service
+// the bell counts unread news and an update waiting to be installed
 int UnreadNotifications( void )
 {
-	return 0;
+	return CZM_NewsUnread() + ( CZM_Update() ? 1 : 0 );
 }
 
 // the day this build was made, 11.10.2026
@@ -104,6 +105,7 @@ private:
 		HIT_SETUP_GO,
 		HIT_ABOUT_TELEGRAM,
 		HIT_ABOUT_GROUP,
+		HIT_UPDATE,
 		HIT_ABOUT_SOURCE,
 		HIT_NAV,                    // 4 navigation items
 		HIT_TILE = HIT_NAV + 4,     // one per server
@@ -121,6 +123,7 @@ private:
 	void DrawNav( void );
 	void DrawOverlay( void );
 	void DrawAbout( void );
+	void DrawBell( void );
 	void DrawSetup( void );
 	void FinishSetup( void );
 
@@ -139,6 +142,7 @@ private:
 	CzmRect m_tiles[CZM_MAX_TILES], m_nav[4];
 	CzmRect m_panel, m_close, m_quitYes, m_quitNo, m_version;
 	CzmRect m_aboutLogo, m_aboutRows[CZM_ABOUT_ROWS];
+	CzmRect m_update, m_updateButton;
 	CzmRect m_setupLang, m_setupNick, m_setupGo;
 	CzmTextEdit m_nick;
 	bool m_bNickWarning;
@@ -279,9 +283,9 @@ void CCzmMainMenu::Layout( void )
 	}
 	else
 	{
-		bool about = m_overlay == OV_ABOUT;
-		int pw = about ? Q_min( (int)( H * 1.16f ), (int)( W * 0.80f )) : Q_min( (int)( H * 1.0f ), (int)( W * 0.62f ));
-		int ph = about ? H * 0.86f : H * 0.62f;
+		bool about = m_overlay == OV_ABOUT, bell = m_overlay == OV_BELL;
+		int pw = about || bell ? Q_min( (int)( H * 1.16f ), (int)( W * 0.80f )) : Q_min( (int)( H * 1.0f ), (int)( W * 0.62f ));
+		int ph = about || bell ? H * 0.86f : H * 0.62f;
 		int pad = H * 0.045f;
 		int closeSize = H * 0.09f;
 		int rowH = H * 0.07f, y;
@@ -296,6 +300,11 @@ void CCzmMainMenu::Layout( void )
 		for( int i = 0; i < CZM_ABOUT_ROWS; i++ )
 			m_aboutRows[i] = CZM_Rect( m_panel.x + pad, y + i * rowH, pw - pad * 2, rowH );
 		m_version = m_aboutRows[4];
+
+		// bell: the update card on top, the news under it
+		m_update = CZM_Rect( m_panel.x + pad, m_iPanelLineY + H * 0.025f, pw - pad * 2, CZM_Update() ? (int)( H * 0.25f ) : 0 );
+		m_updateButton = CZM_Rect( m_update.x + m_update.w - H * 0.03f - H * 0.36f, m_update.y + m_update.h - H * 0.03f - H * 0.08f,
+			H * 0.36f, H * 0.08f );
 	}
 }
 
@@ -335,6 +344,8 @@ int CCzmMainMenu::HitTest( void ) const
 				return HIT_ABOUT_GROUP;
 			if( m_overlay == OV_ABOUT && m_aboutRows[3].HasCursor( ))
 				return HIT_ABOUT_SOURCE;
+			if( m_overlay == OV_BELL && CZM_Update() && m_updateButton.Grown( grow ).HasCursor( ))
+				return HIT_UPDATE;
 		}
 
 		return m_panel.HasCursor() ? HIT_PANEL : HIT_BACKDROP;
@@ -376,7 +387,7 @@ void CCzmMainMenu::Activate( int hit )
 		CZM_OpenSettings( CZM_TAB_PROFILE );
 		break;
 	case HIT_NAV + 0:
-		m_overlay = OV_CHAT;
+		CZM_OpenChat();
 		break;
 	case HIT_NAV + 1:
 		CZM_OpenServerList();
@@ -409,7 +420,26 @@ void CCzmMainMenu::Activate( int hit )
 		break;
 	case HIT_BELL:
 		m_overlay = OV_BELL;
+		CZM_NewsOpen();
 		break;
+	case HIT_UPDATE:
+	{
+		const CzmUpdateInfo *update = CZM_Update();
+		int state;
+		double done, total;
+		char error[32];
+
+		if( !update )
+			break;
+		CZM_UpdateState( &state, &done, &total, error, sizeof( error ));
+		if( state == CZM_UPDATE_DOWNLOADING )
+			CZM_UpdateCancel();
+		else if( state == CZM_UPDATE_READY || state == CZM_UPDATE_PERMISSION )
+			CZM_UpdateInstall();
+		else if( state == CZM_UPDATE_IDLE || state == CZM_UPDATE_ERROR )
+			CZM_UpdateStart( update->url, update->sha256, update->size );
+		break;
+	}
 	case HIT_LANG_RU:
 		CZM_SetLanguage( true );
 		break;
@@ -419,6 +449,9 @@ void CCzmMainMenu::Activate( int hit )
 	case HIT_BACKDROP:
 	case HIT_CLOSE:
 	case HIT_QUIT_NO:
+		// the news seen in the bell are read
+		if( m_overlay == OV_BELL && !CZM_NewsLoading( ))
+			CZM_NewsMarkRead();
 		m_overlay = OV_NONE;
 		break;
 	case HIT_QUIT_YES:
@@ -753,6 +786,134 @@ void CCzmMainMenu::DrawAbout( void )
 	}
 }
 
+void CCzmMainMenu::DrawBell( void )
+{
+	HFont textFont = CZM_Font( CZMF_PANEL_TEXT );
+	HFont smallFont = CZM_Font( CZMF_SMALL );
+	const unsigned int dim = PackRGBA( 165, 172, 182, 255 );
+	const CzmUpdateInfo *update = CZM_Update();
+	int pad = H * 0.045f, x = m_panel.x + pad, w = m_panel.w - pad * 2;
+	int y = m_iPanelLineY + H * 0.025f, bottom = m_panel.y + m_panel.h - pad * 0.7f;
+	int seen = (int)EngFuncs::GetCvarFloat( "czm_news_seen" );
+
+	if( update )
+	{
+		const CzmRect &c = m_update;
+		HFont nameFont = CZM_Font( CZMF_NICK );
+		int state;
+		double done, total;
+		char error[32], text[160], size[32];
+		const char *label;
+		int starts[4], lines, ty;
+
+		CZM_UpdateState( &state, &done, &total, error, sizeof( error ));
+		CZM_DrawSliced( UI_DIR "card_on.png", c.x, c.y, c.w, c.h, 30, (int)( H * 0.022f ));
+
+		snprintf( size, sizeof( size ), "%.0f %s", update->size / 1048576.0, CZM_T( "mb" ));
+		snprintf( text, sizeof( text ), "%s %s", CZM_T( "upd_title" ), update->version );
+		CZM_DrawText( nameFont, c.x + H * 0.03f, c.y + H * 0.022f, c.w - H * 0.06f - CZM_TextWidth( smallFont, size ) - H * 0.02f, text, CZM_White());
+		CZM_DrawText( smallFont, c.x + c.w - H * 0.03f - CZM_TextWidth( smallFont, size ), c.y + H * 0.03f, CZM_TextWidth( smallFont, size ) + 2, size, dim );
+
+		// what is new, up to three lines
+		ty = c.y + H * 0.022f + CZM_FontHeight( nameFont ) + H * 0.01f;
+		lines = CZM_WrapText( textFont, update->notes, c.w - H * 0.06f, starts, 3 );
+		for( int l = 0; l < lines && ty + CZM_FontHeight( textFont ) < m_updateButton.y; l++ )
+		{
+			char line[512];
+			int len = Q_min( starts[l + 1] - starts[l], (int)sizeof( line ) - 1 );
+
+			memcpy( line, update->notes + starts[l], len );
+			line[len] = 0;
+			CZM_DrawText( textFont, c.x + H * 0.03f, ty, c.w - H * 0.06f, line, PackRGBA( 220, 224, 232, 255 ));
+			ty += CZM_FontHeight( textFont ) * 115 / 100;
+		}
+
+		// the button follows the download
+		switch( state )
+		{
+		case CZM_UPDATE_DOWNLOADING:
+		{
+			int barX = c.x + H * 0.03f, barW = m_updateButton.x - H * 0.03f - barX;
+			int barY = m_updateButton.y + m_updateButton.h / 2, barH = Q_max( 4, (int)( H * 0.01f ));
+			int percent = total > 0 ? (int)( done * 100.0 / total ) : 0;
+
+			UI_FillRect( barX, barY, barW, barH, CZM_White( 40 ));
+			UI_FillRect( barX, barY, (int)( barW * bound( 0.0, total > 0 ? done / total : 0.0, 1.0 )), barH, PackRGBA( 239, 68, 68, 255 ));
+			snprintf( text, sizeof( text ), CZM_T( "upd_downloading" ), percent );
+			CZM_DrawText( smallFont, barX, barY - CZM_FontHeight( smallFont ) - H * 0.008f, barW, text, CZM_White());
+			label = CZM_T( "upd_cancel" );
+			break;
+		}
+		case CZM_UPDATE_VERIFYING:
+			label = CZM_T( "upd_verifying" );
+			break;
+		case CZM_UPDATE_READY:
+			label = CZM_T( "upd_install" );
+			break;
+		case CZM_UPDATE_INSTALLING:
+			label = CZM_T( "upd_installing" );
+			break;
+		case CZM_UPDATE_PERMISSION:
+			CZM_DrawText( smallFont, c.x + H * 0.03f, m_updateButton.y + ( m_updateButton.h - CZM_FontHeight( smallFont )) / 2,
+				m_updateButton.x - c.x - H * 0.05f, CZM_T( "upd_permission" ), PackRGBA( 250, 204, 21, 255 ));
+			label = CZM_T( "upd_install" );
+			break;
+		case CZM_UPDATE_ERROR:
+			snprintf( text, sizeof( text ), "upd_error_%s", error[0] ? error : "network" );
+			CZM_DrawText( smallFont, c.x + H * 0.03f, m_updateButton.y + ( m_updateButton.h - CZM_FontHeight( smallFont )) / 2,
+				m_updateButton.x - c.x - H * 0.05f, CZM_T( text ), PackRGBA( 248, 113, 113, 255 ));
+			label = CZM_T( "upd_download" );
+			break;
+		default:
+			label = CZM_T( "upd_download" );
+			break;
+		}
+
+		CZM_DrawButton( state == CZM_UPDATE_DOWNLOADING ? UI_DIR "button_secondary.png" : UI_DIR "button_primary.png", m_updateButton, label,
+			CZM_White(), IsPressed( HIT_UPDATE ));
+		y = c.y + c.h + H * 0.03f;
+	}
+
+	// news, newest first
+	if( !CZM_NewsCount( ))
+	{
+		const char *text = CZM_NewsLoading() ? CZM_T( "news_loading" ) : update ? "" : CZM_T( "bell_empty" );
+		int iconSize = H * 0.10f;
+		int middle = ( y + bottom ) / 2;
+
+		if( !update )
+			CZM_DrawImage( UI_DIR "icon_bell.png", m_panel.x + ( m_panel.w - iconSize ) / 2, middle - iconSize, iconSize, iconSize, CZM_White( 60 ));
+		CZM_DrawText( textFont, x, update ? y : middle + H * 0.025f, w, text, dim, QM_CENTER );
+		return;
+	}
+
+	for( int i = 0; i < CZM_NewsCount() && y < bottom; i++ )
+	{
+		const CzmNews *n = CZM_NewsItem( i );
+		char date[32], line[1024];
+		int starts[7], lines;
+		time_t t = n->time;
+
+		strftime( date, sizeof( date ), "%d.%m.%Y", localtime( &t ));
+		if( n->id > seen )
+			CZM_DrawImage( UI_DIR "dot.png", x, y + ( CZM_FontHeight( smallFont ) - H * 0.014f ) / 2, H * 0.014f, H * 0.014f, PackRGBA( 239, 68, 68, 255 ));
+		CZM_DrawText( smallFont, x + ( n->id > seen ? H * 0.025f : 0 ), y, w, date, dim );
+		y += CZM_FontHeight( smallFont ) + H * 0.006f;
+
+		lines = CZM_WrapText( textFont, n->text, w, starts, 6 );
+		for( int l = 0; l < lines && y + CZM_FontHeight( textFont ) <= bottom; l++ )
+		{
+			int len = Q_min( starts[l + 1] - starts[l], (int)sizeof( line ) - 1 );
+
+			memcpy( line, n->text + starts[l], len );
+			line[len] = 0;
+			CZM_DrawText( textFont, x, y, w, line, CZM_White());
+			y += CZM_FontHeight( textFont ) * 115 / 100;
+		}
+		y += H * 0.025f;
+	}
+}
+
 void CCzmMainMenu::DrawSetup( void )
 {
 	HFont titleFont = CZM_Font( CZMF_PANEL_TITLE );
@@ -819,17 +980,9 @@ void CCzmMainMenu::DrawOverlay( void )
 		closeIcon, closeIcon, IsPressed( HIT_CLOSE ) ? CZM_White() : PackRGBA( 190, 196, 206, 255 ));
 	UI_FillRect( m_panel.x + pad, m_iPanelLineY, m_panel.w - pad * 2, CZM_LineWidth(), CZM_White( 30 ));
 
-	if( m_overlay == OV_BELL || m_overlay == OV_CHAT )
+	if( m_overlay == OV_BELL )
 	{
-		HFont textFont = CZM_Font( CZMF_PANEL_TEXT );
-		int iconSize = H * 0.10f;
-		int middle = ( m_iPanelLineY + m_panel.y + m_panel.h ) / 2;
-		bool chat = m_overlay == OV_CHAT;
-
-		CZM_DrawImage( chat ? UI_DIR "icon_chat.png" : UI_DIR "icon_bell.png", m_panel.x + ( m_panel.w - iconSize ) / 2, middle - iconSize,
-			iconSize, iconSize, CZM_White( 60 ));
-		CZM_DrawText( textFont, m_panel.x + pad, middle + H * 0.025f, m_panel.w - pad * 2, CZM_T( chat ? "chat_soon" : "bell_empty" ),
-			PackRGBA( 165, 172, 182, 255 ), QM_CENTER );
+		DrawBell();
 		return;
 	}
 

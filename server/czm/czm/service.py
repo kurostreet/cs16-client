@@ -33,11 +33,15 @@ def clean_nick(nick: str) -> str:
     return nick if len(nick) >= 2 else "Player"
 
 
-def clean_avatar(avatar: str, current: str = "") -> str:
+def has_photo(player_id: int) -> bool:
+    return (get_settings().avatar_dir / f"{player_id}.png").exists()
+
+
+def clean_avatar(avatar: str, photo: bool = False) -> str:
     avatar = (avatar or "").strip()
     if avatar == "photo":
         # a photo exists only after an upload
-        return "photo" if current == "photo" else ""
+        return "photo" if photo else ""
     if avatar.isdigit() and 1 <= int(avatar) <= 10:
         return avatar
     return ""
@@ -71,7 +75,7 @@ def hello(conn: sqlite3.Connection, key: str, device: str, nick: str, avatar: st
     else:
         conn.execute(
             "UPDATE players SET device_hash = CASE WHEN ? != '' THEN ? ELSE device_hash END, nick = ?, avatar = ?, lang = ?, version = ?, seen = ? WHERE id = ?",
-            (device_hash, device_hash, clean_nick(nick), clean_avatar(avatar, row["avatar"]), lang[:8], version[:32], t, row["id"]),
+            (device_hash, device_hash, clean_nick(nick), clean_avatar(avatar, has_photo(row["id"])), lang[:8], version[:32], t, row["id"]),
         )
     return conn.execute("SELECT * FROM players WHERE key_hash = ?", (key_hash,)).fetchone()
 

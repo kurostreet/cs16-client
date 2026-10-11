@@ -88,6 +88,7 @@ jobs:
                   assert b"menu_czmshop" in menu and b"czm_menu_cards" in menu and b"czm_shop_auto" in menu, abi
                   assert b"menu_czmservers" in menu and b"czm_srv_filters" in menu and b"favorite_servers.lst" in menu, abi
                   assert b"czmavatar://pick?file=%s" in menu and b"czm_avatar_photo" in menu, abi
+                  assert b"menu_czmchat" in menu and b"/api/v1/hello" in menu and b"ru/kurostreet/counterzombiemobile/CzmNet" in menu, abi
                   engine = apk.read("lib/" + abi + "/libxash.so")
                   assert b"czm_loading_enable" in engine and b"czm_loading_error" in engine, abi
                   assert b"czm_queryserver" in engine and b"czm_mictest" in engine, abi

@@ -54,6 +54,8 @@ int CZM_FontHeight( HFont font );
 int CZM_TextWidth( HFont font, const char *text );
 // single line, cut with an ellipsis when it does not fit into w
 void CZM_DrawText( HFont font, int x, int y, int w, const char *text, unsigned int color, unsigned int justify = QM_LEFT );
+// line starts of text wrapped into width (starts needs maxLines + 1 places), returns the number of lines
+int CZM_WrapText( HFont font, const char *text, int width, int *starts, int maxLines );
 
 // fonts are recreated together with the menu fonts when the resolution changes
 void CZM_CreateFonts( float scale );
@@ -227,6 +229,82 @@ void CZM_OpenTouchEditor( void );
 bool CZM_ShopShow( int menuType, int team );
 // in a match: server menus (plugins, votes) drawn as cards over the game
 void CZM_DrawGameOverlay( void );
+
+/*
+ * network through the Android side (czm/menu/CzmNet.cpp, CzmNet.java)
+ */
+class CUtlString;
+bool CZM_NetAvailable( void );
+// a request number, 0 if there is no network layer; body is UTF-8 JSON or ""
+int CZM_NetRequest( const char *method, const char *url, const char *key, const char *body );
+int CZM_NetUpload( const char *url, const char *key, const char *path, const char *contentType ); // path in the game folder
+int CZM_NetDownload( const char *url, const char *path );                                          // path in the game folder
+// true once the answer is there (status 0: no network), the number is then forgotten
+bool CZM_NetPoll( int id, int *status, CUtlString &body );
+const char *CZM_NetDeviceId( void );
+void CZM_NetNewKey( char *out, size_t size );
+int CZM_NetVersionCode( void );
+bool CZM_NetCanSelfUpdate( void );
+
+// update from inside the game
+enum
+{
+	CZM_UPDATE_IDLE = 0,
+	CZM_UPDATE_DOWNLOADING,
+	CZM_UPDATE_VERIFYING,
+	CZM_UPDATE_READY,
+	CZM_UPDATE_ERROR,
+	CZM_UPDATE_INSTALLING,
+	CZM_UPDATE_PERMISSION,
+};
+void CZM_UpdateStart( const char *url, const char *sha256, double size );
+void CZM_UpdateState( int *state, double *done, double *total, char *error, size_t errorSize );
+void CZM_UpdateInstall( void );
+void CZM_UpdateCancel( void );
+void CZM_UpdateCleanup( void );
+
+/*
+ * the player on our service (czm/menu/CzmOnline.cpp)
+ */
+struct CzmNews
+{
+	int id;
+	int time;
+	char text[1024];
+};
+
+struct CzmUpdateInfo
+{
+	bool available;
+	bool cleaned;
+	char version[32];
+	int code;
+	double size;
+	char sha256[80];
+	char url[256];
+	char notes[512];
+};
+
+class CzmJson;
+void CZM_OnlineFrame( void );          // every frame
+const char *CZM_OnlineUrl( const char *path );
+const char *CZM_OnlineKey( void );
+bool CZM_OnlineReady( void );
+int CZM_OnlinePlayer( void );
+bool CZM_OnlineBan( int *until, bool *forever, const char **reason );
+void CZM_OnlineReadBan( const CzmJson &j, int ban );
+int CZM_NewsUnread( void );
+void CZM_NewsOpen( void );             // loads the list
+void CZM_NewsMarkRead( void );
+bool CZM_NewsLoading( void );
+int CZM_NewsCount( void );
+const CzmNews *CZM_NewsItem( int index );
+const CzmUpdateInfo *CZM_Update( void ); // NULL if there is none
+// picture of a chat avatar ("", "1".."10", "photo:<rev>"), downloads photos when needed
+const char *CZM_AvatarFor( const char *ref, int player );
+
+// chat window (czm/menu/CzmChat.cpp)
+void CZM_OpenChat( void );
 
 /*
  * server list: the game's list of servers in our look (czm/menu/CzmServers.cpp)

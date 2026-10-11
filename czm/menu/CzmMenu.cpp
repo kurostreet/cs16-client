@@ -100,8 +100,6 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "nav_about", "Об игре", "About" },
 	{ "bell_title", "Уведомления", "Notifications" },
 	{ "bell_empty", "Пока нет уведомлений", "No notifications yet" },
-	{ "chat_title", "Мировой чат", "World chat" },
-	{ "chat_soon", "Скоро! Общий чат и комнаты RU и EN.", "Coming soon: a global chat with RU and EN rooms." },
 	{ "about_title", "Об игре", "About" },
 	{ "about_tg", "Связь с разработчиком", "Contact the developer" },
 	{ "about_group", "Группа игры", "Game community" },
@@ -266,6 +264,36 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "srv_pass_text", "Этот сервер закрыт паролем", "This server needs a password" },
 	{ "srv_pass_hint", "Пароль", "Password" },
 	{ "srv_pass_go", "Войти", "Join" },
+	// chat
+	{ "chat_title", "ЧАТ", "CHAT" },
+	{ "chat_rules", "Без мата и оскорблений. Нажми на сообщение, чтобы пожаловаться", "No swearing or insults. Tap a message to report it" },
+	{ "chat_placeholder", "Сообщение в %s…", "Message to %s…" },
+	{ "chat_connecting", "Подключаемся к чату…", "Connecting to the chat…" },
+	{ "chat_loading", "Загружаем сообщения…", "Loading messages…" },
+	{ "chat_empty", "Здесь пока тихо. Напиши первым!", "It's quiet here. Say something first!" },
+	{ "chat_offline", "Нет связи с сервером, попробуй позже", "No connection to the server, try again later" },
+	{ "chat_slow", "Не так быстро — подожди %d с", "Not so fast — wait %d s" },
+	{ "chat_repeat", "Это сообщение уже отправлено", "You already sent this message" },
+	{ "chat_reported", "Жалоба отправлена, спасибо", "Report sent, thank you" },
+	{ "chat_report_slow", "Слишком много жалоб, попробуй позже", "Too many reports, try again later" },
+	{ "chat_report_title", "Пожаловаться на %s?", "Report %s?" },
+	{ "chat_report_message", "На сообщение", "The message" },
+	{ "chat_report_avatar", "На аватар", "The avatar" },
+	{ "chat_banned_until", "Чат закрыт для тебя до %s. Вопросы — Telegram @blackmodru", "You can't chat until %s. Questions: Telegram @blackmodru" },
+	{ "chat_banned_forever", "Чат закрыт для тебя навсегда. Вопросы — Telegram @blackmodru", "You can't chat anymore. Questions: Telegram @blackmodru" },
+	// news and updates
+	{ "upd_title", "Доступно обновление", "Update available" },
+	{ "upd_download", "Скачать", "Download" },
+	{ "upd_downloading", "Скачиваем… %d%%", "Downloading… %d%%" },
+	{ "upd_verifying", "Проверяем файл…", "Checking the file…" },
+	{ "upd_install", "Установить", "Install" },
+	{ "upd_installing", "Устанавливаем…", "Installing…" },
+	{ "upd_permission", "Разреши установку для игры в настройках Android и нажми ещё раз", "Allow installs for the game in Android settings, then tap again" },
+	{ "upd_error_network", "Связь прервалась. Нажми, чтобы продолжить", "The download stopped. Tap to continue" },
+	{ "upd_error_broken", "Файл повреждён, скачаем заново", "The file is damaged, it will download again" },
+	{ "upd_error_install", "Не удалось установить. Попробуй ещё раз", "Could not install. Try again" },
+	{ "upd_cancel", "Отмена", "Cancel" },
+	{ "news_loading", "Загружаем новости…", "Loading news…" },
 	// first start
 	{ "setup_title", "Добро пожаловать!", "Welcome!" },
 	{ "setup_text", "Выбери язык и придумай ник", "Choose a language and a nickname" },
@@ -294,6 +322,9 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_menu_cards", "1", FCVAR_ARCHIVE ); // server menus as cards
 	EngFuncs::CvarRegister( "czm_avatar", "", FCVAR_ARCHIVE );       // "", "1".."10" or "photo"
 	EngFuncs::CvarRegister( "czm_avatar_photo", "", FCVAR_ARCHIVE ); // the player's own photo file
+	EngFuncs::CvarRegister( "czm_avatar_sent", "", FCVAR_ARCHIVE );  // the photo the service already has
+	EngFuncs::CvarRegister( "czm_news_seen", "0", FCVAR_ARCHIVE );   // the newest news the player opened
+	EngFuncs::CvarRegister( "czm_chat_room", "0", FCVAR_ARCHIVE );   // 0 global, 1 ru, 2 en
 	EngFuncs::CvarRegister( "czm_srv_filters", "0", FCVAR_ARCHIVE ); // server list filters, bits
 	EngFuncs::CvarRegister( "czm_srv_sort", "0", FCVAR_ARCHIVE );    // 0 players, 1 ping, 2 name
 }
@@ -603,6 +634,50 @@ void CZM_CleanName( const char *in, char *out, size_t size )
 	}
 
 	out[len] = 0;
+}
+
+// line starts of text wrapped into width; long words are cut between letters
+int CZM_WrapText( HFont font, const char *text, int width, int *starts, int maxLines )
+{
+	int len = strlen( text ), lines = 0, start = 0;
+	char buf[512];
+
+	while( start < len && lines < maxLines )
+	{
+		int lastSpace = -1, end = start, fit = start;
+
+		starts[lines++] = start;
+		// the longest piece from start that fits
+		while( end < len )
+		{
+			int next = end + 1;
+
+			while( next < len && ( text[next] & 0xC0 ) == 0x80 )
+				next++;
+			memcpy( buf, text + start, next - start );
+			buf[next - start] = 0;
+			if( CZM_TextWidth( font, buf ) > width )
+				break;
+			if( text[end] == ' ' )
+				lastSpace = end;
+			fit = next;
+			end = next;
+		}
+
+		if( end >= len )
+		{
+			start = len;
+			break;
+		}
+
+		// cut at the last space if there is one, else between letters
+		start = lastSpace > start ? lastSpace + 1 : Q_max( fit, start + 1 );
+		while( start < len && text[start] == ' ' )
+			start++;
+	}
+
+	starts[lines] = len;
+	return lines;
 }
 
 bool CZM_CursorIn( int x, int y, int w, int h )

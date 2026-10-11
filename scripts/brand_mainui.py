@@ -45,7 +45,9 @@ def brand_base_menu(source):
         "\t// our loading screen replaces the console while the engine connects\n"
         "\tif( CZM_DrawLoadingScreen( ))\n\t\treturn;\n\n"
         "\t// server menus as cards over the game\n"
-        "\tCZM_DrawGameOverlay();\n",
+        "\tCZM_DrawGameOverlay();\n\n"
+        "\t// answers of our service: hello, news, chat avatars\n"
+        "\tCZM_OnlineFrame();\n",
         filename,
     )
     return replace_once(
