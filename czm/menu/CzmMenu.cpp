@@ -244,7 +244,6 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "srv_none_hint", "Проверь интернет и обнови список", "Check your connection and refresh the list" },
 	{ "srv_refresh", "Обновить", "Refresh" },
 	{ "srv_pick", "Выбери сервер в списке", "Pick a server from the list" },
-	{ "srv_ours", "НАШ", "OURS" },
 	{ "srv_password", "С паролем", "Password" },
 	{ "srv_players", "ИГРОКИ", "PLAYERS" },
 	{ "srv_frags", "Фраги", "Frags" },

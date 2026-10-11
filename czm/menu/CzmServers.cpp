@@ -111,7 +111,6 @@ struct CzmEntry
 	bool gs;             // GoldSrc protocol, else Xash
 	bool xash;           // answered a Xash query: a Xash server, whatever else it answers
 	bool answered;       // info arrived at least once
-	bool ours;           // one of the project servers
 	double queryTime;    // last query we sent, for the ping
 	double pendingSince; // first query that is still without an answer
 	double answerTime;   // last info received
@@ -808,12 +807,6 @@ CzmEntry *CCzmServers::Add( const netadr_t &adr )
 	entry.mode = MODE_OTHER;
 	FoldText( address, entry.search, sizeof( entry.search ));
 
-	for( int i = 0; i < CZM_ServerCount(); i++ )
-	{
-		if( !strcmp( CZM_Server( i )->address, address ))
-			entry.ours = true;
-	}
-
 	m_entries.AddToTail( entry );
 
 	h = HashAddress( address );
@@ -909,19 +902,7 @@ void CCzmServers::OnServerInfo( netadr_t adr, const char *info )
 	{
 		// a new server answers while the master list is being asked
 		if( m_flRefreshTime <= 0.0 || EngFuncs::DoubleTime() - m_flRefreshTime > LIST_TIMEOUT * 2 )
-		{
-			bool ours = false;
-
-			for( int i = 0; i < CZM_ServerCount(); i++ )
-			{
-				if( !strcmp( CZM_Server( i )->address, EngFuncs::NET_AdrToString( adr )))
-					ours = true;
-			}
-
-			// our own servers are asked by the main screen all the time, they always belong here
-			if( !ours )
-				return;
-		}
+			return;
 
 		e = Add( adr );
 		if( !e )
@@ -1256,7 +1237,7 @@ bool CCzmServers::Passes( const CzmEntry &e ) const
 	case TAB_ALL:
 		if( !e.answered || IsStale( e ))
 			return false;
-		if( !( e.sources & SRC_INTERNET ) && !e.ours )
+		if( !( e.sources & SRC_INTERNET ))
 			return false;
 		break;
 	case TAB_FAVORITES:
@@ -1302,10 +1283,6 @@ static int CompareEntries( const void *a, const void *b )
 
 	if( s_sortTab == TAB_HISTORY )
 		return eb.historyOrder - ea.historyOrder;
-
-	// our servers first
-	if( s_sortTab == TAB_ALL && ea.ours != eb.ours )
-		return ea.ours ? -1 : 1;
 
 	// silent servers last
 	if( ea.answered != eb.answered )
@@ -2234,21 +2211,10 @@ void CCzmServers::DrawRow( int index, const CzmRect &r )
 		statsW += H * 0.02f;
 	}
 
-	// name: our badge, lock, the name
+	// name: lock, the name
 	textW = right - statsW - x;
 	textX = x;
 	y = r.y + r.h * 0.17f;
-	if( e.ours )
-	{
-		HFont small = CZM_Font( CZMF_SMALL );
-		const char *ours = CZM_T( "srv_ours" );
-		int bh = CZM_FontHeight( nameFont ), bw = CZM_TextWidth( small, ours ) + bh * 0.6f;
-
-		CZM_DrawPill( UI_DIR "pill_lang_on.png", x, y, bw, bh );
-		CZM_DrawText( small, x, y + ( bh - CZM_FontHeight( small )) / 2, bw, ours, CZM_White(), QM_CENTER );
-		x += bw + H * 0.012f;
-		textW -= bw + H * 0.012f;
-	}
 	if( e.password )
 	{
 		int size = CZM_FontHeight( nameFont ) * 0.8f;
