@@ -670,6 +670,8 @@ void CCzmMainMenu::DrawAbout( void )
 	CZM_DrawText( textFont, x, y, w, CZM_T( "about_source" ), textColor );
 	y += step;
 	CZM_DrawText( textFont, x, y, w, CZM_T( "about_fonts" ), textColor );
+	y += step;
+	CZM_DrawText( textFont, x, y, w, CZM_T( "about_icons" ), textColor );
 }
 
 void CCzmMainMenu::DrawSetup( void )

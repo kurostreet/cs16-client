@@ -110,6 +110,8 @@ void CZM_ConnectToServer( int index );
  */
 // draws the full-screen art behind every menu window, returns false if the art is missing
 bool CZM_DrawMenuBackground( Point pos, Size size );
+// the button editor keeps the game picture clear behind it
+void CZM_SetGameVisible( bool visible );
 
 // draws the loading screen while the engine connects, returns true if it owns the frame
 bool CZM_DrawLoadingScreen( void );
@@ -188,5 +190,15 @@ bool CZM_FirstStart( void );
 void CZM_FinishFirstStart( void );
 // settings the engine does not keep by itself, call when the main screen opens
 void CZM_ApplyStartupSettings( void );
+
+/*
+ * touch buttons: three layouts and our editor
+ */
+int CZM_TouchScheme( void ); // 1..3
+// switches the layout; fromPreset drops the player's changes to that layout
+void CZM_SetTouchScheme( int scheme, bool fromPreset );
+void CZM_TouchStartup( void ); // first start of this version: our layout replaces the stock one
+void CZM_SaveTouchConfig( void ); // writes the current buttons and touch settings to the layout file
+void CZM_OpenTouchEditor( void );
 
 #endif // CZM_MENU_H

@@ -202,6 +202,9 @@ void SetHand( float v ) { SetCvar( "cl_righthand", v == 0.0f ? 1.0f : 0.0f ); }
 float GetAutoSwitch( void ) { return GetCvar( "_cl_autowepswitch" ) != 0.0f; }
 void SetAutoSwitch( float v ) { SetCvar( "_cl_autowepswitch", v ); }
 
+float GetScheme( void ) { return CZM_TouchScheme() - 1; }
+void SetScheme( float v ) { CZM_SetTouchScheme( (int)v + 1, false ); }
+
 float GetBuyMenu( void ) { return GetCvar( "_vgui_menus" ) != 0.0f ? 0 : 1; }
 void SetBuyMenu( float v ) { SetCvar( "_vgui_menus", v == 0.0f ? 1.0f : 0.0f ); }
 
@@ -251,6 +254,7 @@ const CzmRow s_controls[] =
 	{ ROW_SLIDER, "s_move", "s_move_hint", GetMove, SetMove, NULL, 1.0f, 10.0f, 1.0f, FMT_INT, {}, 0 },
 	{ ROW_SWITCH, "s_gyro", "s_gyro_hint", GetGyro, SetGyro, GyroAvailable, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SLIDER, "s_gyro_power", NULL, GetGyroPower, SetGyroPower, GyroOn, 0.2f, 4.0f, 0.1f, FMT_DECIMAL, {}, 0 },
+	{ ROW_CHOICE, "s_scheme", "s_scheme_hint", GetScheme, SetScheme, NULL, 0, 2, 1, 0, { "opt_scheme1", "opt_scheme2", "opt_scheme3" }, 3 },
 	{ ROW_BUTTONS, "s_buttons", "s_buttons_hint", NULL, NULL, NULL, 0, 0, 0, 0, { "b_edit", "b_reset" }, 2 },
 };
 
@@ -471,7 +475,7 @@ void CCzmSettings::Save( void )
 	// movement zones live in the touch config
 	if( m_bTouchChanged )
 	{
-		EngFuncs::ClientCmd( false, "touch_writeconfig\n" );
+		CZM_SaveTouchConfig();
 		m_bTouchChanged = false;
 	}
 }
@@ -741,10 +745,9 @@ void CCzmSettings::Activate( int hit )
 
 	if( hit == HIT_CONFIRM_YES )
 	{
-		// the default layout of the game, touch.cfg is a copy of it
+		// our default for the current layout, the player's changes to it are dropped
 		m_bConfirm = false;
-		EngFuncs::ClientCmd( false, "exec touch_presets/phone_ahsim.cfg\n" );
-		EngFuncs::ClientCmd( false, "touch_writeconfig\n" );
+		CZM_SetTouchScheme( CZM_TouchScheme(), true );
 		Toast( "reset_done" );
 		return;
 	}
@@ -773,7 +776,7 @@ void CCzmSettings::Activate( int hit )
 			break;
 		case ROW_BUTTONS:
 			if( part == 0 )
-				UI_TouchEdit_Menu();
+				CZM_OpenTouchEditor();
 			else if( part == 1 )
 				m_bConfirm = true;
 			break;

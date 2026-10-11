@@ -29,6 +29,7 @@ target_sources(menu PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmMenu.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmMain.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmSettings.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu/CzmTouch.cpp"
 )
 target_include_directories(menu PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/czm/menu")
 

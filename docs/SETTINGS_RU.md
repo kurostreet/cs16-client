@@ -12,7 +12,7 @@
 
 | Вкладка | Что внутри | Переменные |
 |---|---|---|
-| Управление | обзор, в прицеле, ходьба, гироскоп и его сила, кнопки на экране (изменить, сбросить) | `sensitivity`, `czm_zoom_sens` → `zoom_sensitivity_ratio`, `touch_forwardzone`/`touch_sidezone`, `gyro_enable`, `gyro_yaw`/`gyro_pitch` |
+| Управление | обзор, в прицеле, ходьба, гироскоп и его сила, схема кнопок, кнопки на экране (изменить, сбросить) | `sensitivity`, `czm_zoom_sens` → `zoom_sensitivity_ratio`, `touch_forwardzone`/`touch_sidezone`, `gyro_enable`, `gyro_yaw`/`gyro_pitch`, `czm_touch_scheme` |
 | Графика | яркость, лимит FPS (30/60/90/120), FPS и пинг на экране, эффекты (мало/средне/много) | `brightness`, `fps_max`, `cl_showfps`, `net_graph 3`, `cl_corpsestay`, `max_shells`, `max_smokepuffs`, `fastsprites` |
 | Звук | громкость, музыка в меню, голосовой чат, громкость голосов и микрофона | `volume`, `MP3Volume`, `voice_enable`, `voice_scale`, `voice_transmit_scale` |
 | Игра | язык, прицел (превью, размер, цвет, прозрачность), рука, лучшее оружие, меню покупки | `czm_lang`, `cl_crosshair_size`, `cl_crosshair_color`, `cl_crosshair_translucent`, `cl_righthand`, `_cl_autowepswitch`, `_vgui_menus` |
@@ -24,8 +24,9 @@
 - «Настройки» в паузе — последняя открытая вкладка.
 
 **Кнопки на экране:**
-- «Изменить» открывает движковый редактор раскладки;
-- «Сбросить» возвращает стандартную раскладку игры (`touch_presets/phone_ahsim.cfg`).
+- «Схема кнопок» — Классика, Шутер или Минимум;
+- «Изменить» открывает наш редактор раскладки ([TOUCH_BUTTONS_RU.md](TOUCH_BUTTONS_RU.md));
+- «Сбросить» возвращает стандартную раскладку текущей схемы.
 
 **Скрыто от игрока:**
 - консоль разработчика;

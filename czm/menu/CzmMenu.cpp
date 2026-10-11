@@ -105,6 +105,7 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "about_engine", "Движок Xash3D FWGS и клиент CS16Client — свободное ПО (GPL).", "Xash3D FWGS engine and CS16Client — free software (GPL)." },
 	{ "about_source", "Исходный код: github.com/kurostreet/cs16-client", "Source code: github.com/kurostreet/cs16-client" },
 	{ "about_fonts", "Шрифты Inter — SIL Open Font License 1.1.", "Inter fonts — SIL Open Font License 1.1." },
+	{ "about_icons", "Иконки: game-icons.net (Lorc, Delapouite, Skoll, sbed), CC BY 3.0.", "Icons: game-icons.net (Lorc, Delapouite, Skoll, sbed), CC BY 3.0." },
 	{ "quit_title", "Выйти из игры?", "Quit the game?" },
 	{ "quit_yes", "Выйти", "Quit" },
 	{ "pause", "ПАУЗА", "PAUSED" },
@@ -128,8 +129,13 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "s_gyro_hint", "Наклон телефона двигает прицел", "Tilt the phone to aim" },
 	{ "s_gyro_none", "На этом телефоне нет гироскопа", "This phone has no gyroscope" },
 	{ "s_gyro_power", "Сила гироскопа", "Gyroscope strength" },
+	{ "s_scheme", "Схема кнопок", "Button layout" },
+	{ "s_scheme_hint", "Три раскладки, у каждой свои изменения", "Three layouts, each keeps its own changes" },
+	{ "opt_scheme1", "Классика", "Classic" },
+	{ "opt_scheme2", "Шутер", "Shooter" },
+	{ "opt_scheme3", "Минимум", "Minimal" },
 	{ "s_buttons", "Кнопки на экране", "On-screen buttons" },
-	{ "s_buttons_hint", "Перетаскивание и размер кнопок", "Move and resize the buttons" },
+	{ "s_buttons_hint", "Место, размер, иконки, новые кнопки", "Place, size, icons, new buttons" },
 	{ "b_edit", "Изменить", "Edit" },
 	{ "b_reset", "Сбросить", "Reset" },
 	{ "reset_confirm", "Сбросить раскладку кнопок?", "Reset the button layout?" },
@@ -195,6 +201,8 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_zoom_sens", "1.2", FCVAR_ARCHIVE );
 	EngFuncs::CvarRegister( "czm_connect_name", "", 0 );
 	EngFuncs::CvarRegister( "czm_connect_adr", "", 0 );
+	EngFuncs::CvarRegister( "czm_touch_scheme", "1", FCVAR_ARCHIVE );
+	EngFuncs::CvarRegister( "czm_touch_version", "0", FCVAR_ARCHIVE );
 }
 
 // the phone language, passed by the launcher
@@ -730,6 +738,13 @@ static void CZM_ShowPendingError( void )
 menu background
 =================
 */
+static bool s_bGameVisible;
+
+void CZM_SetGameVisible( bool visible )
+{
+	s_bGameVisible = visible;
+}
+
 bool CZM_DrawMenuBackground( Point pos, Size size )
 {
 	HIMAGE art = CZM_Image( "gfx/czm/menu_bg.png" );
@@ -740,7 +755,8 @@ bool CZM_DrawMenuBackground( Point pos, Size size )
 	// in the game, keep the world visible behind the pause window and settings
 	if( CL_IsActive( ))
 	{
-		UI_FillRect( pos.x, pos.y, size.w, size.h, PackRGBA( 0, 0, 0, 150 ));
+		if( !s_bGameVisible )
+			UI_FillRect( pos.x, pos.y, size.w, size.h, PackRGBA( 0, 0, 0, 150 ));
 		return true;
 	}
 
@@ -1309,4 +1325,6 @@ void CZM_ApplyStartupSettings( void )
 	}
 
 	EngFuncs::CvarSetValue( "cl_allowdownload", 1.0f );
+
+	CZM_TouchStartup();
 }

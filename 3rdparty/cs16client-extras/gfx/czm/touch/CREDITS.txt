@@ -1,0 +1,10 @@
+Counter Zombie Mobile touch button icons
+
+Most glyphs come from game-icons.net and are used under the Creative Commons
+Attribution 3.0 license (https://creativecommons.org/licenses/by/3.0/):
+  Lorc (http://lorcblog.blogspot.com), Delapouite (https://delapouite.com),
+  Skoll, sbed (http://opengameart.org/content/95-game-icons).
+They were recoloured and placed on round buttons by scripts/make_czm_touch.py.
+
+The fire, crouch, movement, "more" and "unstuck" glyphs, the digits and the
+button backgrounds were drawn for this game.

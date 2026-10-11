@@ -65,7 +65,10 @@ jobs:
                            "gfx/fonts/czm/InterDisplay-BlackItalic.otf", "gfx/czm/ui/tile_attack.png",
                            "gfx/czm/ui/tile_escape.png", "gfx/czm/ui/tile_boss.png", "gfx/czm/ui/panel.png",
                            "gfx/czm/ui/dot.png", "gfx/czm/ui/avatar.png", "gfx/czm/ui/tab_on.png",
-                           "logos/czm_logo.png", "logos/czm_zm.png"]:
+                           "logos/czm_logo.png", "logos/czm_zm.png", "gfx/czm/touch/fire.png",
+                           "gfx/czm/touch/jump.png", "gfx/czm/ui/editor_bg.png", "touch_presets/czm_scheme1.cfg",
+                           "touch_presets/czm_scheme2.cfg", "touch_presets/czm_scheme3.cfg",
+                           "userconfig.d/czm_touch.cfg"]:
                   assert apk.read("assets/" + name) == Path("3rdparty/cs16client-extras", name).read_bytes(), name
               for abi, suffix in [("arm64-v8a", "arm64"), ("armeabi-v7a", "armv7l"), ("x86", "i386")]:
                   for library in ["SDL2", "xash", "filesystem_stdio", "ref_gles1", "ref_gl4es", "ref_gles3compat",
@@ -78,6 +81,7 @@ jobs:
                   assert b"czm_loading_session" in menu and b"gfx/czm/loading_%d.png" in menu, abi
                   assert b"menu_czmmain" in menu and b"czm_queryserver" in menu, abi
                   assert b"menu_czmsettings" in menu and b"czm_zoom_sens" in menu, abi
+                  assert b"menu_czmtouch" in menu and b"czm_touch_scheme" in menu, abi
                   engine = apk.read("lib/" + abi + "/libxash.so")
                   assert b"czm_loading_enable" in engine and b"czm_loading_error" in engine, abi
                   assert b"czm_queryserver" in engine, abi
