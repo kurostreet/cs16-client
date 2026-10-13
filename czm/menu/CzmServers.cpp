@@ -536,6 +536,23 @@ static void FillRect( int x, int y, int w, int h, unsigned int color )
 	CZM_DrawImage( UI_DIR "white.png", x, y, w, h, color );
 }
 
+// shared with the main-screen tiles (CzmMain.cpp): map colour and picture
+unsigned int CZM_MapAccent( const char *map, const char *name )
+{
+	CzmEntry e;
+
+	memset( &e, 0, sizeof( e ));
+	Q_strncpy( e.map, map ? map : "", sizeof( e.map ));
+	Q_strncpy( e.name, name ? name : "", sizeof( e.name ));
+	ClassifyMap( &e );
+	return ModeColor( e.mode );
+}
+
+HIMAGE CZM_MapPicture( const char *map )
+{
+	return ( map && map[0] ) ? MapPicture( map ) : 0;
+}
+
 /*
 =================
 CCzmServers
@@ -1691,7 +1708,15 @@ int CCzmServers::HitTest( void ) const
 			CzmRect r = RowRect( index );
 
 			if( r.Contains( x, y ))
-				return HIT_ROW + index * 2 + ( x >= r.x + r.w - r.h ? 1 : 0 );
+			{
+				int col = 0; // the row
+
+				if( x >= r.x + r.w - r.h )
+					col = 1; // the star
+				else if( x >= r.x + r.w - r.h * 2 )
+					col = 2; // the heart (pin to the main screen)
+				return HIT_ROW + index * 3 + col;
+			}
 		}
 
 		if( ViewCount() == 0 && EmptyHasButton() && m_emptyButton.HasCursor( ))
@@ -1824,21 +1849,32 @@ void CCzmServers::Activate( int hit )
 
 	if( hit >= HIT_ROW )
 	{
-		int index = ( hit - HIT_ROW ) / 2;
-		bool star = ( hit - HIT_ROW ) % 2;
+		int index = ( hit - HIT_ROW ) / 3;
+		int col = ( hit - HIT_ROW ) % 3;
 		CzmEntry *e;
 
 		if( index >= ViewCount( ))
 			return;
 
 		e = &m_entries[m_view[index]];
-		if( star )
+		if( col == 1 ) // the star: favorites
 		{
 			bool on = !( e->sources & SRC_FAVORITE );
 
 			CZM_PlayClick();
 			SetFavorite( e, on );
 			Toast( CZM_T( on ? "srv_fav_on" : "srv_fav_off" ));
+			return;
+		}
+		if( col == 2 ) // the heart: pin to the main screen (max 3)
+		{
+			bool on = !CZM_HomePinned( e->address );
+
+			CZM_PlayClick();
+			if( CZM_HomeSetPinned( e->address, e->gs ? "gs" : "49", on ))
+				Toast( CZM_T( on ? "srv_pin_on" : "srv_pin_off" ));
+			else
+				Toast( CZM_T( "srv_pin_full" ));
 			return;
 		}
 
@@ -2128,7 +2164,7 @@ void CCzmServers::DrawRow( int index, const CzmRect &r )
 	HFont statFont = CZM_Font( CZMF_TILE_STATUS );
 	HFont badgeFont = CZM_Font( CZMF_SHOP_PRICE );
 	bool selected = !strcmp( e.address, m_szSelected );
-	bool pressed = m_iPressed == HIT_ROW + index * 2 && IsPressed( m_iPressed );
+	bool pressed = m_iPressed == HIT_ROW + index * 3 && IsPressed( m_iPressed );
 	int pad = r.h * 0.12f, x, right, statsW, starSize, textW, textX, y;
 	unsigned int dim = PackRGBA( 154, 163, 175, 255 );
 	char text[128];
@@ -2161,16 +2197,29 @@ void CCzmServers::DrawRow( int index, const CzmRect &r )
 		x += size + pad * 1.4f;
 	}
 
-	// star, ping, players on the right
+	// star, heart, ping, players on the right
 	starSize = r.h * 0.36f;
 	right = r.x + r.w - r.h;
 	{
 		bool fav = ( e.sources & SRC_FAVORITE ) != 0;
-		bool starPressed = m_iPressed == HIT_ROW + index * 2 + 1 && IsPressed( m_iPressed );
+		bool starPressed = m_iPressed == HIT_ROW + index * 3 + 1 && IsPressed( m_iPressed );
 
 		CZM_DrawImage( fav ? UI_DIR "icon_star_on.png" : UI_DIR "icon_star.png", right + ( r.h - starSize ) / 2, r.y + ( r.h - starSize ) / 2,
 			starSize, starSize, fav ? PackRGBA( 250, 204, 21, 255 ) : starPressed ? CZM_White() : PackRGBA( 110, 116, 126, 255 ));
 	}
+
+	// heart to the left of the star: pin to the main screen (max 3)
+	{
+		int heartSize = r.h * 0.34f;
+		int heartX = right - r.h;
+		bool pinned = CZM_HomePinned( e.address );
+		bool heartPressed = m_iPressed == HIT_ROW + index * 3 + 2 && IsPressed( m_iPressed );
+
+		CZM_DrawImage( pinned ? UI_DIR "icon_heart_on.png" : UI_DIR "icon_heart.png",
+			heartX + ( r.h - heartSize ) / 2, r.y + ( r.h - heartSize ) / 2, heartSize, heartSize,
+			pinned ? PackRGBA( 244, 63, 94, 255 ) : heartPressed ? CZM_White() : PackRGBA( 110, 116, 126, 255 ));
+	}
+	right -= r.h; // the stats and the name stop before the heart
 
 	statsW = H * 0.30f;
 	if( e.answered )
@@ -2303,8 +2352,8 @@ void CCzmServers::DrawEmpty( void )
 void CCzmServers::DrawList( void )
 {
 	HFont font = CZM_Font( CZMF_SMALL );
-	char text[128], servers[48], players[48];
-	int total = 0, first, last;
+	char text[160], servers[48], players[48], pinned[48];
+	int total = 0, first, last, pins = CZM_HomePinCount();
 	bool refreshing = Refreshing();
 	static const char *sortKeys[SORT_COUNT] = { "srv_sort_players", "srv_sort_ping", "srv_sort_name" };
 
@@ -2314,7 +2363,11 @@ void CCzmServers::DrawList( void )
 
 	CountText( servers, sizeof( servers ), ViewCount(), "сервер", "сервера", "серверов", "server", "servers" );
 	CountText( players, sizeof( players ), total, "игрок", "игрока", "игроков", "player", "players" );
-	snprintf( text, sizeof( text ), "%s  ·  %s%s", servers, players, refreshing ? CZM_T( "srv_updating" ) : "" );
+	if( pins > 0 )
+		snprintf( pinned, sizeof( pinned ), "  ·  %s %d/%d", CZM_T( "srv_pinned" ), pins, CZM_HOME_MAX );
+	else
+		pinned[0] = 0;
+	snprintf( text, sizeof( text ), "%s  ·  %s%s%s", servers, players, refreshing ? CZM_T( "srv_updating" ) : "", pinned );
 	CZM_DrawText( font, m_listHead.x + H * 0.01f, m_listHead.y + ( m_listHead.h - CZM_FontHeight( font )) / 2, m_sort.x - m_listHead.x - H * 0.02f,
 		text, PackRGBA( 154, 163, 175, 255 ));
 

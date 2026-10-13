@@ -94,12 +94,15 @@ void CZM_SetLanguage( bool russian );
 /*
  * our servers: the mode tiles of the main screen
  */
+// the main-screen tiles are the servers the player pinned (a heart in the server list), up to 3
+#define CZM_HOME_MAX 3
+
 struct CzmServer
 {
-	const char *title;    // mode name shown on the tile
-	const char *address;  // ip:port
-	const char *tile;     // tile picture
-	unsigned int accent;  // tile colour
+	char address[64];     // ip:port
+	char prot[8];         // "gs" or "49"
+	char name[64];        // the server's own name, the address until it answers
+	unsigned int accent;  // tile colour, from the map
 	char map[64];
 	int players;
 	int maxplayers;
@@ -109,11 +112,21 @@ struct CzmServer
 	int misses;           // queries in a row without an answer
 };
 
-int CZM_ServerCount( void );
+int CZM_ServerCount( void );          // pinned servers, 0..CZM_HOME_MAX
 CzmServer *CZM_Server( int index );
 void CZM_QueryServers( bool force );
 bool CZM_OnServerInfo( netadr_t adr, const char *info ); // true for our own messages, which the stock list must not see
 void CZM_ConnectToServer( int index );
+
+// pinned servers of the main screen, kept in home_servers.lst
+void CZM_HomeReload( void );                 // read the file into the tiles, call when the main screen opens
+int  CZM_HomePinCount( void );
+bool CZM_HomePinned( const char *address );
+bool CZM_HomeSetPinned( const char *address, const char *prot, bool on ); // false when 3 are already pinned
+
+// map picture and accent colour for a server tile (czm/menu/CzmServers.cpp)
+HIMAGE CZM_MapPicture( const char *map );                  // 0 when there is none
+unsigned int CZM_MapAccent( const char *map, const char *name );
 
 /*
  * screens

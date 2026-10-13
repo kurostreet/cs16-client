@@ -248,6 +248,19 @@ def icon(kind, size=128, color=(255, 255, 255, 255)):
         d.polygon([(S * .10, S * .14), (S * .52, S * .14), (S * .90, S * .52), (S * .52, S * .90), (S * .10, S * .52)],
                   outline=c, width=lw)
         d.ellipse([S * .26, S * .30, S * .38, S * .42], fill=c)
+    elif kind in ("heart", "heart_on"):
+        pts = []
+        for i in range(72):
+            t = math.pi * 2 * i / 72
+            hx = 16 * math.sin(t) ** 3
+            hy = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
+            pts.append((S * (.5 + hx / 36.0), S * (.44 - hy / 34.0)))
+        if kind == "heart_on":
+            d.polygon(pts, fill=c)
+        else:
+            d.line(pts + [pts[0]], fill=c, width=int(lw * .95), joint="curve")
+    elif kind == "play":
+        d.polygon([(S * .32, S * .20), (S * .32, S * .80), (S * .82, S * .50)], fill=c)
     return im.resize((size, size), Image.LANCZOS)
 
 
@@ -270,7 +283,7 @@ def make_avatar(name, size=256):
 
 
 NEW_ICONS = ("chat", "globe", "search", "star", "star_on", "refresh", "plus", "lock", "users", "clock", "send", "code",
-             "calendar", "chevron", "sort", "tag")
+             "calendar", "chevron", "sort", "tag", "heart", "heart_on", "play")
 
 
 def main():

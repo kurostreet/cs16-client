@@ -17,6 +17,7 @@ GNU General Public License for more details.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 #include "extdll_menu.h"
 #include "BaseMenu.h"
@@ -227,8 +228,8 @@ void CCzmMainMenu::Layout( void )
 	m_lang = CZM_Rect( W - m_iMargin - langW, top, langW, chip );
 	m_bell = CZM_Rect( m_lang.x - H * 0.025f - chip, top, chip, chip );
 
-	// mode tiles keep the picture aspect (3.7:1)
-	m_iTiles = Q_min( CZM_ServerCount(), CZM_MAX_TILES );
+	// three home slots: pinned servers, the rest are "+ add" tiles
+	m_iTiles = Q_min( CZM_HOME_MAX, CZM_MAX_TILES );
 	tileH = H * 0.205f;
 	tileW = tileH * 37 / 10;
 	if( tileW > W * 0.42f )
@@ -475,7 +476,14 @@ void CCzmMainMenu::Activate( int hit )
 	}
 	default:
 		if( hit >= HIT_TILE && hit < HIT_TILE + m_iTiles )
-			CZM_ConnectToServer( hit - HIT_TILE );
+		{
+			int index = hit - HIT_TILE;
+
+			if( index < CZM_ServerCount( ))
+				CZM_ConnectToServer( index );   // a pinned server
+			else
+				CZM_OpenServerList();           // an empty slot: choose a server
+		}
 		break;
 	}
 }
@@ -624,73 +632,174 @@ void CCzmMainMenu::DrawHeader( void )
 	CZM_DrawText( langFont, m_lang.x + m_lang.w / 2, textY, segment, "EN", russian ? CZM_Grey() : CZM_White(), QM_CENTER );
 }
 
+// a point on the rounded-rectangle border, s in [0, perim)
+static void CZM_RoundRectPoint( const CzmRect &r, float rad, float s, float perim, float *ox, float *oy )
+{
+	const float HALF_PI = 1.5707963f, PI = 3.1415927f;
+	float straightH = r.w - 2 * rad; // top and bottom
+	float straightV = r.h - 2 * rad; // the sides
+	float arc = HALF_PI * rad;       // a quarter circle
+	float a;
+
+	s = fmodf( s, perim );
+	if( s < 0 )
+		s += perim;
+
+	if( s < straightH ) { *ox = r.x + rad + s; *oy = r.y; return; }
+	s -= straightH;
+	if( s < arc ) { a = -HALF_PI + ( s / arc ) * HALF_PI; *ox = r.x + r.w - rad + cosf( a ) * rad; *oy = r.y + rad + sinf( a ) * rad; return; }
+	s -= arc;
+	if( s < straightV ) { *ox = r.x + r.w; *oy = r.y + rad + s; return; }
+	s -= straightV;
+	if( s < arc ) { a = ( s / arc ) * HALF_PI; *ox = r.x + r.w - rad + cosf( a ) * rad; *oy = r.y + r.h - rad + sinf( a ) * rad; return; }
+	s -= arc;
+	if( s < straightH ) { *ox = r.x + r.w - rad - s; *oy = r.y + r.h; return; }
+	s -= straightH;
+	if( s < arc ) { a = HALF_PI + ( s / arc ) * HALF_PI; *ox = r.x + rad + cosf( a ) * rad; *oy = r.y + r.h - rad + sinf( a ) * rad; return; }
+	s -= arc;
+	if( s < straightV ) { *ox = r.x; *oy = r.y + r.h - rad - s; return; }
+	s -= straightV;
+	a = PI + ( s / arc ) * HALF_PI; *ox = r.x + rad + cosf( a ) * rad; *oy = r.y + rad + sinf( a ) * rad;
+}
+
+// a golden spark running around the tile border, so the tile asks to be tapped
+static void CZM_TileLightning( const CzmRect &r, int index )
+{
+	const float TWO_PI = 6.2831853f;
+	float rad = r.h * 0.16f;
+	float perim = 2.0f * ( r.w + r.h ) - 8.0f * rad + TWO_PI * rad;
+	float t = (float)EngFuncs::DoubleTime();
+	float offset = index * perim * 0.41f;              // the three tiles are out of step
+	float head = t * ( perim / 2.6f ) + offset;        // one loop every ~2.6 s
+	int tail = 26;
+	float step = perim / 150.0f;
+
+	for( int k = tail; k >= 0; k-- )
+	{
+		float f = 1.0f - (float)k / tail;              // 0 at the tail, 1 at the head
+		float x = 0, y = 0;
+		int sz = (int)( r.h * ( 0.025f + 0.050f * f ));
+		int a = (int)( 235 * f * f );
+		unsigned int col = ( k <= 1 ) ? PackRGBA( 255, 248, 214, a ) : PackRGBA( 255, 206, 84, a );
+
+		if( sz < 2 )
+			sz = 2;
+		CZM_RoundRectPoint( r, rad, head - k * step, perim, &x, &y );
+		UI_FillRect( (int)x - sz / 2, (int)y - sz / 2, sz, sz, col );
+	}
+}
+
 void CCzmMainMenu::DrawTile( int index, CzmRect r )
 {
-	CzmServer *server = CZM_Server( index );
+	bool add = index >= CZM_ServerCount();
+	CzmServer *server = add ? NULL : CZM_Server( index );
 	HFont statusFont = CZM_Font( CZMF_TILE_STATUS );
-	int margin, textX, textW, statusY, dot, x, right;
-	unsigned int dotColor;
+	int margin = r.h / 10, rad = r.h * 0.16f;
 	char text[128];
-
-	if( !server )
-		return;
 
 	// pressed tiles sink a little
 	if( IsPressed( HIT_TILE + index ))
 	{
 		int dx = r.w * 0.02f, dy = r.h * 0.02f;
 		r = CZM_Rect( r.x + dx, r.y + dy, r.w - dx * 2, r.h - dy * 2 );
+		rad = r.h * 0.16f;
 	}
 
-	margin = r.h / 10;
 	CZM_DrawImage( UI_DIR "tile_shadow.png", r.x - margin, r.y - margin + r.h * 0.05f, r.w + margin * 2, r.h + margin * 2 );
-	CZM_DrawImage( server->tile, r.x, r.y, r.w, r.h );
 
-	// text sits right of the slanted edge and left of the play button
-	textX = r.x + r.h * 0.40f;
-	textW = r.x + r.w - r.h * 0.58f - textX;
-	CZM_DrawText( CZM_Font( CZMF_TILE_TITLE ), textX, r.y + r.h * 0.12f, textW, server->title, CZM_White());
-
-	if( server->map[0] )
+	if( add )
 	{
-		snprintf( text, sizeof( text ), "%s  %s", CZM_T( "lbl_map" ), server->map );
-		CZM_DrawText( CZM_Font( CZMF_TILE_TEXT ), textX, r.y + r.h * 0.47f, textW, text, PackRGBA( 215, 220, 228, 255 ));
+		// an empty slot: a soft card with a plus, taps into the server list
+		bool pressed = IsPressed( HIT_TILE + index );
+		int ps = r.h * 0.26f, cx = r.x + r.w / 2, cy = r.y + r.h * 0.40f;
+		unsigned int tint = pressed ? CZM_White() : PackRGBA( 150, 200, 255, 255 );
+
+		CZM_DrawSliced( UI_DIR "card.png", r.x, r.y, r.w, r.h, 30, rad, CZM_White( 210 ));
+		CZM_DrawImage( UI_DIR "chip_round.png", cx - ps / 2, cy - ps / 2, ps, ps );
+		CZM_DrawImage( UI_DIR "icon_plus.png", cx - ps * 0.27f, cy - ps * 0.27f, ps * 0.54f, ps * 0.54f, tint );
+		CZM_DrawText( CZM_Font( CZMF_TILE_TEXT ), r.x, r.y + r.h * 0.66f, r.w, CZM_T( "tile_add" ), PackRGBA( 220, 224, 232, 255 ), QM_CENTER );
+		CZM_DrawText( CZM_Font( CZMF_SMALL ), r.x, r.y + r.h * 0.82f, r.w, CZM_T( "tile_add_hint" ), PackRGBA( 140, 146, 156, 255 ), QM_CENTER );
+		CZM_TileLightning( r, index );
+		return;
 	}
 
-	statusY = r.y + r.h * 0.69f;
-	dot = r.h * 0.085f;
-	x = textX + dot + r.h * 0.05f;
-	right = textX + textW;
+	unsigned int accent = server->accent ? server->accent : PackRGBA( 124, 58, 237, 255 );
 
-	if( server->answerTime <= 0.0 && server->misses == 0 )
-	{
-		dotColor = PackRGBA( 150, 156, 166, 255 );
-		CZM_DrawText( statusFont, x, statusY, right - x, CZM_T( "querying" ), CZM_Grey());
-	}
-	else if( server->answerTime <= 0.0 || server->misses >= 2 )
-	{
-		dotColor = PackRGBA( 248, 113, 113, 255 );
-		CZM_DrawText( statusFont, x, statusY, right - x, CZM_T( "offline" ), PackRGBA( 248, 113, 113, 255 ));
-	}
-	else
-	{
-		bool full = server->maxplayers > 0 && server->players >= server->maxplayers;
+	// base card
+	CZM_DrawSliced( UI_DIR "card.png", r.x, r.y, r.w, r.h, 30, rad, CZM_White());
 
-		dotColor = full ? PackRGBA( 250, 204, 21, 255 ) : PackRGBA( 74, 222, 128, 255 );
-		snprintf( text, sizeof( text ), "%d/%d %s", server->players, server->maxplayers, CZM_T( "in_game" ));
-		CZM_DrawText( statusFont, x, statusY, right - x, text, CZM_White());
-		x += CZM_TextWidth( statusFont, text );
+	// the map picture as a thumbnail on the right, well inside the rounded corners
+	{
+		int coverW = r.w * 0.40f, coverH = r.h - rad * 2;
+		int coverX = r.x + r.w - coverW - rad, coverY = r.y + rad;
+		HIMAGE cover = CZM_MapPicture( server->map );
 
-		if( server->ping >= 0 && x < right )
+		if( cover )
+			CZM_DrawCover( cover, coverX, coverY, coverW, coverH );
+		else
 		{
-			CZM_DrawText( statusFont, x, statusY, right - x, "  ·  ", CZM_Grey());
-			x += CZM_TextWidth( statusFont, "  ·  " );
-			snprintf( text, sizeof( text ), "%d %s", server->ping, CZM_T( "ms" ));
-			CZM_DrawText( statusFont, x, statusY, right - x, text, CZM_PingColor( server->ping ));
+			UI_FillRect( coverX, coverY, coverW, coverH, PackRGBA( 20, 22, 30, 180 ));
+			UI_FillRect( coverX, coverY, coverW, Q_max( 3, (int)( r.h * 0.02f )), accent );
 		}
+
+		// accent spine on the left edge
+		UI_FillRect( r.x + rad * 0.6f, r.y + rad * 0.7f, Q_max( 3, (int)( r.w * 0.010f )), r.h - rad * 1.4f, accent );
+
+		int textX = r.x + rad * 1.0f;
+		int textW = coverX - textX - r.h * 0.08f;
+		int statusY = r.y + r.h * 0.69f, dot = r.h * 0.085f, x, right = textX + textW;
+		unsigned int dotColor;
+		char name[64];
+
+		CZM_CleanName( server->name, name, sizeof( name ));
+		CZM_DrawText( CZM_Font( CZMF_TILE_TITLE ), textX, r.y + r.h * 0.12f, textW, name[0] ? name : server->address, CZM_White());
+
+		if( server->map[0] )
+		{
+			snprintf( text, sizeof( text ), "%s  %s", CZM_T( "lbl_map" ), server->map );
+			CZM_DrawText( CZM_Font( CZMF_TILE_TEXT ), textX, r.y + r.h * 0.47f, textW, text, PackRGBA( 215, 220, 228, 255 ));
+		}
+
+		x = textX + dot + r.h * 0.05f;
+		if( server->answerTime <= 0.0 && server->misses == 0 )
+		{
+			dotColor = PackRGBA( 150, 156, 166, 255 );
+			CZM_DrawText( statusFont, x, statusY, right - x, CZM_T( "querying" ), CZM_Grey());
+		}
+		else if( server->answerTime <= 0.0 || server->misses >= 2 )
+		{
+			dotColor = PackRGBA( 248, 113, 113, 255 );
+			CZM_DrawText( statusFont, x, statusY, right - x, CZM_T( "offline" ), PackRGBA( 248, 113, 113, 255 ));
+		}
+		else
+		{
+			bool full = server->maxplayers > 0 && server->players >= server->maxplayers;
+
+			dotColor = full ? PackRGBA( 250, 204, 21, 255 ) : PackRGBA( 74, 222, 128, 255 );
+			snprintf( text, sizeof( text ), "%d/%d %s", server->players, server->maxplayers, CZM_T( "in_game" ));
+			CZM_DrawText( statusFont, x, statusY, right - x, text, CZM_White());
+			x += CZM_TextWidth( statusFont, text );
+
+			if( server->ping >= 0 && x < right )
+			{
+				CZM_DrawText( statusFont, x, statusY, right - x, "  ·  ", CZM_Grey());
+				x += CZM_TextWidth( statusFont, "  ·  " );
+				snprintf( text, sizeof( text ), "%d %s", server->ping, CZM_T( "ms" ));
+				CZM_DrawText( statusFont, x, statusY, right - x, text, CZM_PingColor( server->ping ));
+			}
+		}
+		CZM_DrawImage( UI_DIR "dot.png", textX, statusY + ( CZM_FontHeight( statusFont ) - dot ) / 2, dot, dot, dotColor );
 	}
 
-	CZM_DrawImage( UI_DIR "dot.png", textX, statusY + ( CZM_FontHeight( statusFont ) - dot ) / 2, dot, dot, dotColor );
+	// pinned heart in the top-right corner
+	{
+		int hs = r.h * 0.20f;
+
+		CZM_DrawImage( UI_DIR "icon_heart_on.png", r.x + r.w - hs - rad * 0.5f, r.y + rad * 0.4f, hs, hs, PackRGBA( 244, 63, 94, 255 ));
+	}
+
+	// golden spark running around the border
+	CZM_TileLightning( r, index );
 }
 
 void CCzmMainMenu::DrawNav( void )

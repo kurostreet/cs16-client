@@ -254,6 +254,12 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "srv_fav_in", "В избранном", "Favorited" },
 	{ "srv_fav_on", "Добавлено в избранное", "Added to favorites" },
 	{ "srv_fav_off", "Убрано из избранного", "Removed from favorites" },
+	{ "srv_pin_on", "Закреплено на главной", "Pinned to the main screen" },
+	{ "srv_pin_off", "Убрано с главной", "Unpinned from the main screen" },
+	{ "srv_pin_full", "Закрепить можно 3. Сними одно сердечко", "Up to 3 can be pinned. Remove one heart" },
+	{ "srv_pinned", "закреплено", "pinned" },
+	{ "tile_add", "Добавить сервер", "Add a server" },
+	{ "tile_add_hint", "Нажми, чтобы выбрать", "Tap to choose" },
 	{ "srv_add_title", "Добавить сервер", "Add a server" },
 	{ "srv_add_text", "Адрес сервера, например 1.2.3.4:27015", "Server address, e.g. 1.2.3.4:27015" },
 	{ "srv_add_bad", "Не похоже на адрес сервера", "That does not look like a server address" },
@@ -763,33 +769,146 @@ servers
 Temporary list for development; later it comes from kontrafps.ru.
 =================
 */
-static CzmServer s_servers[] =
+#define CZM_HOME_FILE "home_servers.lst"
+
+static CzmServer s_home[CZM_HOME_MAX];
+static int s_homeCount = 0;
+static bool s_homeLoaded = false;
+
+static void CZM_HomeResetLive( CzmServer *s )
 {
-	{ "ZOMBIE ATTACK", "131.196.199.248:27015", "gfx/czm/ui/tile_attack.png", 0xFFFF3B2F },
-	{ "ZOMBIE ESCAPE", "131.196.196.196:27020", "gfx/czm/ui/tile_escape.png", 0xFF22D3EE },
-	{ "ZOMBIE BOSS", "104.234.65.245:27300", "gfx/czm/ui/tile_boss.png", 0xFFA855F7 },
-};
+	s->map[0] = 0;
+	s->players = 0;
+	s->maxplayers = 0;
+	s->ping = -1;
+	s->queryTime = 0.0;
+	s->answerTime = 0.0;
+	s->misses = 0;
+}
+
+static void CZM_HomeInit( CzmServer *s, const char *address, const char *prot )
+{
+	memset( s, 0, sizeof( *s ));
+	Q_strncpy( s->address, address, sizeof( s->address ));
+	Q_strncpy( s->prot, ( prot && prot[0] ) ? prot : "gs", sizeof( s->prot ));
+	Q_strncpy( s->name, address, sizeof( s->name ));
+	s->accent = CZM_MapAccent( "", "" );
+	CZM_HomeResetLive( s );
+}
+
+void CZM_HomeReload( void )
+{
+	int length = 0;
+	byte *data = EngFuncs::COM_LoadFile( CZM_HOME_FILE, &length );
+	char *p = (char *)data;
+
+	s_homeLoaded = true;
+	s_homeCount = 0;
+
+	while( p && s_homeCount < CZM_HOME_MAX )
+	{
+		char address[64], prot[8];
+
+		p = EngFuncs::COM_ParseFile( p, address, sizeof( address ));
+		if( !p || !address[0] )
+			break;
+		p = EngFuncs::COM_ParseFile( p, prot, sizeof( prot ));
+		if( !p )
+			break;
+		if( !strcmp( prot, "48" )) // the legacy protocol is gone from the engine
+			continue;
+
+		CZM_HomeInit( &s_home[s_homeCount++], address, prot );
+	}
+
+	if( data )
+		EngFuncs::COM_FreeFile( data );
+}
+
+static void CZM_HomeEnsureLoaded( void )
+{
+	if( !s_homeLoaded )
+		CZM_HomeReload();
+}
 
 int CZM_ServerCount( void )
 {
-	return sizeof( s_servers ) / sizeof( s_servers[0] );
+	CZM_HomeEnsureLoaded();
+	return s_homeCount;
 }
 
 CzmServer *CZM_Server( int index )
 {
-	static bool initialized = false;
+	CZM_HomeEnsureLoaded();
+	return ( index >= 0 && index < s_homeCount ) ? &s_home[index] : NULL;
+}
 
-	if( !initialized )
+int CZM_HomePinCount( void )
+{
+	return CZM_ServerCount();
+}
+
+bool CZM_HomePinned( const char *address )
+{
+	for( int i = 0; i < CZM_ServerCount(); i++ )
 	{
-		for( int i = 0; i < CZM_ServerCount(); i++ )
-		{
-			s_servers[i].ping = -1;
-			s_servers[i].map[0] = 0;
-		}
-		initialized = true;
+		if( !strcmp( s_home[i].address, address ))
+			return true;
+	}
+	return false;
+}
+
+static void CZM_HomeSaveFile( void )
+{
+	char buf[CZM_HOME_MAX * 80];
+	int n = 0;
+
+	if( s_homeCount <= 0 )
+	{
+		EngFuncs::DeleteFile( CZM_HOME_FILE );
+		return;
 	}
 
-	return ( index >= 0 && index < CZM_ServerCount()) ? &s_servers[index] : NULL;
+	for( int i = 0; i < s_homeCount && n < (int)sizeof( buf ); i++ )
+		n += snprintf( buf + n, sizeof( buf ) - n, "%s %s\n", s_home[i].address, s_home[i].prot[0] ? s_home[i].prot : "gs" );
+
+	EngFuncs::COM_SaveFile( CZM_HOME_FILE, buf, n );
+}
+
+bool CZM_HomeSetPinned( const char *address, const char *prot, bool on )
+{
+	int found = -1;
+
+	CZM_HomeEnsureLoaded();
+
+	for( int i = 0; i < s_homeCount; i++ )
+	{
+		if( !strcmp( s_home[i].address, address ))
+		{
+			found = i;
+			break;
+		}
+	}
+
+	if( on )
+	{
+		if( found >= 0 )
+			return true;                      // already pinned
+		if( s_homeCount >= CZM_HOME_MAX )
+			return false;                     // no free slot, the caller shows a hint
+		CZM_HomeInit( &s_home[s_homeCount++], address, prot );
+	}
+	else
+	{
+		if( found < 0 )
+			return true;
+		for( int i = found; i < s_homeCount - 1; i++ )
+			s_home[i] = s_home[i + 1];
+		s_homeCount--;
+	}
+
+	CZM_HomeSaveFile();
+	return true;
 }
 
 void CZM_QueryServers( bool force )
@@ -841,6 +960,15 @@ bool CZM_OnServerInfo( netadr_t adr, const char *info )
 		server->players = value ? atoi( value ) : 0;
 		value = Info_ValueForKey( info, "maxcl" );
 		server->maxplayers = value ? atoi( value ) : 0;
+
+		// the server name, for the tile
+		value = Info_ValueForKey( info, "host" );
+		if( !value || !value[0] )
+			value = Info_ValueForKey( info, "name" );
+		if( value && value[0] )
+			Q_strncpy( server->name, value, sizeof( server->name ));
+		server->accent = CZM_MapAccent( server->map, server->name );
+
 		server->answerTime = EngFuncs::DoubleTime();
 		server->misses = 0;
 
@@ -861,9 +989,9 @@ void CZM_ConnectToServer( int index )
 	if( !server )
 		return;
 
-	EngFuncs::CvarSetString( "czm_connect_name", server->title );
+	EngFuncs::CvarSetString( "czm_connect_name", server->name );
 	EngFuncs::CvarSetString( "czm_connect_adr", server->address );
-	EngFuncs::ClientCmdF( false, "connect \"%s\" gs\n", server->address );
+	EngFuncs::ClientCmdF( false, "connect \"%s\" %s\n", server->address, server->prot[0] ? server->prot : "gs" );
 }
 
 static CzmServer *CZM_ServerByAddress( const char *address )
