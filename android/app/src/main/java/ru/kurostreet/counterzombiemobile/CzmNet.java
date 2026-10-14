@@ -19,7 +19,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -262,41 +261,35 @@ public final class CzmNet {
         updateCancel = true;
     }
 
-    /** Downloads the APK into the app folder, continuing a broken download, and checks it. */
-    public static void updateStart(final String url, final String sha256, final long size) {
+    /** Downloads a patch when possible, then hands the verified signed APK to Android. */
+    public static void updateStart(final String url, final String sha256, final long size,
+                                   final String patchUrl, final String patchSha, final long patchSize, final String baseSha) {
         if (!canSelfUpdate() || updateState == UPDATE_DOWNLOADING || updateState == UPDATE_VERIFYING || updateState == UPDATE_INSTALLING) return;
         Context ctx = context();
         if (ctx == null) return;
         updateCancel = false;
         updateError = "";
-        updateTotal = size;
+        updateTotal = patchSize > 0 ? patchSize : size;
         updateDone = 0;
-        updateState = UPDATE_DOWNLOADING;
+        updateState = UPDATE_VERIFYING;
         final File dir = new File(ctx.getFilesDir(), "update");
+        final File installed = new File(ctx.getApplicationInfo().sourceDir);
         UPDATE.execute(new Runnable() {
             @Override public void run() {
                 try {
-                    if (!dir.isDirectory()) dir.mkdirs();
-                    File apk = new File(dir, "czm-" + sha256.substring(0, Math.min(16, sha256.length())) + ".apk");
-                    // older downloads go away
-                    File[] old = dir.listFiles();
-                    if (old != null) for (File f : old) if (!f.getName().equals(apk.getName())) f.delete();
-                    if (!(apk.isFile() && apk.length() == size)) fetch(url, apk, size);
-                    if (updateCancel) {
-                        updateState = UPDATE_IDLE;
-                        return;
-                    }
-                    updateState = UPDATE_VERIFYING;
-                    if (!sha256.equalsIgnoreCase(fileSha256(apk))) {
-                        apk.delete();
-                        fail("broken");
-                        return;
-                    }
-                    updateFile = apk;
-                    updateState = UPDATE_READY;
+                    updateFile = ApkUpdate.prepare(dir, installed, url, sha256, size, patchUrl, patchSha, patchSize, baseSha,
+                        new ApkUpdate.Progress() {
+                            @Override public boolean cancelled() { return updateCancel; }
+                            @Override public void update(boolean verifying, long done, long total) {
+                                updateDone = done;
+                                updateTotal = total;
+                                updateState = verifying ? UPDATE_VERIFYING : UPDATE_DOWNLOADING;
+                            }
+                        });
+                    updateState = updateCancel ? UPDATE_IDLE : UPDATE_READY;
                 } catch (Exception e) {
                     Log.w(TAG, "update download failed", e);
-                    fail(updateCancel ? "" : "network");
+                    fail(e instanceof ApkUpdate.UpdateException ? ((ApkUpdate.UpdateException) e).reason : "network");
                     if (updateCancel) updateState = UPDATE_IDLE;
                 }
             }
@@ -306,53 +299,6 @@ public final class CzmNet {
     private static void fail(String why) {
         updateError = why;
         updateState = UPDATE_ERROR;
-    }
-
-    private static void fetch(String url, File apk, long size) throws IOException {
-        for (int attempt = 0; attempt < 5 && !updateCancel; attempt++) {
-            long have = apk.isFile() ? apk.length() : 0;
-            if (have >= size) return;
-            HttpURLConnection conn = open(url, "GET", "");
-            conn.setReadTimeout(30000);
-            if (have > 0) conn.setRequestProperty("Range", "bytes=" + have + "-");
-            try {
-                int code = conn.getResponseCode();
-                if (code == 200) have = 0; // the server sent the whole file
-                else if (code != 206) throw new IOException("HTTP " + code);
-                try (InputStream in = conn.getInputStream(); RandomAccessFile out = new RandomAccessFile(apk, "rw")) {
-                    out.setLength(have);
-                    out.seek(have);
-                    byte[] buf = new byte[128 * 1024];
-                    int n;
-                    updateDone = have;
-                    while (!updateCancel && (n = in.read(buf)) > 0) {
-                        out.write(buf, 0, n);
-                        updateDone += n;
-                    }
-                }
-                if (apk.length() >= size) return;
-            } catch (IOException e) {
-                Log.w(TAG, "download interrupted, again: " + e.getClass().getSimpleName());
-                try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
-            } finally {
-                conn.disconnect();
-            }
-        }
-        if (!updateCancel && (!apk.isFile() || apk.length() < size)) throw new IOException("incomplete");
-    }
-
-    private static String fileSha256(File file) throws IOException {
-        try (InputStream in = new FileInputStream(file)) {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] buf = new byte[256 * 1024];
-            int n;
-            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
-            StringBuilder sb = new StringBuilder();
-            for (byte b : md.digest()) sb.append(String.format("%02x", b));
-            return sb.toString();
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IOException(e);
-        }
     }
 
     /** Hands the downloaded APK to Android; the system asks the player to confirm. */

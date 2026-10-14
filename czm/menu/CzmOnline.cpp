@@ -223,6 +223,10 @@ static void OnHello( int status, const char *body )
 		Q_strncpy( u.sha256, j.String( j.Get( update, "sha256" )), sizeof( u.sha256 ));
 		Q_strncpy( u.url, j.String( j.Get( update, "url" )), sizeof( u.url ));
 		Q_strncpy( u.notes, j.String( j.Get( update, "notes" )), sizeof( u.notes ));
+		u.patchSize = j.Int( j.Get( update, "patch_format" )) == 1 ? j.Number( j.Get( update, "patch_size" )) : 0;
+		Q_strncpy( u.patchUrl, j.String( j.Get( update, "patch_url" )), sizeof( u.patchUrl ));
+		Q_strncpy( u.patchSha256, j.String( j.Get( update, "patch_sha256" )), sizeof( u.patchSha256 ));
+		Q_strncpy( u.baseSha256, j.String( j.Get( update, "base_sha256" )), sizeof( u.baseSha256 ));
 	}
 	else
 	{

@@ -297,7 +297,7 @@ bool CZM_NetCanSelfUpdate( void )
 	return can;
 }
 
-void CZM_UpdateStart( const char *url, const char *sha256, double size )
+void CZM_UpdateStart( const CzmUpdateInfo &update )
 {
 	JNIEnv *env;
 	jclass cls;
@@ -305,9 +305,10 @@ void CZM_UpdateStart( const char *url, const char *sha256, double size )
 
 	if( !CZM_Begin( &env, &cls ))
 		return;
-	m = CZM_Method( env, cls, "updateStart", "(Ljava/lang/String;Ljava/lang/String;J)V" );
+	m = CZM_Method( env, cls, "updateStart", "(Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;JLjava/lang/String;)V" );
 	if( m )
-		env->CallStaticVoidMethod( cls, m, env->NewStringUTF( url ), env->NewStringUTF( sha256 ), (jlong)size );
+		env->CallStaticVoidMethod( cls, m, env->NewStringUTF( update.url ), env->NewStringUTF( update.sha256 ), (jlong)update.size,
+			env->NewStringUTF( update.patchUrl ), env->NewStringUTF( update.patchSha256 ), (jlong)update.patchSize, env->NewStringUTF( update.baseSha256 ));
 	CZM_End( env );
 }
 
@@ -354,7 +355,7 @@ const char *CZM_NetDeviceId( void ) { return ""; }
 void CZM_NetNewKey( char *out, size_t size ) { if( size ) out[0] = 0; }
 int CZM_NetVersionCode( void ) { return 0; }
 bool CZM_NetCanSelfUpdate( void ) { return false; }
-void CZM_UpdateStart( const char *, const char *, double ) {}
+void CZM_UpdateStart( const CzmUpdateInfo & ) {}
 void CZM_UpdateInstall( void ) {}
 void CZM_UpdateCancel( void ) {}
 void CZM_UpdateCleanup( void ) {}

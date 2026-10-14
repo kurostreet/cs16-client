@@ -28,7 +28,7 @@ GNU General Public License for more details.
 
 #define UI_DIR "gfx/czm/ui/"
 #define CZM_MAX_TILES 8
-#define CZM_ABOUT_ROWS 6
+#define CZM_ABOUT_ROWS 7
 
 #define CZM_TELEGRAM_URL "https://t.me/blackmodru"
 #define CZM_GROUP_URL "https://t.me/counter_zombie_mobile"
@@ -438,7 +438,7 @@ void CCzmMainMenu::Activate( int hit )
 		else if( state == CZM_UPDATE_READY || state == CZM_UPDATE_PERMISSION )
 			CZM_UpdateInstall();
 		else if( state == CZM_UPDATE_IDLE || state == CZM_UPDATE_ERROR )
-			CZM_UpdateStart( update->url, update->sha256, update->size );
+			CZM_UpdateStart( *update );
 		break;
 	}
 	case HIT_LANG_RU:
@@ -833,8 +833,8 @@ void CCzmMainMenu::DrawNav( void )
 void CCzmMainMenu::DrawAbout( void )
 {
 	static const char *icons[CZM_ABOUT_ROWS] = { UI_DIR "icon_send.png", UI_DIR "icon_users.png", UI_DIR "icon_globe.png", UI_DIR "icon_code.png",
-		UI_DIR "icon_tag.png", UI_DIR "icon_calendar.png" };
-	static const char *labels[CZM_ABOUT_ROWS] = { "about_tg", "about_group", "about_site", "about_source", "about_version", "about_updated" };
+		UI_DIR "icon_tag.png", UI_DIR "icon_calendar.png", UI_DIR "icon_gear.png" };
+	static const char *labels[CZM_ABOUT_ROWS] = { "about_tg", "about_group", "about_site", "about_source", "about_version", "about_updated", "about_engine" };
 	HFont labelFont = CZM_Font( CZMF_PANEL_TEXT );
 	HFont valueFont = CZM_Font( CZMF_TILE_STATUS );
 	const CzmRect &logoRow = m_aboutLogo;
@@ -866,7 +866,8 @@ void CCzmMainMenu::DrawAbout( void )
 		case 2: value = CZM_T( "about_site_soon" ); valueColor = PackRGBA( 250, 204, 21, 255 ); break;
 		case 3: value = "github.com/kurostreet/cs16-client"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 4: value = CZM_Version(); break;
-		default: value = date; break;
+		case 5: value = date; break;
+		default: value = "Xash3D FWGS (GPL)"; break;
 		}
 
 		if( pressed )
@@ -918,7 +919,10 @@ void CCzmMainMenu::DrawBell( void )
 		CZM_UpdateState( &state, &done, &total, error, sizeof( error ));
 		CZM_DrawSliced( UI_DIR "card_on.png", c.x, c.y, c.w, c.h, 30, (int)( H * 0.022f ));
 
-		snprintf( size, sizeof( size ), "%.0f %s", update->size / 1048576.0, CZM_T( "mb" ));
+		double downloadSize = update->patchSize > 0 ? update->patchSize : update->size;
+		if( state != CZM_UPDATE_IDLE && total > 0 )
+			downloadSize = total;
+		snprintf( size, sizeof( size ), "%.1f %s", downloadSize / 1048576.0, CZM_T( "mb" ));
 		snprintf( text, sizeof( text ), "%s %s", CZM_T( "upd_title" ), update->version );
 		CZM_DrawText( nameFont, c.x + H * 0.03f, c.y + H * 0.022f, c.w - H * 0.06f - CZM_TextWidth( smallFont, size ) - H * 0.02f, text, CZM_White());
 		CZM_DrawText( smallFont, c.x + c.w - H * 0.03f - CZM_TextWidth( smallFont, size ), c.y + H * 0.03f, CZM_TextWidth( smallFont, size ) + 2, size, dim );

@@ -271,7 +271,8 @@ enum
 	CZM_UPDATE_INSTALLING,
 	CZM_UPDATE_PERMISSION,
 };
-void CZM_UpdateStart( const char *url, const char *sha256, double size );
+struct CzmUpdateInfo;
+void CZM_UpdateStart( const CzmUpdateInfo &update );
 void CZM_UpdateState( int *state, double *done, double *total, char *error, size_t errorSize );
 void CZM_UpdateInstall( void );
 void CZM_UpdateCancel( void );
@@ -297,6 +298,10 @@ struct CzmUpdateInfo
 	char sha256[80];
 	char url[256];
 	char notes[512];
+	double patchSize;
+	char patchUrl[256];
+	char patchSha256[80];
+	char baseSha256[80];
 };
 
 class CzmJson;

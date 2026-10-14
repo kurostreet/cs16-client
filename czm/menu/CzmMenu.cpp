@@ -108,6 +108,7 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "about_source", "Исходный код", "Source code" },
 	{ "about_version", "Версия приложения", "App version" },
 	{ "about_updated", "Последнее обновление", "Last update" },
+	{ "about_engine", "Движок", "Engine" },
 	{ "about_more", "Подробности, лицензии и авторы — на GitHub", "Details, licenses and credits are on GitHub" },
 	{ "quit_title", "Выйти из игры?", "Quit the game?" },
 	{ "quit_yes", "Выйти", "Quit" },
@@ -298,6 +299,7 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "upd_error_network", "Связь прервалась. Нажми, чтобы продолжить", "The download stopped. Tap to continue" },
 	{ "upd_error_broken", "Файл повреждён, скачаем заново", "The file is damaged, it will download again" },
 	{ "upd_error_install", "Не удалось установить. Попробуй ещё раз", "Could not install. Try again" },
+	{ "upd_error_storage", "Освободи место на телефоне и попробуй ещё раз", "Free some space on your phone and try again" },
 	{ "upd_cancel", "Отмена", "Cancel" },
 	{ "news_loading", "Загружаем новости…", "Loading news…" },
 	// first start
@@ -310,6 +312,10 @@ static bool s_bInitialized;
 
 void CZM_Init( void )
 {
+	// This also runs after config.cfg: existing players may have saved the old value.
+	if( EngFuncs::GetCvarFloat( "cl_advertise_engine_in_name" ) != 0.0f )
+		EngFuncs::CvarSetValue( "cl_advertise_engine_in_name", 0.0f );
+
 	if( s_bInitialized )
 		return;
 
