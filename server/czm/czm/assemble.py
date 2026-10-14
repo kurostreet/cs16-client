@@ -19,6 +19,7 @@ import zipfile
 from pathlib import Path
 
 from . import db, service
+from .apkpatch import make_patch
 from .config import get_settings
 
 log = logging.getLogger("czm.assemble")
@@ -144,6 +145,26 @@ def remove_old_files(conn) -> None:
     for row in conn.execute("SELECT file FROM releases"):
         if row["file"] not in keep:
             (settings.apk_dir / row["file"]).unlink(missing_ok=True)
+    for row in conn.execute("SELECT p.file, p.release_id, r.file AS apk FROM release_patches p JOIN releases r ON r.id = p.release_id"):
+        if row["apk"] not in keep:
+            (settings.apk_dir / row["file"]).unlink(missing_ok=True)
+            conn.execute("DELETE FROM release_patches WHERE release_id = ?", (row["release_id"],))
+
+
+def release_patches(target: Path, digest: str, bases: list[dict]) -> list[dict]:
+    """A broken/missing base must never stop the full APK release."""
+    patches = []
+    for base in bases:
+        source = get_settings().apk_dir / base["file"]
+        patch = target.with_name(f"czm-{digest[:16]}-from-{base['sha256'][:16]}.czmpatch")
+        try:
+            info = make_patch(source, target, patch, base_sha256=base["sha256"], target_sha256=digest)
+            if info:
+                patches.append({**info, "base_code": base["code"]})
+                log.info("patch from %s: %d bytes, reused %d bytes", base["version"], info["size"], info["reused"])
+        except Exception:
+            log.exception("patch from %s unavailable; full APK remains available", base["version"])
+    return patches
 
 
 def assemble_build(build) -> int:
@@ -161,6 +182,8 @@ def assemble_build(build) -> int:
                 service.publish_release(conn, same["id"], build["notes"])
             return same["id"]
         data_apk = previous_release_apk(conn)
+        bases = [dict(row) for row in conn.execute("SELECT * FROM releases WHERE code < ? ORDER BY code DESC", (build["code"],))
+                 if (settings.apk_dir / row["file"]).is_file()][:3]
     if data_apk is None:
         raise BuildError("нет предыдущей сборки с игровыми файлами")
 
@@ -181,12 +204,17 @@ def assemble_build(build) -> int:
         signed.unlink(missing_ok=True)
         Path(str(signed) + ".idsig").unlink(missing_ok=True)   # v4 signature next to the APK, not needed
 
+    # Verification reads APK ranges into a hash; no extra 400 MB output per patch.
+    patches = release_patches(target, digest, bases)
     with db.db() as conn:
         conn.execute("DELETE FROM releases WHERE file = ? AND published IS NULL", (name,))
         release_id = conn.execute(
             "INSERT INTO releases (version, code, file, size, sha256, created, auto) VALUES (?, ?, ?, ?, ?, ?, 1)",
             (build["version"], build["code"], name, size, digest, db.now()),
         ).lastrowid
+        for patch in patches:
+            conn.execute("INSERT INTO release_patches (release_id, base_code, base_sha256, file, size, sha256) VALUES (?, ?, ?, ?, ?, ?)",
+                         (release_id, patch["base_code"], patch["base_sha256"], patch["file"], patch["size"], patch["sha256"]))
         if settings.build_autopublish:
             notes = build["notes"].strip()
             last = service.latest_release(conn)

@@ -7,7 +7,7 @@ set -euo pipefail
 COMMIT=${1:?usage: install.sh <commit>}
 REPO=https://raw.githubusercontent.com/kurostreet/cs16-client/$COMMIT/server/czm
 FILES="requirements.txt czm/__init__.py czm/config.py czm/db.py czm/profanity.py czm/service.py czm/api.py
-       czm/bot.py czm/steam.py czm/main.py czm/cli.py czm/builds.py czm/assemble.py
+       czm/bot.py czm/steam.py czm/main.py czm/cli.py czm/builds.py czm/assemble.py czm/apkpatch.py
        deploy/czm.service deploy/czm.caddy deploy/install.sh
        deploy/czm-assemble.service deploy/czm-assemble.path deploy/czm-assemble.timer"
 # the public debug key of the engine (the same one signs every build, or updates would not install)

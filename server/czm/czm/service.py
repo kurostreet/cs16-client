@@ -290,10 +290,19 @@ def _release(r: sqlite3.Row | None) -> dict | None:
     }
 
 
-def latest_release(conn: sqlite3.Connection, published_only: bool = True) -> dict | None:
+def latest_release(conn: sqlite3.Connection, published_only: bool = True, *, base_code: int | None = None) -> dict | None:
     query = "SELECT * FROM releases WHERE published IS NOT NULL ORDER BY code DESC LIMIT 1" if published_only else \
         "SELECT * FROM releases ORDER BY id DESC LIMIT 1"
-    return _release(conn.execute(query).fetchone())
+    release = _release(conn.execute(query).fetchone())
+    if release and base_code is not None and 0 < base_code < release["code"]:
+        for patch in conn.execute("SELECT * FROM release_patches WHERE release_id = ? AND base_code = ? ORDER BY size",
+                                  (release["id"], base_code)):
+            path = get_settings().apk_dir / patch["file"]
+            if path.is_file() and path.stat().st_size == patch["size"] and 0 < patch["size"] < release["size"]:
+                release.update(patch_format=1, patch_url=f"{get_settings().public_url}/dl/{patch['file']}",
+                               patch_size=patch["size"], patch_sha256=patch["sha256"], base_sha256=patch["base_sha256"])
+                break
+    return release
 
 
 def release_by_id(conn: sqlite3.Connection, release_id: int) -> dict | None:

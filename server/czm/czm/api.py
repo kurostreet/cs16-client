@@ -88,7 +88,7 @@ async def hello(body: HelloIn, request: Request):
 
     def run(conn):
         player = service.hello(conn, body.key, body.device, body.nick, body.avatar, body.lang, body.version)
-        release = service.latest_release(conn)
+        release = service.latest_release(conn, base_code=body.code)
         return {
             "id": player["id"],
             "avatar": service.avatar_ref(player),
@@ -195,5 +195,5 @@ async def news(request: Request, after: int = 0):
 @router.get("/update")
 async def update(request: Request, code: int = 0):
     _read_limit.check(client_ip(request))
-    release = await in_db(service.latest_release)
+    release = await in_db(lambda conn: service.latest_release(conn, base_code=code))
     return {"update": release if release and release["code"] > code else None}

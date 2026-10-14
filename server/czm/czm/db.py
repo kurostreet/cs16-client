@@ -75,6 +75,16 @@ CREATE TABLE IF NOT EXISTS releases (
     published INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS release_patches (
+    release_id INTEGER NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+    base_code INTEGER NOT NULL,
+    base_sha256 TEXT NOT NULL,
+    file TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    sha256 TEXT NOT NULL,
+    PRIMARY KEY (release_id, base_code, base_sha256)
+);
+
 -- core APKs sent by GitHub Actions, assembled into releases by `czm.cli assemble`
 CREATE TABLE IF NOT EXISTS builds (
     id INTEGER PRIMARY KEY,
