@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from . import api, db, steam
+from . import api, builds, db, steam
 from .config import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -39,7 +39,7 @@ async def cleanup_loop() -> None:
 async def lifespan(app: FastAPI):
     settings = get_settings()
     db.init()
-    for folder in (settings.avatar_dir, settings.apk_dir, settings.serverlist_file.parent):
+    for folder in (settings.avatar_dir, settings.apk_dir, settings.incoming_dir, settings.serverlist_file.parent):
         folder.mkdir(parents=True, exist_ok=True)
 
     tasks = [asyncio.create_task(cleanup_loop()), asyncio.create_task(steam.run())]
@@ -49,6 +49,7 @@ async def lifespan(app: FastAPI):
         bot, dispatcher, owner = botmod.build(settings)
         api.notify_report = owner.notify_report
         tasks.append(asyncio.create_task(botmod.run_bot(bot, dispatcher)))
+        tasks.append(asyncio.create_task(botmod.builds_loop(owner)))
     else:
         log.info("no bot token or owners, complaints only stay in the database")
 
@@ -62,6 +63,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Counter Zombie Mobile", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(api.router)
+app.include_router(builds.router)
 
 
 @app.exception_handler(HTTPException)

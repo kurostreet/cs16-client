@@ -281,10 +281,7 @@ def delete_news(conn: sqlite3.Connection, news_id: int) -> bool:
     return conn.execute("UPDATE news SET deleted = 1 WHERE id = ?", (news_id,)).rowcount > 0
 
 
-def latest_release(conn: sqlite3.Connection, published_only: bool = True) -> dict | None:
-    query = "SELECT * FROM releases WHERE published IS NOT NULL ORDER BY code DESC LIMIT 1" if published_only else \
-        "SELECT * FROM releases ORDER BY id DESC LIMIT 1"
-    r = conn.execute(query).fetchone()
+def _release(r: sqlite3.Row | None) -> dict | None:
     if r is None:
         return None
     return {
@@ -293,8 +290,94 @@ def latest_release(conn: sqlite3.Connection, published_only: bool = True) -> dic
     }
 
 
+def latest_release(conn: sqlite3.Connection, published_only: bool = True) -> dict | None:
+    query = "SELECT * FROM releases WHERE published IS NOT NULL ORDER BY code DESC LIMIT 1" if published_only else \
+        "SELECT * FROM releases ORDER BY id DESC LIMIT 1"
+    return _release(conn.execute(query).fetchone())
+
+
+def release_by_id(conn: sqlite3.Connection, release_id: int) -> dict | None:
+    return _release(conn.execute("SELECT * FROM releases WHERE id = ?", (release_id,)).fetchone())
+
+
+DEFAULT_NOTES = "Исправления и улучшения."
+
+
+def release_news_text(version: str, notes: str) -> str:
+    return f"Обновление {version}\n{notes.strip() or DEFAULT_NOTES}"[:1000]
+
+
 def publish_release(conn: sqlite3.Connection, release_id: int, notes: str) -> None:
-    conn.execute("UPDATE releases SET published = ?, notes = ? WHERE id = ?", (now(), notes.strip()[:1000], release_id))
+    """Players get the update, and the bell keeps what is new as a news item."""
+    notes = notes.strip()[:1000] or DEFAULT_NOTES
+    row = conn.execute("SELECT version, news_id FROM releases WHERE id = ?", (release_id,)).fetchone()
+    if row is None:
+        return
+    text = release_news_text(row["version"], notes)
+    news_id = row["news_id"]
+    if news_id and conn.execute("UPDATE news SET text = ?, deleted = 0 WHERE id = ?", (text, news_id)).rowcount:
+        pass
+    else:
+        news_id = add_news(conn, text)
+    conn.execute("UPDATE releases SET published = ?, notes = ?, news_id = ? WHERE id = ?",
+                 (now(), notes, news_id, release_id))
+
+
+def unpublish_release(conn: sqlite3.Connection, release_id: int) -> None:
+    """Players go back to the previous published build; its news item leaves the bell."""
+    row = conn.execute("SELECT news_id FROM releases WHERE id = ?", (release_id,)).fetchone()
+    if row is None:
+        return
+    if row["news_id"]:
+        delete_news(conn, row["news_id"])
+    conn.execute("UPDATE releases SET published = NULL WHERE id = ?", (release_id,))
+
+
+def set_release_notes(conn: sqlite3.Connection, release_id: int, notes: str) -> None:
+    """Corrects what is new of a published release, in the update card and in the news."""
+    notes = notes.strip()[:1000] or DEFAULT_NOTES
+    row = conn.execute("SELECT version, news_id FROM releases WHERE id = ?", (release_id,)).fetchone()
+    if row is None:
+        return
+    conn.execute("UPDATE releases SET notes = ? WHERE id = ?", (notes, release_id))
+    if row["news_id"]:
+        conn.execute("UPDATE news SET text = ? WHERE id = ?", (release_news_text(row["version"], notes), row["news_id"]))
+
+
+# automatic builds ------------------------------------------------------------
+
+def build_by_commit(conn: sqlite3.Connection, commit: str) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM builds WHERE commit_sha = ?", (commit,)).fetchone()
+
+
+def add_build(conn: sqlite3.Connection, commit: str, version: str, code: int, notes: str, file: str) -> int:
+    conn.execute("DELETE FROM builds WHERE commit_sha = ? AND status = 'failed'", (commit,))
+    return conn.execute(
+        "INSERT INTO builds (commit_sha, version, code, notes, file, created) VALUES (?, ?, ?, ?, ?, ?)",
+        (commit, version, code, notes.strip()[:1000], file, now()),
+    ).lastrowid
+
+
+def pending_builds(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM builds WHERE status = 'new' ORDER BY id").fetchall()
+
+
+def finish_build(conn: sqlite3.Connection, build_id: int, status: str, error: str = "", release_id: int | None = None) -> None:
+    conn.execute("UPDATE builds SET status = ?, error = ?, release_id = ?, finished = ? WHERE id = ?",
+                 (status, error[:500], release_id, now(), build_id))
+
+
+def unnotified_builds(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute(
+        "SELECT b.*, r.size AS release_size, r.published AS release_published, r.notes AS release_notes "
+        "FROM builds b LEFT JOIN releases r ON r.id = b.release_id "
+        "WHERE b.status IN ('done', 'failed') AND b.notified = 0 ORDER BY b.id"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_build_notified(conn: sqlite3.Connection, build_id: int) -> None:
+    conn.execute("UPDATE builds SET notified = 1 WHERE id = ?", (build_id,))
 
 
 def stats(conn: sqlite3.Connection) -> dict:

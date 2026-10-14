@@ -1,0 +1,10 @@
+[Unit]
+Description=Counter Zombie Mobile: look for builds left after a restart
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=15min
+Unit=czm-assemble.service
+
+[Install]
+WantedBy=timers.target

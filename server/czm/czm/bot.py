@@ -33,7 +33,9 @@ HELP = (
     "Жалобы из игрового чата приходят сюда с кнопками бана.\n\n"
     "/news <i>текст</i> — новость в колокольчик всем игрокам\n"
     "/news — последние новости, /delnews <i>номер</i> — убрать новость\n"
-    "/release — загруженная сборка, /release <i>что нового</i> — выпустить обновление\n"
+    "Обновления выходят сами: после каждой правки сервер собирает игру и выпускает её, "
+    "сюда приходит сообщение с кнопкой отмены.\n"
+    "/release — что сейчас у игроков, /release <i>текст</i> — поправить «что нового»\n"
     "/ban <i>ID</i> week|month|forever <i>причина</i> — бан игрока\n"
     "/unban <i>ID</i> — разбан, /bans — кто забанен\n"
     "/stats — сводка"
@@ -165,21 +167,88 @@ class OwnerBot:
             return
         release = await in_db(service.latest_release, False)
         if release is None:
-            await message.answer("Сборок пока нет: загружу на сервер, когда будет новая.")
+            await message.answer("Сборок пока нет: первая появится после следующей правки.")
             return
         size = f"{release['size'] / 1024 / 1024:.0f} МБ"
         notes = (command.args or "").strip()
-        if release["published"] and not notes:
-            await message.answer(f"Последняя сборка {release['version']} ({size}) уже выпущена.\n{html.escape(release['notes'])}")
-            return
         if not notes:
-            await message.answer(
-                f"Готова сборка <b>{release['version']}</b> ({size}), ещё не выпущена.\n"
-                "Выпустить: /release и что нового, например:\n<code>/release Новый список серверов и аватары</code>"
-            )
+            if release["published"]:
+                await message.answer(
+                    f"У игроков <b>{release['version']}</b> ({size}).\nЧто нового: {html.escape(release['notes'])}\n\n"
+                    "Новые сборки выходят сами. Поправить текст: <code>/release новый текст</code>"
+                )
+            else:
+                await message.answer(
+                    f"Сборка <b>{release['version']}</b> ({size}) не выпущена.\n"
+                    "Выпустить: /release и что нового, например:\n<code>/release Новый список серверов и аватары</code>"
+                )
+            return
+        if release["published"]:
+            await in_db(service.set_release_notes, release["id"], notes)
+            await message.answer(f"✏️ Текст обновления {release['version']} изменён, в колокольчике тоже.")
             return
         await in_db(service.publish_release, release["id"], notes)
         await message.answer(f"✅ Обновление {release['version']} выпущено, игроки увидят его в игре.")
+
+    # automatic builds -----------------------------------------------------
+
+    @staticmethod
+    def build_text(b: dict, state: str = "") -> tuple[str, InlineKeyboardMarkup | None]:
+        version = html.escape(b["version"])
+        if b["status"] == "failed":
+            return (f"⚠️ Сборка {version} не собралась на сервере: {html.escape(b['error'])}\n"
+                    "У игроков осталась прошлая версия."), None
+        size = f"{(b.get('release_size') or 0) / 1024 / 1024:.0f} МБ"
+        notes = html.escape(b.get("release_notes") or "")
+        published = state == "published" if state else bool(b.get("release_published"))
+        rid = b["release_id"]
+        if published:
+            text = f"🚀 <b>Вышло обновление {version}</b> ({size})\n{notes}\n\nИгроки увидят его в колокольчике в течение 10 минут."
+            button = InlineKeyboardButton(text="↩️ Отменить выпуск", callback_data=f"ru:{rid}")
+        else:
+            text = (f"↩️ Выпуск {version} отменён, у игроков прошлая версия." if state == "undone"
+                    else f"📦 Готова сборка <b>{version}</b> ({size})\n{notes}")
+            button = InlineKeyboardButton(text="🚀 Выпустить", callback_data=f"rp:{rid}")
+        return text, InlineKeyboardMarkup(inline_keyboard=[[button]])
+
+    async def notify_builds(self) -> None:
+        for b in await in_db(service.unnotified_builds):
+            text, keyboard = self.build_text(b)
+            sent = False
+            for owner in self.owners:
+                try:
+                    await self.bot.send_message(owner, text, reply_markup=keyboard)
+                    sent = True
+                except TelegramAPIError as e:
+                    log.warning("could not send build %s to %s: %s", b["id"], owner, e)
+            if sent or not self.owners:
+                await in_db(service.mark_build_notified, b["id"])
+
+    async def on_release_button(self, query: CallbackQuery, action: str, release_id: int) -> None:
+        def act(conn):
+            release = service.release_by_id(conn, release_id)
+            if release is None:
+                return None
+            if action == "ru" and release["published"]:
+                service.unpublish_release(conn, release_id)
+            elif action == "rp" and not release["published"]:
+                service.publish_release(conn, release_id, release["notes"])
+            return service.release_by_id(conn, release_id)
+
+        release = await in_db(act)
+        if release is None:
+            await query.answer("Нет такой сборки")
+            return
+        published = bool(release["published"])
+        await query.answer("Выпущено" if published else "Отменено")
+        info = {"version": release["version"], "status": "done", "release_id": release_id,
+                "release_size": release["size"], "release_notes": release["notes"]}
+        text, keyboard = self.build_text(info, "published" if published else "undone")
+        if query.message:
+            try:
+                await query.message.edit_text(text, reply_markup=keyboard)
+            except TelegramAPIError as e:
+                log.warning("could not edit build message: %s", e)
 
     async def on_ban(self, message: Message, command: CommandObject) -> None:
         if not self.allowed(message.from_user and message.from_user.id):
@@ -231,6 +300,9 @@ class OwnerBot:
         if len(parts) < 2 or not parts[1].isdigit():
             await query.answer()
             return
+        if parts[0] in ("ru", "rp"):
+            await self.on_release_button(query, parts[0], int(parts[1]))
+            return
         report_id = int(parts[1])
 
         def act(conn):
@@ -274,7 +346,7 @@ class OwnerBot:
         try:
             await self.bot.set_my_commands([
                 BotCommand(command="news", description="Новость в колокольчик"),
-                BotCommand(command="release", description="Выпустить обновление"),
+                BotCommand(command="release", description="Что сейчас у игроков"),
                 BotCommand(command="bans", description="Кто забанен"),
                 BotCommand(command="unban", description="Разбан игрока"),
                 BotCommand(command="stats", description="Сводка"),
@@ -322,3 +394,15 @@ async def run_bot(bot: Bot, dispatcher: Dispatcher) -> None:
         except Exception as e:  # keep the API alive whatever the bot does
             log.warning("bot stopped: %s, restarting in 30 s", e)
             await asyncio.sleep(30)
+
+
+async def builds_loop(owner: OwnerBot) -> None:
+    """Tells the owner about every assembled or failed build."""
+    while True:
+        try:
+            await owner.notify_builds()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.warning("build notices failed: %s", e)
+        await asyncio.sleep(15)

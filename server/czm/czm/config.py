@@ -22,6 +22,19 @@ class Settings(BaseSettings):
     steam_key: str = ""
     steam_refresh_seconds: int = 300
 
+    # automatic updates: GitHub Actions sends each new core APK (proved by its OIDC token),
+    # the server adds the game data of the previous release, signs it and publishes it
+    build_repository_id: int = 1413538918       # kurostreet/cs16-client
+    build_repository: str = "kurostreet/cs16-client"
+    build_ref: str = "refs/heads/feature/mobile-launcher"
+    build_workflow: str = ".github/workflows/build.yml"
+    build_audience: str = "kontrafps.ru"
+    build_autopublish: bool = True              # players get every build at once
+    build_max_mb: int = 700
+    build_keep: int = 3                         # release APK files kept on disk
+    apksigner: str = "apksigner"
+    keystore: str = ""                          # default: <data_dir>/signing/debug.keystore (public upstream debug key)
+
     # chat rules
     rooms: str = "global,ru,en"
     message_max_chars: int = 200
@@ -52,6 +65,14 @@ class Settings(BaseSettings):
     @property
     def apk_dir(self) -> Path:
         return self.data_dir / "apk"
+
+    @property
+    def incoming_dir(self) -> Path:
+        return self.data_dir / "incoming"
+
+    @property
+    def keystore_file(self) -> Path:
+        return Path(self.keystore) if self.keystore else self.data_dir / "signing" / "debug.keystore"
 
     @property
     def serverlist_file(self) -> Path:

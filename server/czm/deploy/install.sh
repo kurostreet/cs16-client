@@ -7,12 +7,25 @@ set -euo pipefail
 COMMIT=${1:?usage: install.sh <commit>}
 REPO=https://raw.githubusercontent.com/kurostreet/cs16-client/$COMMIT/server/czm
 FILES="requirements.txt czm/__init__.py czm/config.py czm/db.py czm/profanity.py czm/service.py czm/api.py
-       czm/bot.py czm/steam.py czm/main.py czm/cli.py deploy/czm.service deploy/czm.caddy deploy/install.sh"
+       czm/bot.py czm/steam.py czm/main.py czm/cli.py czm/builds.py czm/assemble.py
+       deploy/czm.service deploy/czm.caddy deploy/install.sh
+       deploy/czm-assemble.service deploy/czm-assemble.path deploy/czm-assemble.timer"
+# the public debug key of the engine (the same one signs every build, or updates would not install)
+XASH=51353ff8d65e58300eeb2bd014867673f1f367c6
+KEYSTORE_URL=https://raw.githubusercontent.com/FWGS/xash3d-fwgs/$XASH/android/debug.keystore
 DEST=/opt/czm/releases/$COMMIT
 
 id czm >/dev/null 2>&1 || useradd --system --home-dir /var/lib/czm --shell /usr/sbin/nologin czm
-mkdir -p "$DEST/czm" "$DEST/deploy" /var/lib/czm/avatars /var/lib/czm/apk /var/lib/czm/server-list /etc/czm
+mkdir -p "$DEST/czm" "$DEST/deploy" /var/lib/czm/avatars /var/lib/czm/apk /var/lib/czm/server-list \
+         /var/lib/czm/incoming /var/lib/czm/signing /etc/czm
 for f in $FILES; do curl -fsSL "$REPO/$f" -o "$DEST/$f"; done
+
+# automatic updates sign the APK with apksigner (Java)
+if ! command -v apksigner >/dev/null 2>&1; then
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends apksigner >/dev/null
+fi
+[ -s /var/lib/czm/signing/debug.keystore ] || curl -fsSL "$KEYSTORE_URL" -o /var/lib/czm/signing/debug.keystore
 
 [ -x /opt/czm/venv/bin/python ] || python3 -m venv /opt/czm/venv
 /opt/czm/venv/bin/pip install -q --disable-pip-version-check -r "$DEST/requirements.txt"
@@ -33,12 +46,28 @@ chmod 640 /etc/czm/env
 # the web server reads avatars, APK files and the server list
 chown -R czm:czm /var/lib/czm
 chmod 755 /var/lib/czm /var/lib/czm/avatars /var/lib/czm/apk /var/lib/czm/server-list
+chmod 750 /var/lib/czm/incoming /var/lib/czm/signing
 
 ln -sfn "$DEST" /opt/czm/current
-install -m 644 "$DEST/deploy/czm.service" /etc/systemd/system/czm.service
+for unit in czm.service czm-assemble.service czm-assemble.path czm-assemble.timer; do
+  install -m 644 "$DEST/deploy/$unit" /etc/systemd/system/$unit
+done
 systemctl daemon-reload
 systemctl enable --quiet czm
 systemctl restart czm
+systemctl enable --quiet --now czm-assemble.path czm-assemble.timer
+
+# the site: replaced only when it changed and Caddy accepts the new one
+if [ -d /etc/caddy/sites ] && ! cmp -s "$DEST/deploy/czm.caddy" /etc/caddy/sites/czm.caddy; then
+  [ -f /etc/caddy/sites/czm.caddy ] && cp -p /etc/caddy/sites/czm.caddy /etc/caddy/sites/czm.caddy.previous
+  install -m 644 "$DEST/deploy/czm.caddy" /etc/caddy/sites/czm.caddy
+  if caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    systemctl reload caddy
+  elif [ -f /etc/caddy/sites/czm.caddy.previous ]; then
+    echo "Caddy rejected the new site, the previous one stays"
+    mv /etc/caddy/sites/czm.caddy.previous /etc/caddy/sites/czm.caddy
+  fi
+fi
 for i in $(seq 1 20); do
   curl -fsS http://127.0.0.1:8200/api/v1/ping >/dev/null 2>&1 && break
   sleep 1

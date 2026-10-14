@@ -74,7 +74,28 @@ CREATE TABLE IF NOT EXISTS releases (
     created INTEGER NOT NULL,
     published INTEGER
 );
+
+-- core APKs sent by GitHub Actions, assembled into releases by `czm.cli assemble`
+CREATE TABLE IF NOT EXISTS builds (
+    id INTEGER PRIMARY KEY,
+    commit_sha TEXT NOT NULL UNIQUE,
+    version TEXT NOT NULL,
+    code INTEGER NOT NULL,
+    notes TEXT NOT NULL DEFAULT '',
+    file TEXT NOT NULL,                   -- core APK in the incoming folder
+    status TEXT NOT NULL DEFAULT 'new',   -- new, done, failed
+    error TEXT NOT NULL DEFAULT '',
+    release_id INTEGER,
+    created INTEGER NOT NULL,
+    finished INTEGER,
+    notified INTEGER NOT NULL DEFAULT 0
+);
 """
+
+# columns added after the first version of a table
+COLUMNS = {
+    "releases": {"news_id": "INTEGER", "auto": "INTEGER NOT NULL DEFAULT 0"},
+}
 
 _lock = threading.Lock()
 
@@ -115,6 +136,15 @@ def init() -> None:
         conn = connect()
         try:
             conn.executescript(SCHEMA)
+            for table, columns in COLUMNS.items():
+                have = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+                for name, kind in columns.items():
+                    if name not in have:
+                        try:
+                            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+                        except sqlite3.OperationalError as e:  # the other process was first
+                            if "duplicate column" not in str(e):
+                                raise
         finally:
             conn.close()
 

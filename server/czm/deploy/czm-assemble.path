@@ -1,0 +1,9 @@
+[Unit]
+Description=Counter Zombie Mobile: a new build arrived
+
+[Path]
+PathChanged=/var/lib/czm/incoming/.trigger
+Unit=czm-assemble.service
+
+[Install]
+WantedBy=multi-user.target

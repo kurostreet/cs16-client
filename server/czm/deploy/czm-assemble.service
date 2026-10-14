@@ -1,0 +1,21 @@
+[Unit]
+Description=Counter Zombie Mobile: assemble and publish builds sent by GitHub Actions
+After=network-online.target czm.service
+
+[Service]
+Type=oneshot
+User=czm
+Group=czm
+WorkingDirectory=/opt/czm/current
+EnvironmentFile=/etc/czm/env
+Environment=JAVA_TOOL_OPTIONS=-Xmx256m
+ExecStart=/opt/czm/venv/bin/python -m czm.cli assemble
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=700M
+TimeoutStartSec=40min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/czm

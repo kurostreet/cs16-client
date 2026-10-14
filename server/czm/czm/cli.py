@@ -1,7 +1,10 @@
-"""Server commands: python -m czm.cli add-release <apk> <version> <code>
+"""Server commands:
+  python -m czm.cli add-release <apk> <version> <code>
+  python -m czm.cli assemble
 
 add-release moves an uploaded APK into the download folder and remembers it as the
 newest build. Players see it only after the owner publishes it in the bot (/release).
+assemble turns the core APKs sent by GitHub Actions into releases (czm-assemble.service).
 """
 import hashlib
 import shutil
@@ -33,6 +36,12 @@ def add_release(apk: Path, version: str, code: int) -> None:
 
 
 def main(argv: list[str]) -> int:
+    if argv == ["assemble"]:
+        import logging
+        from .assemble import run_pending
+        logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s %(message)s")
+        run_pending()
+        return 0
     if len(argv) == 4 and argv[0] == "add-release" and argv[3].isdigit():
         add_release(Path(argv[1]), argv[2], int(argv[3]))
         return 0
