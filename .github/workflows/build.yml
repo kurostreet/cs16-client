@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write   # the game server checks this token before it takes a new build
 
 concurrency:
   group: android-${{ github.ref }}
@@ -114,3 +115,35 @@ jobs:
             tools/apksigner.jar
           if-no-files-found: error
           retention-days: 30
+      - name: Send the build to the game server
+        # the server adds the game data, signs the APK and gives it to the players at once
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/feature/mobile-launcher'
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" apk-info.txt | head -n1)
+          CODE=$(sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" apk-info.txt | head -n1)
+          SHA256=$(cut -d' ' -f1 CounterZombieMobile-Core-test.apk.sha256)
+          NOTES=$( [ -f czm/whatsnew.txt ] && base64 -w0 czm/whatsnew.txt || true )
+          # until the server has the builds endpoint it answers 404: nothing to send yet
+          if [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST https://kontrafps.ru/api/v1/builds || true)" = 404 ]; then
+            echo "::notice::The game server does not take builds yet, skipped"
+            exit 0
+          fi
+          echo "Sending $VERSION ($CODE), $(du -m CounterZombieMobile-Core-test.apk | cut -f1) MB"
+          for attempt in 1 2 3 4; do
+            # a fresh token for every attempt, they live only a few minutes
+            TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=kontrafps.ru" | python3 -c 'import json, sys; print(json.load(sys.stdin)["value"])')
+            echo "::add-mask::$TOKEN"
+            if curl -sS --fail-with-body --max-time 1200 -X POST -H "Expect:" \
+                -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/vnd.android.package-archive" \
+                -H "X-CZM-Notes: $NOTES" -T CounterZombieMobile-Core-test.apk \
+                "https://kontrafps.ru/api/v1/builds?version=$VERSION&code=$CODE&sha256=$SHA256&commit=$GITHUB_SHA"; then
+              echo
+              exit 0
+            fi
+            echo
+            echo "attempt $attempt failed"
+            sleep 30
+          done
+          exit 1
