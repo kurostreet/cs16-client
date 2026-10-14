@@ -145,7 +145,7 @@ def remove_old_files(conn) -> None:
     for row in conn.execute("SELECT file FROM releases"):
         if row["file"] not in keep:
             (settings.apk_dir / row["file"]).unlink(missing_ok=True)
-    for row in conn.execute("SELECT p.file, p.release_id, r.file AS apk FROM release_patches p JOIN releases r ON r.id = p.release_id"):
+    for row in list(conn.execute("SELECT p.file, p.release_id, r.file AS apk FROM release_patches p JOIN releases r ON r.id = p.release_id")):
         if row["apk"] not in keep:
             (settings.apk_dir / row["file"]).unlink(missing_ok=True)
             conn.execute("DELETE FROM release_patches WHERE release_id = ?", (row["release_id"],))

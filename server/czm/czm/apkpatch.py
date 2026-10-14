@@ -147,9 +147,12 @@ def verify_patch(base: Path, patch: Path, expected_sha256: str, expected_size: i
         except (ValueError, UnicodeError) as e:
             raise PatchError("bad recipe") from e
         data_start = 12 + length
-        if (recipe.get("format") != 1 or recipe.get("base_sha256") != sha256_of(base)
+        if not isinstance(recipe, dict):
+            raise PatchError("bad recipe")
+        base_size = base.stat().st_size
+        if (type(recipe.get("format")) is not int or recipe.get("format") != 1 or recipe.get("base_sha256") != sha256_of(base)
                 or recipe.get("sha256") != expected_sha256 or recipe.get("size") != expected_size
-                or recipe.get("base_size") != base.stat().st_size or not 0 < expected_size <= MAX_APK):
+                or recipe.get("base_size") != base_size or not 0 < expected_size <= MAX_APK):
             raise PatchError("recipe does not match APKs")
         data_size, ops = recipe.get("data_size"), recipe.get("ops")
         if (type(data_size) is not int or data_size < 0 or data_start + data_size != patch.stat().st_size
@@ -165,7 +168,7 @@ def verify_patch(base: Path, patch: Path, expected_sha256: str, expected_size: i
                 kind, offset, count = op
                 if kind not in (0, 1) or offset < 0 or count <= 0 or count > expected_size - produced:
                     raise PatchError("operation outside output")
-                limit = base.stat().st_size if kind == 0 else data_size
+                limit = base_size if kind == 0 else data_size
                 if offset > limit or count > limit - offset or kind == 1 and offset != used:
                     raise PatchError("operation outside source")
                 for chunk in _range(original if kind == 0 else data, offset if kind == 0 else data_start + offset, count):
