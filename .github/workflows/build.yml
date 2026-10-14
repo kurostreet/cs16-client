@@ -53,7 +53,9 @@ jobs:
           /tmp/czm-server-check/bin/pip install -q -r server/czm/requirements.txt
           PYTHONPATH=server/czm /tmp/czm-server-check/bin/python -m unittest discover -s server/czm/tests -v
       - name: Apply engine patches
-        run: python3 scripts/apply_engine_patches.py
+        run: |
+          python3 -m unittest discover -s tests -p test_engine_patches.py -v
+          python3 scripts/apply_engine_patches.py
       - name: Build engine and client from source
         working-directory: android
         run: ./gradlew --no-daemon assembleGitDebug
