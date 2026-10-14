@@ -126,6 +126,10 @@ bool CZM_HomeSetPinned( const char *address, const char *prot, bool on ); // fal
 
 // map picture and accent colour for a server tile (czm/menu/CzmServers.cpp)
 HIMAGE CZM_MapPicture( const char *map );                  // 0 when there is none
+HIMAGE CZM_MapPreview( const char *map );
+bool CZM_MapInstalled( const char *map );
+void CZM_DrawMapPreview( const char *map, int x, int y, int w, int h );
+void CZM_MapPicturesFrame( void );
 unsigned int CZM_MapAccent( const char *map, const char *name );
 
 /*
@@ -249,6 +253,7 @@ void CZM_DrawGameOverlay( void );
  */
 class CUtlString;
 bool CZM_NetAvailable( void );
+void CZM_StartupReady( void );
 // a request number, 0 if there is no network layer; body is UTF-8 JSON or ""
 int CZM_NetRequest( const char *method, const char *url, const char *key, const char *body );
 int CZM_NetUpload( const char *url, const char *key, const char *path, const char *contentType ); // path in the game folder

@@ -63,6 +63,10 @@ class Settings(BaseSettings):
         return self.data_dir / "avatars"
 
     @property
+    def mappic_dir(self) -> Path:
+        return self.data_dir / "mappics"
+
+    @property
     def apk_dir(self) -> Path:
         return self.data_dir / "apk"
 

@@ -109,7 +109,7 @@ def messages(conn: sqlite3.Connection, room: str, after: int) -> list[dict]:
         (room, after, limit),
     ).fetchall()
     return [
-        {"id": r["id"], "p": r["player"], "n": r["nick"], "a": avatar_ref(r), "t": r["text"], "ts": r["created"]}
+        {"id": r["id"], "p": r["player"], "n": r["nick"], "a": avatar_ref(r), "t": profanity.clean(r["text"]), "ts": r["created"]}
         for r in reversed(rows)
     ]
 

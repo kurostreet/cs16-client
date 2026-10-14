@@ -7,6 +7,7 @@ The roots are tied to word starts where a root alone would hit normal words
 ("употребляю", "небо", "хлеб").
 """
 import re
+from . import links
 
 _LOOKALIKE = str.maketrans({
     "a": "а", "b": "б", "c": "с", "e": "е", "k": "к", "m": "м", "o": "о", "p": "р",
@@ -53,6 +54,7 @@ _EN_RE = re.compile("|".join(_ENGLISH), re.IGNORECASE)
 
 def clean(text: str) -> str:
     """The text with swear words replaced by ***."""
+    text = links.clean(text)
     spans = []
     lowered = text.lower()
     lookalike = lowered.translate(_LOOKALIKE)

@@ -685,7 +685,9 @@ static void CZM_TileLightning( const CzmRect &r, int index )
 		if( sz < 2 )
 			sz = 2;
 		CZM_RoundRectPoint( r, rad, head - k * step, perim, &x, &y );
-		UI_FillRect( (int)x - sz / 2, (int)y - sz / 2, sz, sz, col );
+		CZM_DrawImage( UI_DIR "dot.png", (int)x - sz, (int)y - sz, sz * 2, sz * 2,
+			PackRGBA( 255, 191, 70, (int)( a * 0.16f )));
+		CZM_DrawImage( UI_DIR "dot.png", (int)x - sz / 2, (int)y - sz / 2, sz, sz, col );
 	}
 }
 
@@ -732,32 +734,45 @@ void CCzmMainMenu::DrawTile( int index, CzmRect r )
 	{
 		int coverW = r.w * 0.40f, coverH = r.h - rad * 2;
 		int coverX = r.x + r.w - coverW - rad, coverY = r.y + rad;
-		HIMAGE cover = CZM_MapPicture( server->map );
-
-		if( cover )
-			CZM_DrawCover( cover, coverX, coverY, coverW, coverH );
-		else
-		{
-			UI_FillRect( coverX, coverY, coverW, coverH, PackRGBA( 20, 22, 30, 180 ));
-			UI_FillRect( coverX, coverY, coverW, Q_max( 3, (int)( r.h * 0.02f )), accent );
-		}
+		CZM_DrawMapPreview( server->map, coverX, coverY, coverW, coverH );
 
 		// accent spine on the left edge
 		UI_FillRect( r.x + rad * 0.6f, r.y + rad * 0.7f, Q_max( 3, (int)( r.w * 0.010f )), r.h - rad * 1.4f, accent );
 
 		int textX = r.x + rad * 1.0f;
 		int textW = coverX - textX - r.h * 0.08f;
-		int statusY = r.y + r.h * 0.69f, dot = r.h * 0.085f, x, right = textX + textW;
+		int statusY = r.y + r.h * 0.78f, dot = r.h * 0.07f, x, right = textX + textW;
 		unsigned int dotColor;
-		char name[64];
+		char name[128];
 
 		CZM_CleanName( server->name, name, sizeof( name ));
-		CZM_DrawText( CZM_Font( CZMF_TILE_TITLE ), textX, r.y + r.h * 0.12f, textW, name[0] ? name : server->address, CZM_White());
+		HFont titleFont = CZM_Font( CZMF_TILE_TITLE );
+		if( CZM_FontHeight( titleFont ) * 2 > r.h * 0.44f ) titleFont = CZM_Font( CZMF_TILE_TEXT );
+		const char *title = name[0] ? name : server->address;
+		char first[128];
+		size_t best = 0, space = 0;
+		for( size_t i = 0; title[i] && i < sizeof( first ) - 1; )
+		{
+			size_t next = i + 1;
+			while( title[next] && ((unsigned char)title[next] & 0xc0) == 0x80 ) next++;
+			if( next >= sizeof( first )) break;
+			memcpy( first, title, next ); first[next] = 0;
+			if( CZM_TextWidth( titleFont, first ) > textW ) break;
+			best = next;
+			if( title[i] == ' ' ) space = i;
+			i = next;
+		}
+		if( title[best] && space ) best = space;
+		memcpy( first, title, best ); first[best] = 0;
+		CZM_DrawText( titleFont, textX, r.y + r.h * 0.08f, textW, first, CZM_White());
+		const char *second = title + best;
+		while( *second == ' ' ) second++;
+		if( *second ) CZM_DrawText( titleFont, textX, r.y + r.h * 0.08f + CZM_FontHeight( titleFont ), textW, second, CZM_White());
 
 		if( server->map[0] )
 		{
 			snprintf( text, sizeof( text ), "%s  %s", CZM_T( "lbl_map" ), server->map );
-			CZM_DrawText( CZM_Font( CZMF_TILE_TEXT ), textX, r.y + r.h * 0.47f, textW, text, PackRGBA( 215, 220, 228, 255 ));
+			CZM_DrawText( CZM_Font( CZMF_SMALL ), textX, r.y + r.h * 0.57f, textW, text, PackRGBA( 215, 220, 228, 255 ));
 		}
 
 		x = textX + dot + r.h * 0.05f;
@@ -819,14 +834,17 @@ void CCzmMainMenu::DrawNav( void )
 		bool pressed = IsPressed( HIT_NAV + i );
 		unsigned int color = pressed ? CZM_White() : PackRGBA( 225, 228, 235, 255 );
 
-		if( pressed )
-			UI_FillRect( r.x, r.y, r.w, r.h, CZM_White( 20 ));
+		CzmRect button = CZM_Rect( r.x + H * 0.016f, r.y + H * 0.009f,
+			r.w - H * 0.032f, r.h - H * 0.018f );
+		float pulse = 0.5f + 0.5f * sinf((float)EngFuncs::DoubleTime() * 1.1f - i * 0.6f );
+		CZM_DrawSliced( UI_DIR "button_secondary.png", button.x, button.y, button.w, button.h, 30, (int)( H * 0.02f ),
+			pressed ? PackRGBA( 255, 155, 165, 255 ) : PackRGBA( 255, (int)( 190 + 50 * pulse ), (int)( 195 + 45 * pulse ), 230 ));
+		CZM_DrawImage( UI_DIR "dot.png", r.x + r.w / 2 - iconSize, top, iconSize * 2, iconSize * 2,
+			PackRGBA( 239, 45, 62, pressed ? 80 : (int)( 12 + 17 * pulse )));
 
 		CZM_DrawImage( icons[i], r.x + ( r.w - iconSize ) / 2, top + H * 0.014f, iconSize, iconSize, color );
 		CZM_DrawText( font, r.x, top + H * 0.072f - CZM_FontHeight( font ) / 2, r.w, CZM_T( labels[i] ), color, QM_CENTER );
 
-		if( i > 0 )
-			UI_FillRect( r.x, top + H * 0.025f, CZM_LineWidth(), H - top - H * 0.05f, CZM_White( 30 ));
 	}
 }
 
@@ -1112,6 +1130,7 @@ void CCzmMainMenu::Draw()
 
 	if( m_overlay != OV_NONE )
 		DrawOverlay();
+	CZM_StartupReady();
 }
 
 /*

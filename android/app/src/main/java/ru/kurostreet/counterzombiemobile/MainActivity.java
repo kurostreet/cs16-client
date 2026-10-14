@@ -21,8 +21,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    private TextView status;
-    private ProgressBar progress;
+    private CzmStartupView startup;
     private Button retry;
     private GameDataInstaller.Installation installation;
     private boolean resumed;
@@ -30,45 +29,23 @@ public class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setGravity(Gravity.CENTER);
-        layout.setPadding(dp(28), dp(24), dp(28), dp(24));
-        layout.setBackgroundColor(Color.rgb(13, 19, 27));
-        ImageView logo = new ImageView(this);
-        logo.setImageResource(R.mipmap.ic_launcher);
-        layout.addView(logo, new LinearLayout.LayoutParams(dp(140), dp(140)));
-        TextView title = new TextView(this);
-        title.setText(R.string.app_name);
-        title.setTextSize(23);
-        title.setTextColor(Color.WHITE);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, dp(20), 0, dp(28));
-        layout.addView(title);
-        status = new TextView(this);
-        status.setTextColor(Color.rgb(186, 214, 232));
-        status.setGravity(Gravity.CENTER);
-        status.setTextSize(16);
-        layout.addView(status);
-        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(100);
-        LinearLayout.LayoutParams bar = new LinearLayout.LayoutParams(-1, dp(8));
-        bar.topMargin = dp(18);
-        layout.addView(progress, bar);
+        android.widget.FrameLayout layout = new android.widget.FrameLayout(this);
+        startup = new CzmStartupView(this);
+        layout.addView(startup, new android.widget.FrameLayout.LayoutParams(-1, -1));
         retry = new Button(this);
-        retry.setText("Повторить");
+        retry.setText(CzmStartupView.russian() ? "Повторить" : "Retry");
         retry.setVisibility(View.GONE);
         retry.setOnClickListener(view -> prepare());
-        layout.addView(retry);
+        android.widget.FrameLayout.LayoutParams button = new android.widget.FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        button.bottomMargin = dp(12);
+        layout.addView(retry, button);
         setContentView(layout);
         prepare();
     }
 
     private void prepare() {
         retry.setVisibility(View.GONE);
-        progress.setVisibility(View.VISIBLE);
-        progress.setProgress(0);
-        status.setText("Готовим первый запуск…");
+        startup.setProgress(CzmStartupView.russian() ? "Подготовка ресурсов…" : "Preparing resources…", 0);
         Context application = getApplicationContext();
         WeakReference<MainActivity> reference = new WeakReference<>(this);
         WORKER.execute(() -> {
@@ -77,8 +54,7 @@ public class MainActivity extends Activity {
                         MAIN.post(() -> {
                             MainActivity activity = reference.get();
                             if (activity != null && !activity.isDestroyed()) {
-                                activity.status.setText(message + " " + percent + "%");
-                                activity.progress.setProgress(percent);
+                                activity.startup.setProgress(message, percent);
                             }
                         }));
                 MAIN.post(() -> {
@@ -93,8 +69,7 @@ public class MainActivity extends Activity {
                 MAIN.post(() -> {
                     MainActivity activity = reference.get();
                     if (activity != null && !activity.isDestroyed()) {
-                        activity.status.setText(e.getMessage() == null ? "Не удалось подготовить игру." : e.getMessage());
-                        activity.progress.setVisibility(View.GONE);
+                        activity.startup.setProgress(e.getMessage() == null ? "Не удалось подготовить игру." : e.getMessage(), -2);
                         activity.retry.setVisibility(View.VISIBLE);
                     }
                 });
@@ -105,7 +80,7 @@ public class MainActivity extends Activity {
     private void launchWhenReady() {
         if (!resumed || launched || installation == null) return;
         launched = true;
-        startActivity(new Intent(this, su.xash.engine.XashActivity.class)
+        startActivity(new Intent(this, CzmGameActivity.class)
                 .putExtra("gamedir", "cstrike")
                 .putExtra("gamelibdir", getApplicationInfo().nativeLibraryDir)
                 .putExtra("basedir", installation.writable.getAbsolutePath())

@@ -282,6 +282,7 @@ void CZM_OnlineFrame( void )
 
 	if( !s_online.key[0] )
 		return;
+	CZM_MapPicturesFrame();
 
 	if( s_online.helloId )
 	{

@@ -51,6 +51,12 @@ public final class CzmNet {
         return SDLActivity.getContext();
     }
 
+    /** Native menu calls this only after its first complete draw. */
+    public static void startupReady() {
+        Context ctx = context();
+        if (ctx instanceof CzmGameActivity) ((CzmGameActivity)ctx).menuReady();
+    }
+
     /** files/game/cstrike: the game's writable folder. */
     public static String gameDir() {
         Context ctx = context();

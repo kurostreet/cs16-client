@@ -1,0 +1,120 @@
+diff --git a/engine/client/cl_scrn.c b/engine/client/cl_scrn.c
+--- a/engine/client/cl_scrn.c
++++ b/engine/client/cl_scrn.c
+@@ -27,6 +27,10 @@
+ CVAR_DEFINE_AUTO( cl_testlights, "0", FCVAR_CHEAT, "test dynamic lights" );
+ CVAR_DEFINE( cl_allow_levelshots, "allow_levelshots", "0", FCVAR_ARCHIVE, "allow engine to use indivdual levelshots instead of 'loading' image" );
+ CVAR_DEFINE_AUTO( cl_levelshot_name, "*black", 0, "contains path to current levelshot" );
++static CVAR_DEFINE_AUTO( czm_current_map, "", FCVAR_READ_ONLY|FCVAR_PRIVILEGED, "current map for shared previews" );
++static CVAR_DEFINE_AUTO( czm_map_visit, "0", FCVAR_READ_ONLY|FCVAR_PRIVILEGED, "map visit counter" );
++static CVAR_DEFINE_AUTO( czm_mapshot_ready, "0", FCVAR_READ_ONLY|FCVAR_PRIVILEGED, "alive eight seconds after spawn" );
++static CVAR_DEFINE_AUTO( czm_mapshot_state, "0", FCVAR_PRIVILEGED, "0 idle, 1 capture requested, 2 written, 3 failed" );
+ static CVAR_DEFINE_AUTO( cl_envshot_size, "256", FCVAR_ARCHIVE, "envshot size of cube side" );
+ CVAR_DEFINE_AUTO( v_dark, "0", 0, "starts level from dark screen" );
+ static CVAR_DEFINE_AUTO( net_speeds, "0", FCVAR_ARCHIVE, "show network packets" );
+@@ -672,11 +676,60 @@
+ text to the screen.
+ ==================
+ */
++// Publish only public map state. Network/authentication stays in the menu.
++static void CZM_MapPictureState( void )
++{
++ static qboolean active;
++ static double alive_since;
++ if( !scr_init ) return;
++ qboolean playing = cls.state == ca_active && !cl.background && clgame.mapname[0];
++ if( !playing )
++ {
++  if( active )
++  {
++   Cvar_DirectSet( &czm_current_map, "" );
++   Cvar_DirectSetValue( &czm_mapshot_state, 0 );
++  }
++  active = false;
++  alive_since = 0;
++  if( czm_mapshot_ready.value ) Cvar_DirectSetValue( &czm_mapshot_ready, 0 );
++  return;
++ }
++ char map[64];
++ Q_strncpy( map, clgame.mapname, sizeof( map ));
++ for( char *p = map; *p; p++ ) if( *p >= 'A' && *p <= 'Z' ) *p += 'a' - 'A';
++ if( !active || Q_strcmp( map, czm_current_map.string ))
++ {
++  Cvar_DirectSet( &czm_current_map, map );
++  Cvar_DirectSetValue( &czm_map_visit, czm_map_visit.value + 1 );
++  Cvar_DirectSetValue( &czm_mapshot_state, 0 );
++  alive_since = 0;
++ }
++ active = true;
++ if( cl.health <= 0 || cls.spectator ) alive_since = 0;
++ else if( alive_since == 0 ) alive_since = host.realtime;
++ int ready = alive_since != 0 && host.realtime - alive_since >= 8.0;
++ if( czm_mapshot_ready.value != ready ) Cvar_DirectSetValue( &czm_mapshot_ready, ready );
++}
++
++void SCR_CzmMapPictureCapture( void )
++{
++ if( !scr_init || czm_mapshot_state.value != 1 || !czm_mapshot_ready.value
++  || cls.state != ca_active || cl.background || !cl.video_prepped || UI_IsVisible()
++  || host.status != HOST_FRAME || cls.scrshot_action != scrshot_inactive ) return;
++ // Called after the world and before HUD/touch/menu: the displayed frame keeps its HUD.
++ char path[128];
++ Q_snprintf( path, sizeof( path ), "czm_cache/maps/%s_capture.png", czm_current_map.string );
++ qboolean ok = ref.dllFuncs.VID_ScreenShot( path, VID_LEVELSHOT );
++ Cvar_DirectSetValue( &czm_mapshot_state, ok ? 2 : 3 );
++}
++
+ void SCR_UpdateScreen( void )
+ {
+ 	qboolean screen_redraw = true; // assume screen has been redrawn
+ 
+ 	CZM_Loading_Frame();
++	CZM_MapPictureState();
+ 
+ 	if( !V_PreRender( )) return;
+ 
+@@ -933,6 +986,10 @@
+ 	Cvar_RegisterVariable( &cl_allow_levelshots );
+ 	Cvar_RegisterVariable( &scr_loading );
+ 	CZM_Loading_Init();
++	Cvar_RegisterVariable( &czm_current_map );
++	Cvar_RegisterVariable( &czm_map_visit );
++	Cvar_RegisterVariable( &czm_mapshot_ready );
++	Cvar_RegisterVariable( &czm_mapshot_state );
+ 	Cvar_RegisterVariable( &scr_download );
+ 	Cvar_RegisterVariable( &cl_testlights );
+ 	Cvar_RegisterVariable( &cl_envshot_size );
+diff --git a/engine/client/client.h b/engine/client/client.h
+--- a/engine/client/client.h
++++ b/engine/client/client.h
+@@ -998,6 +998,7 @@
+ void SCR_RegisterTextures( void );
+ void SCR_LoadCreditsFont( void );
+ void SCR_MakeScreenShot( void );
++void SCR_CzmMapPictureCapture( void );
+ void SCR_MakeLevelShot( void );
+ void SCR_NetSpeeds( void );
+ void SCR_RSpeeds( void );
+diff --git a/engine/client/cl_view.c b/engine/client/cl_view.c
+--- a/engine/client/cl_view.c
++++ b/engine/client/cl_view.c
+@@ -534,6 +534,7 @@
+ {
+ 	qboolean		draw_2d = false;
+ 
++	SCR_CzmMapPictureCapture();
+ 	ref.dllFuncs.R_AllowFog( false );
+ 	ref.dllFuncs.R_Set2DMode( true );
+ 
+diff --git a/ref/gl/gl_backend.c b/ref/gl/gl_backend.c
+--- a/ref/gl/gl_backend.c
++++ b/ref/gl/gl_backend.c
+@@ -583,6 +583,8 @@
+ 	case VID_MINISHOT:
+ 		flags |= IMAGE_RESAMPLE;
+ 		height = shot_type == VID_MINISHOT ? 200 : 480;
++		if( shot_type == VID_LEVELSHOT && !Q_strncmp( filename, "czm_cache/maps/", 15 ))
++			height = 170;
+ 		width = Q_rint( height * ((double)r_shot->width / r_shot->height ));
+ 		break;
+ 	case VID_MAPSHOT:

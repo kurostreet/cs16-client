@@ -368,6 +368,7 @@ public:
 	int Draw( float flTime );
 
 	int DrawScoreboard( float flTime );
+	int DrawCzmScoreboard( void );
 	int DrawTeams( float listslot );
 	int DrawPlayers( float listslot, int nameoffset = 0, const char *team = NULL ); // returns the ypos where it finishes drawing
 

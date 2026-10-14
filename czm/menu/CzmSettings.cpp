@@ -366,7 +366,7 @@ const CzmRow s_graphics[] =
 {
 	{ ROW_SLIDER, "s_brightness", NULL, GetBrightness, SetBrightness, NULL, 0.0f, 3.0f, 0.05f, FMT_RANGE, {}, 0 },
 	{ ROW_CHOICE, "s_fps", "s_fps_hint", GetFps, SetFps, NULL, 0, 3, 1, 0, { "30", "60", "90", "120" }, 4 },
-	{ ROW_CHOICE, "s_render", "s_render_hint", GetRenderer, SetRenderer, NULL, 0, 2, 1, 0, { "GLES1", "GL4ES", "GLES3" }, 3 },
+	{ ROW_CHOICE, "s_render", "s_render_hint", GetRenderer, SetRenderer, NULL, 0, 2, 1, 0, { "render_classic", "render_compatible", "render_modern" }, 3 },
 	{ ROW_CHOICE, "s_textsize", "s_textsize_hint", GetTextSize, SetTextSize, NULL, 0, 2, 1, 0, { "opt_small", "opt_medium", "opt_large" }, 3 },
 	{ ROW_CHOICE, "s_hudsize", "s_hudsize_hint", GetHudSize, SetHudSize, NULL, 0, 2, 1, 0, { "opt_small", "opt_medium", "opt_large" }, 3 },
 	{ ROW_SWITCH, "s_showfps", NULL, GetShowFps, SetShowFps, NULL, 0, 1, 1, 0, {}, 0 },

@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 from pydantic import BaseModel, Field
 
-from . import service
+from . import service, mappics
 from .config import get_settings
 from .db import db
 
@@ -147,6 +147,30 @@ async def report(body: ReportIn, x_czm_key: str | None = Header(default=None)):
     if info and notify_report:
         asyncio.create_task(notify_report(info))
     return {"ok": True}
+
+
+@router.post("/mappic/{name}")
+async def mappic(name: str, request: Request, x_czm_key: str | None = Header(default=None)):
+    player = await current_player(x_czm_key)
+    if await in_db(service.active_ban, player):
+        raise HTTPException(403, {"error": "banned"})
+    try:
+        name = mappics.map_name(name)
+    except ValueError:
+        raise HTTPException(400, {"error": "map"})
+    folder = get_settings().mappic_dir
+    if (folder / f"{name}.png").is_file():
+        return JSONResponse({"ok": True, "exists": True}, status_code=409)
+    data = await request.body()
+    try:
+        png = await asyncio.to_thread(mappics.prepare, data)
+    except ValueError as error:
+        code = str(error)
+        raise HTTPException(413 if code == "size" else 422 if code == "dark" else 400, {"error": code})
+    except Exception:
+        raise HTTPException(400, {"error": "image"})
+    created = await asyncio.to_thread(mappics.publish, folder, name, png)
+    return JSONResponse({"ok": True, "exists": not created}, status_code=201 if created else 409)
 
 
 @router.post("/avatar")

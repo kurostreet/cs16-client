@@ -173,10 +173,10 @@ int CHudScoreboard :: Draw( float flTime )
 
 	if( !m_bForceDraw )
 	{
-		xstart     = 0.125f * ScreenWidth;
+		xstart     = 0.06f * ScreenWidth;
 		xend       = ScreenWidth - xstart;
-		ystart     = 90;
-		yend       = ScreenHeight - ystart;
+		ystart     = ScreenHeight * 0.06f;
+		yend       = ScreenHeight * 0.92f;
 		m_colors.r = 0;
 		m_colors.g = 0;
 		m_colors.b = 0;
@@ -184,7 +184,7 @@ int CHudScoreboard :: Draw( float flTime )
 		m_bDrawStroke = true;
 	}
 
-	return DrawScoreboard(flTime);
+	return DrawCzmScoreboard();
 }
 
 int CHudScoreboard :: DrawScoreboard( float fTime )

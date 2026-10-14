@@ -31,6 +31,12 @@ kontrafps.ru {
 	}
 
 	# APK of the updates, downloads continue after a break (Range)
+	handle_path /mappics/* {
+		root * /var/lib/czm/mappics
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
 	handle_path /dl/* {
 		root * /var/lib/czm/apk
 		file_server

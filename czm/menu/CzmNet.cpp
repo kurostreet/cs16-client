@@ -138,6 +138,21 @@ bool CZM_NetAvailable( void )
 	return env && CZM_NetClass( env );
 }
 
+void CZM_StartupReady( void )
+{
+	static bool sent;
+	JNIEnv *env;
+	jclass cls;
+	if( sent || !CZM_Begin( &env, &cls )) return;
+	jmethodID m = CZM_Method( env, cls, "startupReady", "()V" );
+	if( m )
+	{
+		env->CallStaticVoidMethod( cls, m );
+		sent = !env->ExceptionCheck();
+	}
+	CZM_End( env );
+}
+
 int CZM_NetRequest( const char *method, const char *url, const char *key, const char *body )
 {
 	JNIEnv *env;
@@ -347,6 +362,7 @@ void CZM_UpdateState( int *state, double *done, double *total, char *error, size
 #else // not Android: no network for the menu
 
 bool CZM_NetAvailable( void ) { return false; }
+void CZM_StartupReady( void ) {}
 int CZM_NetRequest( const char *, const char *, const char *, const char * ) { return 0; }
 int CZM_NetUpload( const char *, const char *, const char *, const char * ) { return 0; }
 int CZM_NetDownload( const char *, const char * ) { return 0; }

@@ -1,0 +1,46 @@
+diff --git a/engine/client/sound/s_main.c b/engine/client/sound/s_main.c
+--- a/engine/client/sound/s_main.c
++++ b/engine/client/sound/s_main.c
+@@ -118,7 +118,7 @@ float S_GetMasterVolume( void )
+ {
+ 	float	scale = 1.0f;
+ 
+-	if( host.status == HOST_NOFOCUS && snd_mute_losefocus.value != 0.0f )
++	if( host.status == HOST_SLEEP || ( host.status == HOST_NOFOCUS && snd_mute_losefocus.value != 0.0f ))
+ 	{
+ 		// we return zero volume to keep sounds running
+ 		return 0.0f;
+diff --git a/engine/client/sound/s_stream.c b/engine/client/sound/s_stream.c
+--- a/engine/client/sound/s_stream.c
++++ b/engine/client/sound/s_stream.c
+@@ -68,7 +68,7 @@ void S_MusicFade( float fade_percent )
+ */
+ float S_GetMusicVolume( void )
+ {
+-	if( host.status == HOST_NOFOCUS && snd_mute_losefocus.value != 0.0f )
++	if( host.status == HOST_SLEEP || ( host.status == HOST_NOFOCUS && snd_mute_losefocus.value != 0.0f ))
+ 	{
+ 		// we return zero volume to keep sounds running
+ 		return 0.0f;
+diff --git a/engine/platform/sdl2/host_sdl2.c b/engine/platform/sdl2/host_sdl2.c
+--- a/engine/platform/sdl2/host_sdl2.c
++++ b/engine/platform/sdl2/host_sdl2.c
+@@ -274,6 +274,18 @@ static void SDLash_EventHandler( SDL_Event *event )
+ {
+ 	switch ( event->type )
+ 	{
++	// Android lifecycle events may arrive before window focus events.
++	// Pause the output device itself, including already queued voice/music.
++	case SDL_APP_WILLENTERBACKGROUND:
++		SNDDMA_Activate( false );
++		SDLash_ActiveEvent( false );
++		host.status = HOST_SLEEP;
++		break;
++	case SDL_APP_DIDENTERFOREGROUND:
++		SDLash_ActiveEvent( true );
++		SNDDMA_Activate( true );
++		break;
++
+ 	/* Mouse events */
+ 	case SDL_MOUSEMOTION:
+ 		if( host.mouse_visible )
