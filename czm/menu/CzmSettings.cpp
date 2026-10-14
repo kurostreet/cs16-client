@@ -707,7 +707,7 @@ void CCzmSettings::Layout( void )
 		case ROW_CHOICE:
 		{
 			int ch = H * 0.064f;
-			int cw = Q_min( controlW, (int)( row.numOptions * H * 0.16f ));
+			int cw = row.get == GetRenderer ? controlW : Q_min( controlW, (int)( row.numOptions * H * 0.16f ));
 			l.control = CZM_Rect( l.rect.x + l.rect.w - cw, l.rect.y + ( h - ch ) / 2, cw, ch );
 			for( int k = 0; k < row.numOptions; k++ )
 				l.parts[k] = CZM_Rect( l.control.x + l.control.w * k / row.numOptions, l.control.y,
@@ -1174,8 +1174,14 @@ void CCzmSettings::DrawChoice( int i, const RowLayout &l )
 		else if( pressed )
 			CZM_DrawPill( UI_DIR "button_secondary.png", p.x + inset, p.y + inset, p.w - inset * 2, p.h - inset * 2 );
 
-		CZM_DrawText( font, p.x + inset, p.y + ( p.h - CZM_FontHeight( font )) / 2, p.w - inset * 2, CZM_T( row.options[k] ),
-			active ? CZM_White() : PackRGBA( 190, 196, 206, 255 ), QM_CENTER );
+		const char *label = CZM_T( row.options[k] );
+		int available = p.w - inset * 2;
+		int textH = CZM_FontHeight( font );
+		int textW = CZM_TextWidth( font, label );
+		if( textW > available && available > 0 )
+			textH = Q_max( 1, textH * available / textW );
+		UI_DrawString( font, p.x + inset, p.y + ( p.h - textH ) / 2, available, textH, label,
+			active ? CZM_White() : PackRGBA( 190, 196, 206, 255 ), textH, QM_CENTER | QM_TOP, ETF_NO_WRAP | ETF_FORCECOL );
 	}
 }
 

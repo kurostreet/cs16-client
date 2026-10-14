@@ -103,7 +103,8 @@ int CHudScoreboard::DrawCzmScoreboard( void )
 	const int pad = std::max( 6, h / 40 ), gap = pad * 2;
 	int tw = 0, fontH = 0;
 	gEngfuncs.pfnDrawConsoleStringLen( "Ag", &tw, &fontH );
-	fontH = std::max( 8, (int)( fontH / std::max( 1.0f, gHUD.m_flScale )));
+	// Console metrics and all scoreboard coordinates are already in HUD units.
+	fontH = std::max( 8, fontH );
 	const int head = std::max( h / 7, fontH * 3 + pad );
 	const int columns = w > ScreenHeight * 0.9f ? 2 : 1;
 	const int rows = std::max( 1, ( count + columns - 1 ) / columns );
