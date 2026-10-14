@@ -179,6 +179,7 @@ def assemble_build(build) -> int:
     finally:
         unsigned.unlink(missing_ok=True)
         signed.unlink(missing_ok=True)
+        Path(str(signed) + ".idsig").unlink(missing_ok=True)   # v4 signature next to the APK, not needed
 
     with db.db() as conn:
         conn.execute("DELETE FROM releases WHERE file = ? AND published IS NULL", (name,))

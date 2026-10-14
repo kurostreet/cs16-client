@@ -3,6 +3,8 @@ name: Counter Zombie Mobile Android
 on:
   push:
     branches: [feature/mobile-launcher]
+    # every build goes to the players: server code and texts alone do not make an update
+    paths-ignore: ['server/**', '.github/**', '**/*.md', 'czm/whatsnew.txt']
   pull_request:
   workflow_dispatch:
 
