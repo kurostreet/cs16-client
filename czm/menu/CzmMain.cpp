@@ -30,7 +30,7 @@ GNU General Public License for more details.
 #define CZM_MAX_TILES 8
 #define CZM_ABOUT_ROWS 7
 
-#define CZM_TELEGRAM_URL "https://t.me/blackmodru"
+#define CZM_CONTACT_URL "mailto:kuro.street.inc@gmail.com"
 #define CZM_GROUP_URL "https://t.me/counter_zombie_mobile"
 #define CZM_SOURCE_URL "https://github.com/kurostreet/cs16-client"
 
@@ -397,7 +397,7 @@ void CCzmMainMenu::Activate( int hit )
 		CZM_OpenSettings( CZM_TAB_LAST );
 		break;
 	case HIT_ABOUT_TELEGRAM:
-		EngFuncs::ShellExecute( CZM_TELEGRAM_URL, NULL, false );
+		EngFuncs::ShellExecute( CZM_CONTACT_URL, NULL, false );
 		break;
 	case HIT_ABOUT_GROUP:
 		EngFuncs::ShellExecute( CZM_GROUP_URL, NULL, false );
@@ -879,7 +879,7 @@ void CCzmMainMenu::DrawAbout( void )
 
 		switch( i )
 		{
-		case 0: value = "Telegram @blackmodru"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
+		case 0: value = "kuro.street.inc@gmail.com"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 1: value = "t.me/counter_zombie_mobile"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 2: value = CZM_T( "about_site_soon" ); valueColor = PackRGBA( 250, 204, 21, 255 ); break;
 		case 3: value = "github.com/kurostreet/cs16-client"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;

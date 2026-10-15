@@ -170,6 +170,7 @@ unsigned int CZM_White( int alpha = 255 );
 unsigned int CZM_Grey( void );
 int CZM_LineWidth( void );
 void CZM_PlayClick( void );
+void CZM_MenuAudioFrame( void );
 void CZM_DrawPanel( const CzmRect &r );
 void CZM_DrawButton( const char *image, const CzmRect &r, const char *label, unsigned int textColor, bool pressed, int font = CZMF_BUTTON );
 

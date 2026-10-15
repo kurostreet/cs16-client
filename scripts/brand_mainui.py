@@ -42,6 +42,7 @@ def brand_base_menu(source):
         source,
         "\t// advance global time\n\tuiStatic.realTime = flTime * 1000;\n",
         "\t// advance global time\n\tuiStatic.realTime = flTime * 1000;\n\n"
+        "\tCZM_MenuAudioFrame();\n\n"
         "\t// our loading screen replaces the console while the engine connects\n"
         "\tif( CZM_DrawLoadingScreen( ))\n\t\treturn;\n\n"
         "\t// server menus as cards over the game\n"
@@ -50,6 +51,25 @@ def brand_base_menu(source):
         "\tCZM_OnlineFrame();\n",
         filename,
     )
+    source = replace_once(
+        source,
+        'EngFuncs::PlayBackgroundTrack( "media/gamestartup", "media/gamestartup" );',
+        'CZM_MenuAudioFrame();',
+        filename,
+    )
+    start = source.index("static void UI_LoadSounds( void )\n{")
+    end = source.index("\n}\n", start) + 3
+    source = source[:start] + '''static void UI_LoadSounds( void )
+{
+\tmemset( uiStatic.sounds, 0, sizeof( uiStatic.sounds ) );
+\tfor( int i = 0; i < SND_COUNT; i++ )
+\t{
+\t\t// Scrolling and pointer hover stay quiet; button actions use the same tap.
+\t\tif( i != SND_MOVE && i != SND_GLOW && i != SND_ROLLOVER && i != SND_NULL )
+\t\t\tQ_strncpy( uiStatic.sounds[i], "czm/tapscroll.mp3", sizeof( uiStatic.sounds[i] ));
+\t}
+}
+''' + source[end:]
     return replace_once(
         source,
         "uiStatic.renderPicbuttonText = gMenu.m_gameinfo.flags & GFL_RENDER_PICBUTTON_TEXT;",

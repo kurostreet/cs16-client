@@ -179,6 +179,7 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "opt_high", "Много", "High" },
 	{ "s_volume", "Громкость", "Volume" },
 	{ "s_music", "Музыка в меню", "Menu music" },
+	{ "s_ui_volume", "Звуки кнопок", "Button sounds" },
 	{ "s_voice", "Голосовой чат", "Voice chat" },
 	{ "s_voice_hint", "Слышать игроков и говорить", "Hear and talk to players" },
 	{ "s_voice_in", "Громкость голосов", "Voice volume" },
@@ -342,6 +343,7 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_avatar_sent", "", FCVAR_ARCHIVE );  // the photo the service already has
 	EngFuncs::CvarRegister( "czm_news_seen", "0", FCVAR_ARCHIVE );   // the newest news the player opened
 	EngFuncs::CvarRegister( "czm_chat_room", "0", FCVAR_ARCHIVE );   // 0 global, 1 ru, 2 en
+	EngFuncs::CvarRegister( "czm_ui_volume", "0.65", FCVAR_ARCHIVE );
 	EngFuncs::CvarRegister( "czm_srv_filters", "0", FCVAR_ARCHIVE ); // server list filters, bits
 	EngFuncs::CvarRegister( "czm_srv_sort", "0", FCVAR_ARCHIVE );    // 0 players, 1 ping, 2 name
 }
@@ -1409,6 +1411,25 @@ int CZM_LineWidth( void )
 void CZM_PlayClick( void )
 {
 	EngFuncs::PlayLocalSound( uiStatic.sounds[SND_LAUNCH] );
+}
+
+void CZM_MenuAudioFrame( void )
+{
+	static bool playing;
+	CZM_Init();
+	const bool inMenu = !CL_IsActive() && !gpGlobals->demoplayback && uiStatic.menu.IsActive()
+		&& EngFuncs::GetCvarFloat( "czm_loading_stage" ) == CZM_STAGE_NONE;
+	if( !inMenu )
+	{
+		if( playing ) EngFuncs::StopBackgroundTrack();
+		playing = false;
+		return;
+	}
+	if( !playing )
+	{
+		EngFuncs::PlayBackgroundTrack( "media/czm_sound.mp3", "media/czm_sound.mp3" );
+		playing = true;
+	}
 }
 
 void CZM_DrawPanel( const CzmRect &r )

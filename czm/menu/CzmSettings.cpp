@@ -218,6 +218,8 @@ float GetVolume( void ) { return GetCvar( "volume" ); }
 void SetVolume( float v ) { SetCvar( "volume", v ); }
 float GetMusic( void ) { return GetCvar( "MP3Volume" ); }
 void SetMusic( float v ) { SetCvar( "MP3Volume", v ); }
+float GetUiVolume( void ) { return GetCvar( "czm_ui_volume" ); }
+void SetUiVolume( float v ) { SetCvar( "czm_ui_volume", v ); }
 float GetVoice( void ) { return GetCvar( "voice_enable" ) != 0.0f; }
 void SetVoice( float v ) { SetCvar( "voice_enable", v ); }
 bool VoiceOn( void ) { return GetVoice() != 0.0f; }
@@ -381,6 +383,7 @@ const CzmRow s_sound[] =
 {
 	{ ROW_SLIDER, "s_volume", NULL, GetVolume, SetVolume, NULL, 0.0f, 1.0f, 0.05f, FMT_PERCENT, {}, 0 },
 	{ ROW_SLIDER, "s_music", NULL, GetMusic, SetMusic, NULL, 0.0f, 1.0f, 0.05f, FMT_PERCENT, {}, 0 },
+	{ ROW_SLIDER, "s_ui_volume", NULL, GetUiVolume, SetUiVolume, NULL, 0.0f, 1.0f, 0.05f, FMT_PERCENT, {}, 0 },
 	{ ROW_SWITCH, "s_voice", "s_voice_hint", GetVoice, SetVoice, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SLIDER, "s_voice_in", NULL, GetVoiceIn, SetVoiceIn, VoiceOn, 0.0f, 2.0f, 0.05f, FMT_PERCENT, {}, 0 },
 	{ ROW_SLIDER, "s_voice_out", NULL, GetVoiceOut, SetVoiceOut, VoiceOn, 0.0f, 2.0f, 0.05f, FMT_PERCENT, {}, 0 },

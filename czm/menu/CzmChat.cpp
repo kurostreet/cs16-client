@@ -86,6 +86,7 @@ public:
 	void Show() override;
 	void Hide() override;
 	void Draw() override;
+	bool IsRoot() const override { return false; }
 	bool KeyDown( int key ) override;
 	bool KeyUp( int key ) override;
 	bool MouseMove( int x, int y ) override;
@@ -99,6 +100,7 @@ private:
 		HIT_ROOM,                    // ROOMS
 		HIT_INPUT = HIT_ROOM + ROOMS,
 		HIT_SEND,
+		HIT_HANDLE,
 		HIT_POPUP_MESSAGE,
 		HIT_POPUP_AVATAR,
 		HIT_POPUP_CANCEL,
@@ -154,8 +156,11 @@ private:
 	float m_flVelocity;
 	int m_iLastMoveY;
 	double m_flLastMoveTime, m_flLastDraw;
+	float m_flOpen;
+	bool m_bClosing, m_bHandleDrag;
 
 	int W, H;
+	CzmRect m_sheet, m_handle;
 	CzmRect m_back, m_rooms_[ROOMS], m_panel, m_clip, m_input, m_send;
 	CzmRect m_popup, m_popupMessage, m_popupAvatar, m_popupCancel;
 	int m_iAvatar, m_iTextX, m_iTextW, m_iGap;
@@ -175,6 +180,8 @@ CCzmChat::CCzmChat() : CMenuFramework( "CzmChat" )
 	m_iDownY = m_iLastMoveY = 0;
 	m_flScrollAtDown = m_flScroll = m_flVelocity = 0.0f;
 	m_flLastMoveTime = m_flLastDraw = 0.0;
+	m_flOpen = 0.0f;
+	m_bClosing = m_bHandleDrag = false;
 	W = H = 0;
 	m_iAvatar = m_iTextX = m_iTextW = m_iGap = 1;
 	for( int i = 0; i < ROOMS; i++ )
@@ -195,13 +202,20 @@ void CCzmChat::Show()
 	m_flScroll = 0.0f;
 	m_flVelocity = 0.0f;
 	m_rooms[m_iRoom].nextPoll = 0.0; // fresh messages at once
+	m_flOpen = 0.0f;
+	m_bClosing = m_bHandleDrag = false;
+	m_flLastDraw = EngFuncs::DoubleTime();
 	CMenuFramework::Show();
+	DisableTransition(); // The sheet has its own slide; keep the main screen behind it.
 }
 
 void CCzmChat::Hide()
 {
 	EndInput();
-	CMenuFramework::Hide();
+	m_bClosing = true;
+	m_bHandleDrag = false;
+	m_iPopup = -1;
+	m_flVelocity = 0.0f;
 }
 
 void CCzmChat::Toast( const char *text )
@@ -410,8 +424,8 @@ layout and input
 */
 int CCzmChat::MessageHeight( CzmChatMessage &m )
 {
-	HFont nameFont = CZM_Font( CZMF_SHOP_NAME );
-	HFont textFont = CZM_Font( CZMF_PANEL_TEXT );
+	HFont nameFont = CZM_Font( CZMF_SMALL );
+	HFont textFont = CZM_Font( CZMF_TILE_TEXT );
 	int lineH = CZM_FontHeight( textFont ) * 115 / 100;
 
 	if( m.wrapWidth != m_iTextW )
@@ -441,9 +455,15 @@ void CCzmChat::Layout( void )
 
 	W = ScreenWidth;
 	H = ScreenHeight;
-	margin = W * 0.03f;
-	top = H * 0.035f;
-	hb = H * 0.075f;
+	int sheetW = Q_min( (int)( W * 0.86f ), (int)( H * 1.65f ));
+	int sheetH = H * 0.76f;
+	float eased = m_flOpen * m_flOpen * ( 3.0f - 2.0f * m_flOpen );
+	m_sheet = CZM_Rect( ( W - sheetW ) / 2, H * 0.965f - sheetH + ( 1.0f - eased ) * ( sheetH + H * 0.04f ), sheetW, sheetH );
+	pad = H * 0.025f;
+	margin = m_sheet.x + pad;
+	top = m_sheet.y + H * 0.055f;
+	hb = H * 0.065f;
+	m_handle = CZM_Rect( W / 2 - H * 0.16f, m_sheet.y, H * 0.32f, H * 0.045f );
 
 	m_back = CZM_Rect( margin, top, hb, hb );
 	x = margin + hb + H * 0.03f + CZM_TextWidth( titleFont, CZM_T( "chat_title" )) + H * 0.05f;
@@ -455,21 +475,21 @@ void CCzmChat::Layout( void )
 	}
 
 	// input at the bottom
-	ih = H * 0.085f;
-	bottom = H - H * 0.035f;
-	m_send = CZM_Rect( W - margin - ih, bottom - ih, ih, ih );
+	ih = H * 0.075f;
+	bottom = m_sheet.y + m_sheet.h - pad;
+	m_send = CZM_Rect( m_sheet.x + m_sheet.w - pad - ih, bottom - ih, ih, ih );
 	m_input = CZM_Rect( margin, bottom - ih, m_send.x - H * 0.02f - margin, ih );
 
 	// messages between the header and the input
-	m_panel = CZM_Rect( margin, top + hb + H * 0.03f, W - margin * 2, 0 );
+	m_panel = CZM_Rect( margin, top + hb + H * 0.05f, m_sheet.w - pad * 2, 0 );
 	m_panel.h = m_input.y - H * 0.025f - m_panel.y;
-	pad = H * 0.03f;
-	m_clip = CZM_Rect( m_panel.x + pad, m_panel.y + pad * 0.6f, m_panel.w - pad * 2, m_panel.h - pad * 1.2f );
+	m_clip = m_panel;
 
-	m_iAvatar = H * 0.075f;
-	m_iGap = H * 0.022f;
+	m_iAvatar = H * 0.06f;
+	m_iGap = H * 0.018f;
 	m_iTextX = m_clip.x + m_iAvatar + H * 0.022f;
 	m_iTextW = m_clip.x + m_clip.w - m_iTextX;
+	if( m_bTyping ) EngFuncs::SetTextInputRect( m_input.x, m_input.y, m_input.w, m_input.h );
 
 	// complaint window
 	{
@@ -500,6 +520,10 @@ int CCzmChat::HitTest( void ) const
 
 	if( m_back.Grown( grow ).HasCursor( ))
 		return HIT_BACK;
+	if( m_handle.HasCursor() )
+		return HIT_HANDLE;
+	if( !m_sheet.Contains( x, y ))
+		return HIT_BACKDROP;
 	for( int i = 0; i < ROOMS; i++ )
 	{
 		if( m_rooms_[i].HasCursor( ))
@@ -540,6 +564,7 @@ void CCzmChat::Activate( int hit )
 	switch( hit )
 	{
 	case HIT_BACK:
+	case HIT_HANDLE:
 		Hide();
 		return;
 	case HIT_INPUT:
@@ -556,7 +581,8 @@ void CCzmChat::Activate( int hit )
 		return;
 	case HIT_POPUP_CANCEL:
 	case HIT_BACKDROP:
-		m_iPopup = -1;
+		if( m_iPopup >= 0 ) m_iPopup = -1;
+		else Hide();
 		return;
 	}
 
@@ -586,6 +612,7 @@ void CCzmChat::Activate( int hit )
 
 bool CCzmChat::KeyDown( int key )
 {
+	if( m_bClosing ) return true;
 	Layout();
 
 	if( m_bTyping )
@@ -622,6 +649,7 @@ bool CCzmChat::KeyDown( int key )
 		m_flScrollAtDown = m_flScroll;
 		m_flVelocity = 0.0f;
 		m_bScrolling = false;
+		m_bHandleDrag = hit == HIT_HANDLE;
 		m_bMaybeScroll = m_iPopup < 0 && m_clip.HasCursor();
 		return true;
 	}
@@ -660,7 +688,7 @@ bool CCzmChat::KeyUp( int key )
 		m_iPressed = HIT_NONE;
 		if( m_bScrolling && EngFuncs::DoubleTime() - m_flLastMoveTime > 0.08 )
 			m_flVelocity = 0.0f;
-		m_bMaybeScroll = m_bScrolling = false;
+		m_bMaybeScroll = m_bScrolling = m_bHandleDrag = false;
 
 		if( tap && hit != HIT_NONE && hit == pressed )
 			Activate( hit );
@@ -673,6 +701,12 @@ bool CCzmChat::KeyUp( int key )
 bool CCzmChat::MouseMove( int x, int y )
 {
 	CMenuFramework::MouseMove( x, y );
+	if( m_bHandleDrag && uiStatic.cursorY - m_iDownY > ScreenHeight * 0.065f )
+	{
+		m_iPressed = HIT_NONE;
+		Hide();
+		return true;
+	}
 
 	if( m_bMaybeScroll )
 	{
@@ -752,15 +786,13 @@ static void FormatTime( int t, char *out, size_t size )
 void CCzmChat::DrawMessages( void )
 {
 	CzmChatRoom &room = m_rooms[m_iRoom];
-	HFont nameFont = CZM_Font( CZMF_SHOP_NAME );
+	HFont nameFont = CZM_Font( CZMF_SMALL );
 	HFont timeFont = CZM_Font( CZMF_SMALL );
-	HFont textFont = CZM_Font( CZMF_PANEL_TEXT );
+	HFont textFont = CZM_Font( CZMF_TILE_TEXT );
 	HFont infoFont = CZM_Font( CZMF_PANEL_TEXT );
 	int lineH = CZM_FontHeight( textFont ) * 115 / 100;
 	int me = CZM_OnlinePlayer();
 	int bottom, maxScroll;
-
-	CZM_DrawPanel( m_panel );
 
 	if( !CZM_NetAvailable() || ( !CZM_OnlineReady() && !room.loaded ))
 	{
@@ -924,6 +956,14 @@ void CCzmChat::Draw()
 	int icon;
 
 	m_flLastDraw = now;
+	m_flOpen = bound( 0.0f, m_flOpen + ( m_bClosing ? -1.0f : 1.0f ) * dt / 0.24f, 1.0f );
+	if( m_bClosing && m_flOpen <= 0.0f )
+	{
+		m_bClosing = false;
+		CMenuFramework::Hide();
+		DisableTransition();
+		return;
+	}
 	Layout();
 	Poll();
 
@@ -936,8 +976,9 @@ void CCzmChat::Draw()
 			m_flVelocity = 0.0f;
 	}
 
-	UI_FillRect( 0, 0, W, H, PackRGBA( 0, 0, 0, 130 ));
-	CZM_DrawImage( UI_DIR "fade_top.png", 0, 0, W, H * 0.24f, CZM_White( 210 ));
+	UI_FillRect( 0, 0, W, H, PackRGBA( 0, 0, 0, (int)( 90 * m_flOpen )));
+	CZM_DrawPanel( m_sheet );
+	CZM_DrawPill( UI_DIR "button_secondary.png", W / 2 - H * 0.055f, m_sheet.y + H * 0.018f, H * 0.11f, H * 0.008f, PackRGBA( 210, 216, 228, 210 ));
 
 	// header: back, title, rooms
 	CZM_DrawImage( UI_DIR "chip_round.png", m_back.x, m_back.y, m_back.w, m_back.h, IsPressed( HIT_BACK ) ? PackRGBA( 170, 170, 170, 255 ) : CZM_White());
@@ -962,12 +1003,11 @@ void CCzmChat::Draw()
 				active || IsPressed( HIT_ROOM + i ) ? CZM_White() : PackRGBA( 170, 176, 186, 255 ), QM_CENTER );
 		}
 
-		// the rules, small, right of the rooms
+		// Keep rules on their own line, including narrow screens.
 		{
 			HFont small = CZM_Font( CZMF_SMALL );
-			int x = bar.x + bar.w + H * 0.04f;
-			CZM_DrawText( small, x, bar.y + ( bar.h - CZM_FontHeight( small )) / 2, W - W * 0.03f - x, CZM_T( "chat_rules" ),
-				PackRGBA( 130, 136, 146, 255 ), QM_RIGHT );
+			CZM_DrawText( small, m_panel.x, m_panel.y - CZM_FontHeight( small ) - H * 0.012f, m_panel.w, CZM_T( "chat_rules" ),
+				PackRGBA( 150, 156, 168, 255 ));
 		}
 	}
 
