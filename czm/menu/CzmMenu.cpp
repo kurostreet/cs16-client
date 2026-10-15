@@ -82,7 +82,8 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "ms", "мс", "ms" },
 	{ "cancel", "Отмена", "Cancel" },
 	// connection errors
-	{ "err_connect", "Не удалось подключиться к серверу.\nПроверь интернет или попробуй позже.", "Could not connect to the server.\nCheck your connection or try again later." },
+	{ "err_connect", "Соединение прервалось до входа в игру.\nПричина отключения не передана.", "The connection closed before entering the game.\nNo disconnect reason was provided." },
+	{ "err_timeout", "Сервер не ответил за отведённое время.\nСоединение закрыто по таймауту.", "The server did not respond in time.\nThe connection timed out." },
 	{ "err_full", "Сервер заполнен.\nПопробуй позже или выбери другой режим.", "The server is full.\nTry again later or pick another mode." },
 	{ "err_password", "Неверный пароль сервера.", "Wrong server password." },
 	{ "err_banned", "Доступ на этот сервер закрыт.", "You are not allowed on this server." },
@@ -1089,6 +1090,8 @@ static void CZM_ShowPendingError( void )
 
 	if( !strcmp( reason, "#connect_failed" ))
 		snprintf( text, sizeof( text ), "%s", CZM_T( "err_connect" ));
+	else if( !strcmp( reason, "#connection_timeout" ))
+		snprintf( text, sizeof( text ), "%s", CZM_T( "err_timeout" ));
 	else if( CZM_Contains( reason, "full" ))
 		snprintf( text, sizeof( text ), "%s", CZM_T( "err_full" ));
 	else if( CZM_Contains( reason, "password" ))

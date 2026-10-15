@@ -68,6 +68,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_map_capture.py -v
           python3 -m unittest discover -s tests -p test_avatar_restore.py -v
           python3 -m unittest discover -s tests -p test_scoreboard_styles.py -v
+          python3 -m unittest discover -s tests -p test_loading_errors.py -v
       - name: Build engine and client from source
         working-directory: android
         run: ./gradlew --no-daemon assembleGitDebug

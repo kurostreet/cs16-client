@@ -695,7 +695,7 @@ void CCzmSettings::Layout( void )
 		if( row.type == ROW_XHAIR )
 			h = rowH * 1.6f;
 		else if( row.type == ROW_TABPREVIEW )
-			h = H * 0.56f;
+			h = H * 0.50f;
 		else if( row.type == ROW_SPRAYS || row.type == ROW_AVATARS )
 		{
 			int card = H * 0.13f, cardGap = H * 0.022f;
@@ -1247,12 +1247,25 @@ void CCzmSettings::DrawCrosshairPreview( const CzmRect &box )
 
 void CCzmSettings::DrawTabPreview( const CzmRect &box )
 {
+	if( box.w <= 0 || box.h <= 0 )
+		return;
+
 	const int style = (int)GetTabStyle();
 	const int pad = Q_max( 4, (int)( H * 0.012f ));
 	HFont font = CZM_Font( CZMF_SMALL );
 	const int fh = CZM_FontHeight( font );
+	CzmRect clip;
+	clip.x = Q_max( box.x, m_clip.x );
+	clip.y = Q_max( box.y, m_clip.y );
+	clip.w = Q_min( box.x + box.w, m_clip.x + m_clip.w ) - clip.x;
+	clip.h = Q_min( box.y + box.h, m_clip.y + m_clip.h ) - clip.y;
+	if( clip.w <= 0 || clip.h <= 0 )
+		return;
+	// Cover artwork is larger than the requested box. Clip the whole preview,
+	// including text, against its own frame and the enclosing scroll panel.
+	UI::Scissor::PushScissor( box.x, box.y, box.w, box.h );
 	CZM_DrawCover( CZM_Image( "gfx/czm/loading_2.png" ), box.x, box.y, box.w, box.h );
-	FillClipped( box.x, box.y, box.w, box.h, PackRGBA( 0, 0, 0, 90 ), m_clip );
+	FillClipped( box.x, box.y, box.w, box.h, PackRGBA( 0, 0, 0, 90 ), clip );
 	int w = style == 1 ? box.w * 0.72f : box.w - pad * 2;
 	int h = style == 1 ? box.h * 0.88f : box.h - pad * 2;
 	int x = box.x + ( box.w - w ) / 2, y = box.y + ( box.h - h ) / 2;
@@ -1261,27 +1274,28 @@ void CCzmSettings::DrawTabPreview( const CzmRect &box )
 	const int cw = ( w - pad * 2 - gap * ( cols - 1 )) / cols;
 	const int rh = Q_max( 1, ( h - head - pad ) / rows );
 	if( style != 2 )
-		FillClipped( x, y, w, h, PackRGBA( 10, 13, 19, 235 ), m_clip );
-	FillClipped( x, y, w, 2, PackRGBA( 224, 35, 47, 255 ), m_clip );
+		FillClipped( x, y, w, h, PackRGBA( 10, 13, 19, 235 ), clip );
+	FillClipped( x, y, w, 2, PackRGBA( 224, 35, 47, 255 ), clip );
 	CZM_DrawText( font, x + pad, y + pad, w - pad * 2, "COUNTER ZOMBIE MOBILE  /  6", CZM_White() );
 	for( int c = 0; c < cols; c++ )
 	{
 		int left = x + pad + c * ( cw + gap );
 		if( style == 2 )
-			FillClipped( left - pad / 2, y + head - fh - pad, cw + pad, h - head + fh + pad, PackRGBA( 10, 13, 19, 230 ), m_clip );
+			FillClipped( left - pad / 2, y + head - fh - pad, cw + pad, h - head + fh + pad, PackRGBA( 10, 13, 19, 230 ), clip );
 		CZM_DrawText( font, left + pad, y + head - fh - pad, cw, CZM_T( "s_tab_style" ), PackRGBA( 160, 170, 187, 255 ));
 		for( int row = 0; row < rows; row++ )
 		{
 			int n = c * rows + row, ry = y + head + row * rh;
 			int inset = style == 2 ? pad / 2 : 1;
-			FillClipped( left, ry, cw, rh - inset, n == 1 ? PackRGBA( 90, 24, 34, 230 ) : PackRGBA( 24, 28, 38, 210 ), m_clip );
-			FillClipped( left, ry, 2, rh - inset, n < 3 ? PackRGBA( 233, 84, 101, 255 ) : PackRGBA( 75, 167, 245, 255 ), m_clip );
+			FillClipped( left, ry, cw, rh - inset, n == 1 ? PackRGBA( 90, 24, 34, 230 ) : PackRGBA( 24, 28, 38, 210 ), clip );
+			FillClipped( left, ry, 2, rh - inset, n < 3 ? PackRGBA( 233, 84, 101, 255 ) : PackRGBA( 75, 167, 245, 255 ), clip );
 			char name[48]; snprintf( name, sizeof( name ), "PLAYER %02d", n + 1 );
 			int ty = ry + Q_max( 0, ( rh - fh ) / 2 );
 			CZM_DrawText( font, left + pad, ty, cw * 0.55f, name, CZM_White() );
 			CZM_DrawText( font, left + cw * 0.65f, ty, cw * 0.32f, "12   4   48", PackRGBA( 150, 210, 180, 255 ));
 		}
 	}
+	UI::Scissor::PopScissor();
 }
 
 void CCzmSettings::DrawRow( int i )

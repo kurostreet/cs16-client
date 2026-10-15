@@ -1,0 +1,56 @@
+diff --git a/engine/common/host.c b/engine/common/host.c
+--- a/engine/common/host.c
++++ b/engine/common/host.c
+@@ -315,6 +315,9 @@
+ 
+ 	SV_Shutdown( "\n" );
+ #if !XASH_DEDICATED
++	// Keep the actual load/protocol failure before disconnect clears client state.
++	if( Q_strcmp( string, "disconnected from server\n" ))
++		CZM_Loading_SetError( string );
+ 	CL_Disconnect();
+ 
+ 	// recreate world if needs
+@@ -692,6 +695,10 @@
+ 	va_start( argptr, error );
+ 	Q_vsnprintf( hosterror1, sizeof( hosterror1 ), error, argptr );
+ 	va_end( argptr );
++
++#if !XASH_DEDICATED
++	CZM_Loading_SetError( hosterror1 );
++#endif
+ 
+ 	CL_WriteMessageHistory (); // before Q_error call
+ 
+diff --git a/engine/client/cl_main.c b/engine/client/cl_main.c
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -1504,6 +1504,7 @@
+ 		if( cls.connect_retry >= CL_CONNECTION_RETRIES )
+ 		{
+ 			Con_DPrintf( S_ERROR "%s: couldn't connect\n", __func__ );
++			CZM_Loading_SetError( "#connection_timeout" );
+ 			CL_Disconnect();
+ 			return;
+ 		}
+@@ -3199,6 +3200,7 @@
+ 		if( host.realtime - cls.netchan.last_received > cl_timeout.value )
+ 		{
+ 			Con_Printf( "\nServer connection timed out.\n" );
++			CZM_Loading_SetError( "#connection_timeout" );
+ 			CL_Disconnect();
+ 			return;
+ 		}
+diff --git a/engine/client/czm_loading.c b/engine/client/czm_loading.c
+--- a/engine/client/czm_loading.c
++++ b/engine/client/czm_loading.c
+@@ -695,7 +695,8 @@
+ 
+ void CZM_Loading_SetError( const char *reason )
+ {
+-	if( !czm.active || COM_StringEmpty( reason ))
++	// A later generic disconnect must not replace the server's original reason.
++	if( !czm.active || czm.cancelled || !COM_StringEmpty( czm.error ) || COM_StringEmpty( reason ))
+ 		return;
+ 
+ 	Q_strncpy( czm.error, reason, sizeof( czm.error ));
