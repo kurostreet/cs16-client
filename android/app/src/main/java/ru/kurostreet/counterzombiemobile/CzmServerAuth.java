@@ -2,29 +2,20 @@
 package ru.kurostreet.counterzombiemobile;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.os.Build;
 import android.security.KeyPairGeneratorSpec;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
-import android.text.InputFilter;
-import android.text.InputType;
 import android.util.Base64;
 import android.view.View;
-import android.view.WindowManager;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
 import android.widget.Toast;
 import java.math.BigInteger;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.util.Calendar;
 import java.util.HashSet;
 import java.util.Set;
@@ -36,7 +27,7 @@ import org.libsdl.app.SDLActivity;
 public final class CzmServerAuth {
     private static final String ALIAS = "czm.server.credentials.v1";
     private static final ExecutorService WORK = Executors.newSingleThreadExecutor();
-    private static AlertDialog editor;
+    private static CzmDialog editor;
     private static long warnedAt;
     private CzmServerAuth() {}
 
@@ -88,6 +79,29 @@ public final class CzmServerAuth {
         return edit.putString("entry:" + address, encrypted).putStringSet("managed", managed).commit();
     }
 
+    // Separate scope and prefs: the account session never enters a game server's userinfo.
+    static synchronized String session(Context context) throws Exception {
+        String raw = context.getSharedPreferences("czm_account", Context.MODE_PRIVATE).getString("session", "");
+        if (raw.isEmpty()) return "";
+        String[] parts = raw.split("\\.", -1);
+        if (parts.length != 3) throw new IllegalArgumentException();
+        byte[][] data = new byte[3][];
+        for (int i = 0; i < 3; ++i) data[i] = Base64.decode(parts[i], Base64.NO_WRAP);
+        return ServerAuthData.open((PrivateKey)keys(context, false).getKey(ALIAS, null), "czm-account-session-v1", data)[1];
+    }
+
+    static synchronized void session(Context context, String token) throws Exception {
+        SharedPreferences.Editor edit = context.getSharedPreferences("czm_account", Context.MODE_PRIVATE).edit();
+        if (token.isEmpty()) {
+            if (!edit.remove("session").commit()) throw new IllegalStateException();
+            return;
+        }
+        byte[][] data = ServerAuthData.seal(keys(context, true).getCertificate(ALIAS).getPublicKey(), "czm-account-session-v1", "_session", token);
+        String value = Base64.encodeToString(data[0], Base64.NO_WRAP) + "." + Base64.encodeToString(data[1], Base64.NO_WRAP)
+            + "." + Base64.encodeToString(data[2], Base64.NO_WRAP);
+        if (!edit.putString("session", value).commit()) throw new IllegalStateException();
+    }
+
     /** Called by the engine at the actual outbound connect packet, never by a game server. */
     public static synchronized String userinfo(String address, String base, int limit) {
         Context context = SDLActivity.getContext();
@@ -108,15 +122,6 @@ public final class CzmServerAuth {
         return wire;
     }
 
-    private static int dp(Context context, int value) {
-        return (int)(context.getResources().getDisplayMetrics().density * value + .5f);
-    }
-
-    private static TextView label(Activity activity, LinearLayout layout, String text) {
-        TextView view = new TextView(activity); view.setText(text); view.setTextColor(Color.LTGRAY);
-        view.setPadding(0, dp(activity, 8), 0, dp(activity, 4)); layout.addView(view); return view;
-    }
-
     /** An Android password field prevents keyboard suggestions and masks the secret. */
     public static void show(final String endpoint, final String name, final boolean ru) {
         Context context = SDLActivity.getContext();
@@ -127,37 +132,21 @@ public final class CzmServerAuth {
             final String address;
             try { address = ServerAuthData.address(endpoint); }
             catch (Exception e) { Toast.makeText(activity, ru ? "Неверный адрес сервера" : "Invalid server address", Toast.LENGTH_LONG).show(); return; }
-            LinearLayout layout = new LinearLayout(activity); layout.setOrientation(LinearLayout.VERTICAL);
-            int padding = dp(activity, 20); layout.setPadding(padding, padding / 2, padding, padding);
-            layout.setBackgroundColor(Color.rgb(20, 23, 30));
-            label(activity, layout, name + "\n" + address);
-            label(activity, layout, ru ? "Параметр setinfo" : "Setinfo parameter");
-            EditText parameter = new EditText(activity); parameter.setSingleLine(true); parameter.setTextColor(Color.WHITE);
-            parameter.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-            parameter.setFilters(new InputFilter[] {new InputFilter.LengthFilter(31)}); layout.addView(parameter);
-            label(activity, layout, ru ? "Пароль админа/VIP" : "Admin/VIP password");
-            EditText password = new EditText(activity); password.setSingleLine(true); password.setTextColor(Color.WHITE);
-            password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-            password.setFilters(new InputFilter[] {new InputFilter.LengthFilter(63)}); layout.addView(password);
-            if (Build.VERSION.SDK_INT >= 26) password.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+            CzmDialog dialog = new CzmDialog(activity, ru ? "Админка/VIP" : "Admin/VIP", name + " · " + address,
+                ru ? "Сохранить" : "Save", ru ? "Отмена" : "Cancel");
+            editor = dialog;
+            EditText parameter = dialog.field(ru ? "Параметр сервера" : "Server parameter", false, 31);
+            EditText password = dialog.field(ru ? "Пароль админа/VIP" : "Admin/VIP password", true, 63);
             try {
                 String[] data = load(activity, address); parameter.setText(data[0]); password.setText(data[1]);
             } catch (Exception e) {
                 parameter.setText("_pw");
                 password.setError(ru ? "Сохранённый пароль недоступен. Введите заново." : "Saved password is unavailable. Enter it again.");
             }
-            label(activity, layout, ru ? "Только для этого IP и порта. Пустой пароль удаляет настройку."
+            dialog.note(ru ? "Только для этого сервера. Пустой пароль удаляет сохранение."
                 : "Only for this IP and port. An empty password removes the setting.");
-            ScrollView scroll = new ScrollView(activity); scroll.addView(layout);
-            AlertDialog dialog = new AlertDialog.Builder(activity, android.R.style.Theme_Material_Dialog_Alert)
-                .setTitle(ru ? "Админка/VIP" : "Admin/VIP").setView(scroll)
-                .setPositiveButton(ru ? "Сохранить" : "Save", null)
-                .setNegativeButton(ru ? "Отмена" : "Cancel", (d, which) -> {}).create();
-            editor = dialog;
             dialog.setOnDismissListener(d -> { password.setText(""); editor = null; });
-            dialog.setOnShowListener(d -> {
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.rgb(239, 68, 68));
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            dialog.submit.setOnClickListener(v -> {
                     final String field = parameter.getText().toString(), secret = password.getText().toString();
                     if (!secret.isEmpty() && !ServerAuthData.key(field)) {
                         parameter.setError(ru ? "Начните с _, затем буквы, цифры или _" : "Start with _, then letters, digits or _"); return;
@@ -165,7 +154,7 @@ public final class CzmServerAuth {
                     if (!secret.isEmpty() && !ServerAuthData.password(secret)) {
                         password.setError(ru ? "До 63 байт, без кавычек, точки с запятой и обратного слеша" : "Up to 63 bytes; no quotes, semicolon or backslash"); return;
                     }
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+                    dialog.busy(true);
                     WORK.execute(() -> {
                         boolean ok;
                         try { ok = save(activity, address, field, secret); } catch (Exception e) { ok = false; }
@@ -176,15 +165,13 @@ public final class CzmServerAuth {
                                 dialog.dismiss(); Toast.makeText(activity, ru ? "Сохранено. Применится при следующем подключении."
                                     : "Saved. Applies on the next connection.", Toast.LENGTH_LONG).show();
                             } else {
-                                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                                dialog.busy(false);
                                 password.setError(ru ? "Не удалось сохранить. Попробуйте ещё раз." : "Could not save. Please try again.");
                             }
                         });
                     });
-                });
             });
             dialog.show();
-            if (dialog.getWindow() != null) dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         });
     }
 }

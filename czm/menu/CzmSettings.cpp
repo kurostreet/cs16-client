@@ -326,6 +326,7 @@ enum ERowType
 	ROW_COLORS,   // crosshair colours
 	ROW_XHAIR,    // crosshair preview
 	ROW_NICK,
+	ROW_ACCOUNT,
 	ROW_AVATARS,
 	ROW_SPRAYS,
 	ROW_MIC,      // microphone test: level meter and a start/stop button
@@ -407,6 +408,7 @@ const CzmRow s_game[] =
 
 const CzmRow s_profile[] =
 {
+	{ ROW_ACCOUNT, "s_account", "s_account_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_NICK, "s_nick", "s_nick_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_AVATARS, "s_avatar", "s_avatar_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_SPRAYS, "s_spray", "s_spray_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
@@ -751,6 +753,7 @@ void CCzmSettings::Layout( void )
 			l.control = CZM_Rect( l.rect.x + l.rect.w - bw, l.rect.y + H * 0.015f, bw, h - H * 0.03f );
 			break;
 		}
+		case ROW_ACCOUNT:
 		case ROW_NICK:
 		{
 			int fh = H * 0.07f;
@@ -836,6 +839,7 @@ int CCzmSettings::HitTest( void ) const
 			break;
 		case ROW_SWITCH:
 			return HIT_ROW + i * 20; // the whole row toggles
+		case ROW_ACCOUNT:
 		case ROW_NICK:
 			if( l.control.Grown( grow ).Contains( x, y ))
 				return HIT_ROW + i * 20;
@@ -947,6 +951,9 @@ void CCzmSettings::Activate( int hit )
 			else if( part == 1 )
 				m_bConfirm = true;
 			break;
+		case ROW_ACCOUNT:
+			CZM_AccountShow( CZM_OnlineKey(), EngFuncs::GetCvarString( "name" ));
+			break;
 		case ROW_NICK:
 		{
 			char clean[64];
@@ -960,6 +967,7 @@ void CCzmSettings::Activate( int hit )
 			break;
 		case ROW_AVATARS:
 			// the photo card: choose the photo, a second tap (or no photo yet) opens the gallery
+			CZM_OnlineAvatarChanged();
 			if( part == 0 )
 			{
 				if( CZM_AvatarPhoto()[0] && CZM_CurrentAvatar() != CZM_AVATAR_PHOTO )
@@ -1303,6 +1311,10 @@ void CCzmSettings::DrawRow( int i )
 	}
 	case ROW_XHAIR:
 		DrawCrosshairPreview( l.control );
+		break;
+	case ROW_ACCOUNT:
+		CZM_DrawButton( UI_DIR "button_secondary.png", l.control, CZM_T( "s_account_open" ), CZM_White(),
+			IsPressed( HIT_ROW + i * 20 ), CZMF_TILE_STATUS );
 		break;
 	case ROW_NICK:
 	{

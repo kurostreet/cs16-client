@@ -23,6 +23,37 @@ CREATE TABLE IF NOT EXISTS players (
 );
 CREATE INDEX IF NOT EXISTS players_device ON players(device_hash);
 
+CREATE TABLE IF NOT EXISTS accounts (
+    player INTEGER PRIMARY KEY REFERENCES players(id),
+    login TEXT NOT NULL,
+    nick_key TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    email TEXT UNIQUE,
+    created INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS account_sessions (
+    token_hash TEXT PRIMARY KEY,
+    player INTEGER NOT NULL REFERENCES accounts(player),
+    created INTEGER NOT NULL,
+    seen INTEGER NOT NULL,
+    expires INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS account_sessions_player ON account_sessions(player);
+CREATE TABLE IF NOT EXISTS auth_limits (
+    bucket TEXT PRIMARY KEY,
+    count INTEGER NOT NULL,
+    expires INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS auth_codes (
+    player INTEGER NOT NULL REFERENCES accounts(player),
+    purpose TEXT NOT NULL,
+    target TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    expires INTEGER NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(player, purpose)
+);
+
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY,
     room TEXT NOT NULL,

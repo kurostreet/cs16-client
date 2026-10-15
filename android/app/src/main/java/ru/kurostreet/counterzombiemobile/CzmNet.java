@@ -42,6 +42,7 @@ public final class CzmNet {
     private static final ExecutorService POOL = Executors.newFixedThreadPool(3);
     private static final ExecutorService UPDATE = Executors.newSingleThreadExecutor();
     private static final ConcurrentHashMap<Integer, String> RESULTS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Integer, Integer> GENERATIONS = new ConcurrentHashMap<>();
     private static final AtomicInteger NEXT = new AtomicInteger(1);
     private static final int MAX_BODY = 1 << 20;
 
@@ -50,6 +51,9 @@ public final class CzmNet {
     public static void serverAuthShow(String address, String name, boolean russian) {
         CzmServerAuth.show(address, name, russian);
     }
+
+    public static void accountShow(String legacy, String nick, boolean russian) { CzmAccount.show(legacy, nick, russian); }
+    public static byte[] accountEvent() { return CzmAccount.event(); }
 
     public static byte[] serverUserinfo(String address, byte[] base, int limit) {
         return CzmServerAuth.userinfo(address, new String(base, StandardCharsets.UTF_8), limit).getBytes(StandardCharsets.UTF_8);
@@ -100,9 +104,11 @@ public final class CzmNet {
     /** GET or POST with a JSON body (UTF-8 bytes, empty for none); returns the number to poll. */
     public static int request(final String method, final String url, final String key, final byte[] body) {
         final int id = NEXT.getAndIncrement();
+        final int generation = CzmAccount.generation();
+        GENERATIONS.put(id, generation);
         POOL.execute(new Runnable() {
             @Override public void run() {
-                RESULTS.put(id, call(method, url, key, body == null || body.length == 0 ? null : body, "application/json"));
+                RESULTS.put(id, CzmAccount.call(generation, method, url, key, body == null || body.length == 0 ? null : body, "application/json"));
             }
         });
         return id;
@@ -120,6 +126,8 @@ public final class CzmNet {
     /** POST of a file from the game folder (the avatar photo). */
     public static int upload(final String url, final String key, final String path, final String contentType) {
         final int id = NEXT.getAndIncrement();
+        final int generation = CzmAccount.generation();
+        GENERATIONS.put(id, generation);
         POOL.execute(new Runnable() {
             @Override public void run() {
                 File file = gameFile(path);
@@ -128,7 +136,7 @@ public final class CzmNet {
                     return;
                 }
                 try {
-                    RESULTS.put(id, call("POST", url, key, readAll(new FileInputStream(file)), contentType));
+                    RESULTS.put(id, CzmAccount.call(generation, "POST", url, key, readAll(new FileInputStream(file)), contentType));
                 } catch (IOException e) {
                     RESULTS.put(id, "0\n");
                 }
@@ -174,6 +182,10 @@ public final class CzmNet {
     /** null while the request runs, then "status\nbody" once as UTF-8 (status 0: no network). */
     public static byte[] poll(int id) {
         String result = RESULTS.remove(id);
+        if (result != null) {
+            Integer generation = GENERATIONS.remove(id);
+            if (generation != null && generation != CzmAccount.generation()) result = "409\n";
+        }
         return result == null ? null : result.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -184,7 +196,9 @@ public final class CzmNet {
     }
 
     private static HttpURLConnection open(String url, String method, String key) throws IOException {
+        if (key != null && !key.isEmpty() && !CzmAccount.serviceUrl(url)) throw new IOException("credential origin");
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        if (key != null && !key.isEmpty()) conn.setInstanceFollowRedirects(false);
         conn.setConnectTimeout(10000);
         conn.setReadTimeout(20000);
         conn.setRequestMethod(method);
@@ -193,7 +207,7 @@ public final class CzmNet {
         return conn;
     }
 
-    private static String call(String method, String url, String key, byte[] data, String contentType) {
+    static String call(String method, String url, String key, byte[] data, String contentType) {
         HttpURLConnection conn = null;
         try {
             conn = open(url, method, key);

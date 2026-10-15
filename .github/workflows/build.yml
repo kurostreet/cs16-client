@@ -53,6 +53,7 @@ jobs:
           echo '3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed  /tmp/czm-json.jar' | sha256sum -c -
           javac --release 11 -cp /tmp/czm-json.jar -d /tmp/czm-java-check android/app/src/main/java/ru/kurostreet/counterzombiemobile/ApkUpdate.java tests/ApkUpdateTest.java
           CZM_JAVA_CLASSES=/tmp/czm-java-check CZM_JSON_JAR=/tmp/czm-json.jar python3 -m unittest discover -s tests -p test_apk_update.py -v
+          CZM_JSON_JAR=/tmp/czm-json.jar python3 -m unittest discover -s tests -p test_account_client.py -v
           python3 -m venv /tmp/czm-server-check
           /tmp/czm-server-check/bin/pip install -q -r server/czm/requirements.txt
           PYTHONPATH=server/czm /tmp/czm-server-check/bin/python -m unittest discover -s server/czm/tests -v
@@ -114,7 +115,7 @@ jobs:
                   assert b"czmavatar://pick?file=%s" in menu and b"czm_avatar_photo" in menu, abi
                   assert b"menu_czmchat" in menu and b"/api/v1/hello" in menu and b"ru/kurostreet/counterzombiemobile/CzmNet" in menu, abi
                   assert b"czm/tapscroll.wav" in menu and b"https://counter-zombie.ru%s" in menu, abi
-                  assert b"serverAuthShow" in menu, abi
+                  assert b"serverAuthShow" in menu and b"accountShow" in menu and b"accountEvent" in menu, abi
                   engine = apk.read("lib/" + abi + "/libxash.so")
                   assert b"serverUserinfo" in engine, abi
                   assert b"czm_loading_enable" in engine and b"czm_loading_error" in engine, abi

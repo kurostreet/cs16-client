@@ -42,6 +42,18 @@ class Settings(BaseSettings):
     room_history: int = 100
     keep_days: int = 7
 
+    # Recovery is offered only when an authenticated TLS SMTP sender is configured.
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = False
+
+    @property
+    def mail_ready(self) -> bool:
+        return bool(self.smtp_host and self.smtp_user and self.smtp_password and self.smtp_from)
+
     @property
     def owner_ids(self) -> set[int]:
         ids = set()

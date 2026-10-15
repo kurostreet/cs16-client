@@ -59,25 +59,35 @@ def avatar_ref(row: sqlite3.Row) -> str:
 def player_by_key(conn: sqlite3.Connection, key: str) -> sqlite3.Row | None:
     if not key or len(key) < 16 or len(key) > 128:
         return None
-    return conn.execute("SELECT * FROM players WHERE key_hash = ?", (hash_secret(key),)).fetchone()
+    from . import accounts
+    if key.startswith(accounts.SESSION_PREFIX):
+        return accounts.player_for_session(conn, key)
+    return conn.execute("SELECT * FROM players WHERE key_hash = ? AND NOT EXISTS "
+                        "(SELECT 1 FROM accounts a WHERE a.player=players.id)", (hash_secret(key),)).fetchone()
 
 
-def hello(conn: sqlite3.Connection, key: str, device: str, nick: str, avatar: str, lang: str, version: str) -> sqlite3.Row:
+def hello(conn: sqlite3.Connection, key: str, device: str, nick: str, avatar: str, lang: str, version: str, keep_avatar: bool = False) -> sqlite3.Row:
+    from . import accounts
     t = now()
     key_hash = hash_secret(key)
     device_hash = hash_secret(device) if device else ""
-    row = conn.execute("SELECT * FROM players WHERE key_hash = ?", (key_hash,)).fetchone()
+    row = player_by_key(conn, key)
+    if row is None and (key.startswith(accounts.SESSION_PREFIX) or conn.execute("SELECT 1 FROM players WHERE key_hash=?", (key_hash,)).fetchone()):
+        raise accounts.AuthError("session", 401)
     if row is None:
         conn.execute(
             "INSERT INTO players (key_hash, device_hash, nick, avatar, lang, version, created, seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (key_hash, device_hash, clean_nick(nick), clean_avatar(avatar), lang[:8], version[:32], t, t),
         )
     else:
+        if keep_avatar:
+            avatar = row["avatar"]
         conn.execute(
             "UPDATE players SET device_hash = CASE WHEN ? != '' THEN ? ELSE device_hash END, nick = ?, avatar = ?, lang = ?, version = ?, seen = ? WHERE id = ?",
             (device_hash, device_hash, clean_nick(nick), clean_avatar(avatar, has_photo(row["id"])), lang[:8], version[:32], t, row["id"]),
         )
-    return conn.execute("SELECT * FROM players WHERE key_hash = ?", (key_hash,)).fetchone()
+    return conn.execute("SELECT * FROM players WHERE id = ?", (row["id"],)).fetchone() if row else \
+        conn.execute("SELECT * FROM players WHERE key_hash = ?", (key_hash,)).fetchone()
 
 
 def active_ban(conn: sqlite3.Connection, player: sqlite3.Row) -> dict | None:

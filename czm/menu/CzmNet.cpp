@@ -148,6 +148,38 @@ void CZM_ServerAuthShow( const char *address, const char *name )
 	CZM_End( env );
 }
 
+void CZM_AccountShow( const char *key, const char *nick )
+{
+	JNIEnv *env;
+	jclass cls;
+	if( !CZM_Begin( &env, &cls )) return;
+	jmethodID m = CZM_Method( env, cls, "accountShow", "(Ljava/lang/String;Ljava/lang/String;Z)V" );
+	if( m ) env->CallStaticVoidMethod( cls, m, env->NewStringUTF( key ), env->NewStringUTF( nick ), (jboolean)CZM_IsRussian() );
+	CZM_End( env );
+}
+
+bool CZM_AccountEvent( CUtlString &body )
+{
+	JNIEnv *env;
+	jclass cls;
+	bool found = false;
+	if( !CZM_Begin( &env, &cls )) return false;
+	jmethodID m = CZM_Method( env, cls, "accountEvent", "()[B" );
+	jbyteArray result = m ? (jbyteArray)env->CallStaticObjectMethod( cls, m ) : NULL;
+	if( result )
+	{
+		jsize n = env->GetArrayLength( result );
+		if( n > 0 && n < 4096 )
+		{
+			char value[4096];
+			env->GetByteArrayRegion( result, 0, n, (jbyte *)value ); value[n] = 0;
+			body.Set( value ); found = true;
+		}
+	}
+	CZM_End( env );
+	return found;
+}
+
 void CZM_StartupReady( void )
 {
 	static bool sent;
@@ -373,6 +405,8 @@ void CZM_UpdateState( int *state, double *done, double *total, char *error, size
 
 bool CZM_NetAvailable( void ) { return false; }
 void CZM_ServerAuthShow( const char *, const char * ) {}
+void CZM_AccountShow( const char *, const char * ) {}
+bool CZM_AccountEvent( CUtlString & ) { return false; }
 void CZM_StartupReady( void ) {}
 int CZM_NetRequest( const char *, const char *, const char *, const char * ) { return 0; }
 int CZM_NetUpload( const char *, const char *, const char *, const char * ) { return 0; }

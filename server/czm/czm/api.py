@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from PIL import Image
 from pydantic import BaseModel, Field
 
-from . import service, mappics
+from . import service, mappics, accounts
 from .config import get_settings
 from .db import db
 
@@ -81,6 +81,7 @@ class HelloIn(BaseModel):
     lang: str = Field(default="", max_length=8)
     version: str = Field(default="", max_length=32)
     code: int = 0
+    keep_avatar: bool = False
 
 
 @router.post("/hello")
@@ -88,7 +89,7 @@ async def hello(body: HelloIn, request: Request):
     _hello_limit.check(client_ip(request))
 
     def run(conn):
-        player = service.hello(conn, body.key, body.device, body.nick, body.avatar, body.lang, body.version)
+        player = service.hello(conn, body.key, body.device, body.nick, body.avatar, body.lang, body.version, body.keep_avatar)
         release = service.latest_release(conn, base_code=body.code)
         return {
             "id": player["id"],
@@ -100,7 +101,46 @@ async def hello(body: HelloIn, request: Request):
             "max_chars": get_settings().message_max_chars,
         }
 
-    return await in_db(run)
+    try:
+        return await in_db(run)
+    except accounts.AuthError as error:
+        return JSONResponse({"error": error.code}, status_code=error.status)
+
+
+class AuthIn(BaseModel):
+    nick: str = Field(default="", max_length=64)
+    password: str = Field(default="", max_length=128)
+    repeat: str = Field(default="", max_length=128)
+    email: str = Field(default="", max_length=254)
+    code: str = Field(default="", max_length=16)
+
+
+@router.post("/auth/{action}")
+async def account_action(action: str, body: AuthIn, request: Request, x_czm_key: str | None = Header(default=None)):
+    key, ip = x_czm_key or "", client_ip(request)
+    operations = {
+        "register": lambda c: accounts.register(c, key, body.nick, body.password, body.repeat, ip),
+        "login": lambda c: accounts.login(c, body.nick, body.password, ip),
+        "me": lambda c: accounts.me(c, key),
+        "logout": lambda c: accounts.logout(c, key),
+        "logout-all": lambda c: accounts.logout(c, key, True),
+        "email": lambda c: accounts.email_request(c, key, body.email, ip),
+        "email-confirm": lambda c: accounts.email_confirm(c, key, body.code, ip),
+        "recover": lambda c: accounts.recover(c, body.nick, ip),
+        "reset": lambda c: accounts.reset(c, body.nick, body.code, body.password, body.repeat, ip),
+    }
+    if action not in operations:
+        raise HTTPException(404)
+
+    def run(conn):
+        # Catch inside the transaction: failed attempts and consumed codes must commit.
+        try:
+            return 200, operations[action](conn)
+        except accounts.AuthError as error:
+            return error.status, {"error": error.code}
+
+    status, result = await in_db(run)
+    return JSONResponse(result, status_code=status, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/chat/{room}")

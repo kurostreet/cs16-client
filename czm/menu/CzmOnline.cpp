@@ -61,6 +61,10 @@ static struct
 	CzmUpdateInfo update;
 	int uploadId;
 	char uploading[64];
+	int profilePhoto; // restored account photo request, no upload until it has completed
+	char profilePhotoPath[64];
+	bool preserveAvatar;
+	double photoRetry;
 } s_online;
 
 static struct
@@ -173,6 +177,7 @@ static void SendHello( void )
 	body.Append( ",\"lang\":" ); CZM_JsonQuote( body, CZM_IsRussian() ? "ru" : "en" );
 	body.Append( ",\"version\":" ); CZM_JsonQuote( body, CZM_Version( ));
 	body.Append( ",\"code\":" ); body.Append( code );
+	if( s_online.preserveAvatar ) body.Append( ",\"keep_avatar\":true" );
 	body.Append( "}" );
 
 	Q_strncpy( s_online.sentNick, nick, sizeof( s_online.sentNick ));
@@ -200,7 +205,8 @@ static void OnHello( int status, const char *body )
 
 	if( status != 200 || !j.Parse( body ))
 	{
-		s_online.nextHello = EngFuncs::DoubleTime() + RETRY_AFTER;
+		if( status == 401 ) s_online.ready = false;
+		s_online.nextHello = EngFuncs::DoubleTime() + ( status == 409 ? 1.0 : RETRY_AFTER );
 		return;
 	}
 
@@ -243,7 +249,7 @@ static void SyncPhoto( void )
 {
 	const char *photo = CZM_AvatarPhoto();
 
-	if( s_online.uploadId || !photo[0] || CZM_CurrentAvatar() != CZM_AVATAR_PHOTO )
+	if( s_online.preserveAvatar || s_online.uploadId || !photo[0] || CZM_CurrentAvatar() != CZM_AVATAR_PHOTO )
 		return;
 	if( !strcmp( photo, EngFuncs::GetCvarString( "czm_avatar_sent" )))
 		return;
@@ -265,6 +271,11 @@ static void PollAvatars( void )
 	}
 }
 
+void CZM_OnlineAvatarChanged( void )
+{
+	s_online.preserveAvatar = false;
+}
+
 void CZM_OnlineFrame( void )
 {
 	double now = EngFuncs::DoubleTime();
@@ -282,6 +293,65 @@ void CZM_OnlineFrame( void )
 
 	if( !s_online.key[0] )
 		return;
+	// Account changes arrive from Java without a password or session token in the engine.
+	if( CZM_AccountEvent( body ))
+	{
+		CzmJson j;
+		if( j.Parse( body.Get() ))
+		{
+			s_online.ready = false;
+			s_online.player = 0;
+			s_online.nextHello = now;
+			s_online.preserveAvatar = false;
+			int profile = j.Get( 0, "profile" );
+			if( j.Bool( j.Get( 0, "guest" )))
+			{
+				CZM_NetNewKey( s_online.key, sizeof( s_online.key ));
+				EngFuncs::COM_SaveFile( KEY_FILE, s_online.key, strlen( s_online.key ));
+				EngFuncs::CvarSetString( "czm_avatar_photo", "" );
+				CZM_SetAvatar( CZM_AVATAR_LOGO );
+			}
+			else if( j.Type( profile ) == CzmJson::T_OBJECT )
+			{
+				const char *avatar = j.String( j.Get( profile, "avatar" ));
+				s_online.player = j.Int( j.Get( profile, "id" ));
+				CZM_SetNick( j.String( j.Get( profile, "nick" )));
+				EngFuncs::CvarSetString( "czm_avatar_photo", "" );
+				if( !strncmp( avatar, "photo:", 6 ))
+				{
+					char path[128];
+					s_online.preserveAvatar = true;
+					EngFuncs::CvarSetString( "czm_avatar", "" );
+					snprintf( s_online.profilePhotoPath, sizeof( s_online.profilePhotoPath ), "czm_cache/account_%d_%d.png", s_online.player, atoi( avatar + 6 ));
+					snprintf( path, sizeof( path ), "/avatars/%d.png?v=%d", s_online.player, atoi( avatar + 6 ));
+					s_online.profilePhoto = CZM_NetDownload( CZM_OnlineUrl( path ), s_online.profilePhotoPath );
+				}
+				else CZM_SetAvatar( atoi( avatar ) - 1 );
+			}
+		}
+	}
+	if( s_online.preserveAvatar && !s_online.profilePhoto && now >= s_online.photoRetry )
+	{
+		char path[128];
+		snprintf( path, sizeof( path ), "/avatars/%d.png", s_online.player );
+		s_online.profilePhoto = CZM_NetDownload( CZM_OnlineUrl( path ), s_online.profilePhotoPath );
+	}
+	if( s_online.profilePhoto && CZM_NetPoll( s_online.profilePhoto, &status, body ))
+	{
+		s_online.profilePhoto = 0;
+		if( status == 200 && s_online.preserveAvatar )
+		{
+			EngFuncs::CvarSetString( "czm_avatar_photo", s_online.profilePhotoPath );
+			EngFuncs::CvarSetString( "czm_avatar_sent", s_online.profilePhotoPath );
+			CZM_SetAvatar( CZM_AVATAR_PHOTO );
+			s_online.preserveAvatar = false;
+		}
+		else
+		{
+			// Keep the remote photo on failures without blocking chat, updates or gameplay.
+			s_online.photoRetry = now + RETRY_AFTER;
+		}
+	}
 	CZM_MapPicturesFrame();
 
 	if( s_online.helloId )

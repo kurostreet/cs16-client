@@ -255,6 +255,9 @@ void CZM_DrawGameOverlay( void );
 class CUtlString;
 bool CZM_NetAvailable( void );
 void CZM_ServerAuthShow( const char *address, const char *name );
+void CZM_AccountShow( const char *key, const char *nick );
+bool CZM_AccountEvent( CUtlString &body );
+void CZM_OnlineAvatarChanged( void );
 void CZM_StartupReady( void );
 // a request number, 0 if there is no network layer; body is UTF-8 JSON or ""
 int CZM_NetRequest( const char *method, const char *url, const char *key, const char *body );
