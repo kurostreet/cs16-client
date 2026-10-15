@@ -1,0 +1,48 @@
+diff --git a/engine/client/cl_scrn.c b/engine/client/cl_scrn.c
+--- a/engine/client/cl_scrn.c
++++ b/engine/client/cl_scrn.c
+@@ -676,6 +676,7 @@
+ text to the screen.
+ ==================
+ */
++// Engine-owned read-only cvars need the internal full setter; public setters reject them.
+ // Publish only public map state. Network/authentication stays in the menu.
+ static void CZM_MapPictureState( void )
+ {
+@@ -687,12 +688,12 @@
+  {
+   if( active )
+   {
+-   Cvar_DirectSet( &czm_current_map, "" );
++   Cvar_DirectFullSet( &czm_current_map, "", 0 );
+    Cvar_DirectSetValue( &czm_mapshot_state, 0 );
+   }
+   active = false;
+   alive_since = 0;
+-  if( czm_mapshot_ready.value ) Cvar_DirectSetValue( &czm_mapshot_ready, 0 );
++  if( czm_mapshot_ready.value ) Cvar_DirectFullSet( &czm_mapshot_ready, "0", 0 );
+   return;
+  }
+  char map[64];
+@@ -700,8 +701,10 @@
+  for( char *p = map; *p; p++ ) if( *p >= 'A' && *p <= 'Z' ) *p += 'a' - 'A';
+  if( !active || Q_strcmp( map, czm_current_map.string ))
+  {
+-  Cvar_DirectSet( &czm_current_map, map );
+-  Cvar_DirectSetValue( &czm_map_visit, czm_map_visit.value + 1 );
++  Cvar_DirectFullSet( &czm_current_map, map, 0 );
++  char visit[32];
++  Q_snprintf( visit, sizeof( visit ), "%d", (int)czm_map_visit.value + 1 );
++  Cvar_DirectFullSet( &czm_map_visit, visit, 0 );
+   Cvar_DirectSetValue( &czm_mapshot_state, 0 );
+   alive_since = 0;
+  }
+@@ -709,7 +712,7 @@
+  if( cl.local.health <= 0 || cls.spectator ) alive_since = 0;
+  else if( alive_since == 0 ) alive_since = host.realtime;
+  int ready = alive_since != 0 && host.realtime - alive_since >= 8.0;
+- if( czm_mapshot_ready.value != ready ) Cvar_DirectSetValue( &czm_mapshot_ready, ready );
++ if( czm_mapshot_ready.value != ready ) Cvar_DirectFullSet( &czm_mapshot_ready, ready ? "1" : "0", 0 );
+ }
+ 
+ void SCR_CzmMapPictureCapture( void )
