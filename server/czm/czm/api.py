@@ -7,7 +7,7 @@ from collections import defaultdict, deque
 from typing import Any, Callable
 
 from fastapi import APIRouter, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from PIL import Image
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,7 @@ from .db import db
 
 log = logging.getLogger("czm.api")
 router = APIRouter(prefix="/api/v1")
+download_router = APIRouter()
 
 # the bot gets complaints through this hook (set by main.py)
 notify_report: Callable[[dict], Any] | None = None
@@ -221,3 +222,25 @@ async def update(request: Request, code: int = 0):
     _read_limit.check(client_ip(request))
     release = await in_db(lambda conn: service.latest_release(conn, base_code=code))
     return {"update": release if release and release["code"] > code else None}
+
+
+@download_router.api_route("/download", methods=["GET", "HEAD"])
+@download_router.api_route("/download/CounterZombieMobile.apk", methods=["GET", "HEAD"])
+async def download_latest():
+    """One shareable link follows the published full APK, including rollbacks."""
+    def available(conn):
+        release = service.latest_release(conn)
+        if not release:
+            return None
+        name = release["url"].rsplit("/", 1)[-1]
+        path = get_settings().apk_dir / name
+        if path.is_file() and release["size"] > 0 and path.stat().st_size == release["size"]:
+            return release["url"]
+        return None
+
+    url = await in_db(available)
+    headers = {"Cache-Control": "no-store"}
+    if not url:
+        return JSONResponse({"error": "unavailable"}, status_code=503,
+                            headers={**headers, "Retry-After": "60"})
+    return RedirectResponse(url, status_code=307, headers=headers)

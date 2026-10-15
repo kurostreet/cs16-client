@@ -25,6 +25,7 @@ class UpdateApiTests(unittest.TestCase):
         self.folder.mkdir()
         app = FastAPI()
         app.include_router(api.router)
+        app.include_router(api.download_router)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 
@@ -67,6 +68,44 @@ class UpdateApiTests(unittest.TestCase):
         self.assertNotIn("patch_url", self.client.get("/api/v1/update?code=100").json()["update"])
         file.unlink()
         self.assertNotIn("patch_url", self.client.get("/api/v1/update?code=100").json()["update"])
+
+    def test_download_follows_publication_and_rollback_without_caching(self):
+        self.release(100)
+        draft = self.release(200, published=False)
+
+        def check(code):
+            for route in ("/download", "/download/CounterZombieMobile.apk"):
+                for method in ("GET", "HEAD"):
+                    with self.subTest(route=route, method=method, code=code):
+                        response = self.client.request(method, route, follow_redirects=False)
+                        self.assertEqual(response.status_code, 307)
+                        self.assertEqual(response.headers["location"], get_settings().public_url + f"/dl/test-{code}.apk")
+                        self.assertEqual(response.headers["cache-control"], "no-store")
+
+        check(100)  # a newer draft must never replace the installed-data APK
+        with db.db() as conn:
+            service.publish_release(conn, draft, "New version")
+        check(200)
+        with db.db() as conn:
+            service.unpublish_release(conn, draft)
+        check(100)
+
+    def test_download_rejects_absent_unpublished_or_incomplete_release(self):
+        for state in ("absent", "draft", "missing", "truncated"):
+            with self.subTest(state=state):
+                if state == "draft":
+                    release = self.release(100, published=False)
+                elif state == "missing":
+                    with db.db() as conn:
+                        service.publish_release(conn, release, "Published")
+                    (self.folder / "test-100.apk").unlink()
+                elif state == "truncated":
+                    (self.folder / "test-100.apk").write_bytes(b"incomplete")
+                response = self.client.get("/download", follow_redirects=False)
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json(), {"error": "unavailable"})
+                self.assertEqual(response.headers["cache-control"], "no-store")
+                self.assertEqual(response.headers["retry-after"], "60")
 
     def test_retention_removes_all_patches_of_expired_targets(self):
         for code in range(1, 6):

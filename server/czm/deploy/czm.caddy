@@ -9,6 +9,12 @@ counter-zombie.ru, kontrafps.ru {
 		Referrer-Policy no-referrer
 	}
 
+	# Stable public link resolves the latest published full APK on each visit.
+	@latest_apk path /download /download/CounterZombieMobile.apk
+	handle @latest_apk {
+		reverse_proxy 127.0.0.1:8200
+	}
+
 	# new builds from GitHub Actions, the service checks the workflow token
 	handle /api/v1/builds {
 		request_body {

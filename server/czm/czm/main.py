@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Counter Zombie Mobile", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(api.router)
+app.include_router(api.download_router)
 app.include_router(builds.router)
 
 
