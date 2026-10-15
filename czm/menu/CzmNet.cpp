@@ -138,6 +138,16 @@ bool CZM_NetAvailable( void )
 	return env && CZM_NetClass( env );
 }
 
+void CZM_ServerAuthShow( const char *address, const char *name )
+{
+	JNIEnv *env;
+	jclass cls;
+	if( !CZM_Begin( &env, &cls )) return;
+	jmethodID m = CZM_Method( env, cls, "serverAuthShow", "(Ljava/lang/String;Ljava/lang/String;Z)V" );
+	if( m ) env->CallStaticVoidMethod( cls, m, env->NewStringUTF( address ), env->NewStringUTF( name ), (jboolean)CZM_IsRussian() );
+	CZM_End( env );
+}
+
 void CZM_StartupReady( void )
 {
 	static bool sent;
@@ -362,6 +372,7 @@ void CZM_UpdateState( int *state, double *done, double *total, char *error, size
 #else // not Android: no network for the menu
 
 bool CZM_NetAvailable( void ) { return false; }
+void CZM_ServerAuthShow( const char *, const char * ) {}
 void CZM_StartupReady( void ) {}
 int CZM_NetRequest( const char *, const char *, const char *, const char * ) { return 0; }
 int CZM_NetUpload( const char *, const char *, const char *, const char * ) { return 0; }

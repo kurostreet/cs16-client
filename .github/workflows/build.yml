@@ -43,6 +43,10 @@ jobs:
         run: |
           javac --release 11 -d /tmp/czm-java-check android/app/src/main/java/ru/kurostreet/counterzombiemobile/ArchiveExtractor.java tests/ArchiveExtractorTest.java
           java -cp /tmp/czm-java-check ArchiveExtractorTest
+      - name: Check server credential isolation and encrypted storage
+        run: |
+          javac --release 11 -d /tmp/czm-auth-check android/app/src/main/java/ru/kurostreet/counterzombiemobile/ServerAuthData.java tests/ServerAuthDataTest.java
+          java -cp /tmp/czm-auth-check ru.kurostreet.counterzombiemobile.ServerAuthDataTest
       - name: Check APK patch generation, download and fallback
         run: |
           curl -fsSL --retry 3 https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar -o /tmp/czm-json.jar
@@ -110,7 +114,9 @@ jobs:
                   assert b"czmavatar://pick?file=%s" in menu and b"czm_avatar_photo" in menu, abi
                   assert b"menu_czmchat" in menu and b"/api/v1/hello" in menu and b"ru/kurostreet/counterzombiemobile/CzmNet" in menu, abi
                   assert b"czm/tapscroll.wav" in menu and b"https://counter-zombie.ru%s" in menu, abi
+                  assert b"serverAuthShow" in menu, abi
                   engine = apk.read("lib/" + abi + "/libxash.so")
+                  assert b"serverUserinfo" in engine, abi
                   assert b"czm_loading_enable" in engine and b"czm_loading_error" in engine, abi
                   assert b"czm_queryserver" in engine and b"czm_mictest" in engine, abi
                   client = apk.read("lib/" + abi + "/libclient_android_" + suffix + ".so")

@@ -363,6 +363,7 @@ private:
 		HIT_SORT = HIT_FILTER + FILTER_COUNT,
 		HIT_EMPTY_BUTTON,
 		HIT_PLAY,
+		HIT_ADMIN,
 		HIT_FAVORITE,
 		HIT_DETAILS,
 		HIT_DIALOG_FIELD,
@@ -485,7 +486,7 @@ private:
 	CzmRect m_back, m_title, m_searchBox, m_searchClear, m_refresh, m_add;
 	CzmRect m_tabs[TAB_COUNT], m_filters[FILTER_COUNT];
 	CzmRect m_listHead, m_sort, m_clip, m_details, m_emptyButton;
-	CzmRect m_play, m_fav;
+	CzmRect m_play, m_fav, m_admin;
 	CzmRect m_dlgPanel, m_dlgField, m_dlgPaste, m_dlgOk, m_dlgCancel;
 	int m_iRowH, m_iRowStep;
 	bool m_bThumbs;
@@ -1400,6 +1401,7 @@ void CCzmServers::Layout( void )
 
 		m_fav = CZM_Rect( m_details.x + pad, m_details.y + m_details.h - pad - bh, fw, bh );
 		m_play = CZM_Rect( m_fav.x + fw + H * 0.02f, m_fav.y, inner - fw - H * 0.02f, bh );
+		m_admin = CZM_Rect( m_fav.x, m_fav.y - H * 0.065f - H * 0.012f, inner, H * 0.065f );
 	}
 
 	// dialogs
@@ -1463,6 +1465,8 @@ int CCzmServers::HitTest( void ) const
 
 	if( m_details.HasCursor( ))
 	{
+		if( m_szSelected[0] && m_admin.HasCursor( ))
+			return HIT_ADMIN;
 		if( m_play.HasCursor( ))
 			return HIT_PLAY;
 		if( m_fav.HasCursor( ))
@@ -1555,6 +1559,12 @@ void CCzmServers::Activate( int hit )
 	case HIT_PLAY:
 		Connect( Selected(), NULL );
 		return;
+	case HIT_ADMIN:
+	{
+		CzmEntry *e = Selected();
+		if( e ) CZM_ServerAuthShow( e->address, e->answered ? e->name : e->address );
+		return;
+	}
 	case HIT_FAVORITE:
 	{
 		CzmEntry *e = Selected();
@@ -2284,7 +2294,7 @@ void CCzmServers::DrawDetails( void )
 
 	// players on the server
 	{
-		int bottom = m_fav.y - H * 0.02f;
+		int bottom = m_admin.y - H * 0.02f;
 		int lineH = CZM_FontHeight( textFont ) + H * 0.01f;
 		int fragsW = H * 0.06f;
 
@@ -2339,6 +2349,8 @@ void CCzmServers::DrawDetails( void )
 			}
 		}
 	}
+
+	CZM_DrawButton( UI_DIR "button_secondary.png", m_admin, CZM_IsRussian() ? "Админка/VIP" : "Admin/VIP", CZM_White(), IsPressed( HIT_ADMIN ));
 
 	// favorite and play
 	{

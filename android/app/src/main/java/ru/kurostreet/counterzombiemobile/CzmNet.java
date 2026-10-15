@@ -47,6 +47,14 @@ public final class CzmNet {
 
     private CzmNet() {}
 
+    public static void serverAuthShow(String address, String name, boolean russian) {
+        CzmServerAuth.show(address, name, russian);
+    }
+
+    public static byte[] serverUserinfo(String address, byte[] base, int limit) {
+        return CzmServerAuth.userinfo(address, new String(base, StandardCharsets.UTF_8), limit).getBytes(StandardCharsets.UTF_8);
+    }
+
     private static Context context() {
         return SDLActivity.getContext();
     }

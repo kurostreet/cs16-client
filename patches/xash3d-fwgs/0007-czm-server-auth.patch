@@ -1,0 +1,96 @@
+diff --git a/engine/client/cl_main.c b/engine/client/cl_main.c
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -14,6 +14,10 @@
+ */
+ 
+ #include <inttypes.h>
++#ifdef __ANDROID__
++#include <jni.h>
++#include "platform/platform.h"
++#endif
+ #include "common.h"
+ #include "client.h"
+ #include "net_encode.h"
+@@ -1203,11 +1207,55 @@
+ 	*(uint32_t*)(cls.steamid + 4) = LittleLong( ((uint32_t*)buf)[5] );
+ }
+ 
++// Build credentials only into the packet for its actual destination. Never mutate
++// cls.userinfo: config writes, local player info and later connections stay clean.
++static const char *CZM_ConnectUserinfo( netadr_t adr, char *out, size_t size )
++{
++ Q_strncpy( out, cls.userinfo, size );
++#ifdef __ANDROID__
++ JNIEnv *env = Android_GetNativeObject( "JNIEnv" );
++ if( !env ) return out;
++ if( (*env)->PushLocalFrame( env, 8 ) < 0 )
++ {
++  if( (*env)->ExceptionCheck( env )) (*env)->ExceptionClear( env );
++  return out;
++ }
++ jclass netclass = (*env)->FindClass( env, "ru/kurostreet/counterzombiemobile/CzmNet" );
++ if( netclass && !(*env)->ExceptionCheck( env ))
++ {
++  jmethodID method = (*env)->GetStaticMethodID( env, netclass, "serverUserinfo", "(Ljava/lang/String;[BI)[B" );
++  if( method && !(*env)->ExceptionCheck( env ))
++  {
++   jbyteArray base = (*env)->NewByteArray( env, Q_strlen( out ));
++   if( base )
++   {
++    (*env)->SetByteArrayRegion( env, base, 0, Q_strlen( out ), (const jbyte *)out );
++    jstring address = (*env)->NewStringUTF( env, NET_AdrToString( adr ));
++    jbyteArray wire = (*env)->CallStaticObjectMethod( env, netclass, method, address, base, (jint)size );
++    if( wire && !(*env)->ExceptionCheck( env ))
++    {
++     jsize length = (*env)->GetArrayLength( env, wire );
++     if( length >= 0 && length < size )
++     {
++      (*env)->GetByteArrayRegion( env, wire, 0, length, (jbyte *)out );
++      out[length] = 0;
++     }
++    }
++   }
++  }
++ }
++ if( (*env)->ExceptionCheck( env )) (*env)->ExceptionClear( env );
++ (*env)->PopLocalFrame( env, NULL );
++#endif
++ return out;
++}
++
+ void CL_SendGoldSrcConnectPacket( netadr_t adr, int challenge, const void *ticket, size_t ticketlen )
+ {
+ 	sizebuf_t send;
+ 	byte send_buf[2048];
+ 	char protinfo[MAX_INFO_STRING];
++	char wireinfo[MAX_INFO_STRING];
+ 
+ 	protinfo[0] = 0;
+ 
+@@ -1222,7 +1270,7 @@
+ 	MSG_Init( &send, "GoldSrcConnect", send_buf, sizeof( send_buf ));
+ 	MSG_WriteLong( &send, NET_HEADER_OUTOFBANDPACKET );
+ 	MSG_WriteStringf( &send, C2S_CONNECT" %i %i \"%s\" \"%s\"\n",
+-		PROTOCOL_GOLDSRC_VERSION, challenge, protinfo, cls.userinfo );
++		PROTOCOL_GOLDSRC_VERSION, challenge, protinfo, CZM_ConnectUserinfo( adr, wireinfo, sizeof( wireinfo )) );
+ 	MSG_SeekToBit( &send, -8, SEEK_CUR ); // rewrite null terminator
+ 	if( ticket == NULL )
+ 		CL_WriteSteamTicket( &send );
+@@ -1247,6 +1295,7 @@
+ static void CL_SendConnectPacket( connprotocol_t proto, int challenge )
+ {
+ 	char protinfo[MAX_INFO_STRING];
++	char wireinfo[MAX_INFO_STRING];
+ 	netadr_t adr = { 0 };
+ 
+ 	protinfo[0] = 0;
+@@ -1323,7 +1372,7 @@
+ 			Info_SetValueForKeyf( protinfo, "cookie", sizeof( protinfo ), "%016"PRIx64, cls.netchan_pending_cookie );
+ 		}
+ 
+-		Netchan_OutOfBandPrint( NS_CLIENT, adr, C2S_CONNECT" %i %i \"%s\" \"%s\"\n", PROTOCOL_VERSION, challenge, protinfo, cls.userinfo );
++		Netchan_OutOfBandPrint( NS_CLIENT, adr, C2S_CONNECT" %i %i \"%s\" \"%s\"\n", PROTOCOL_VERSION, challenge, protinfo, CZM_ConnectUserinfo( adr, wireinfo, sizeof( wireinfo )) );
+ 		Con_Printf( "Trying to connect with modern protocol\n" );
+ 	}
+ 
