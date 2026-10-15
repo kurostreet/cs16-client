@@ -62,7 +62,9 @@ jobs:
           python3 -m unittest discover -s tests -p test_engine_patches.py -v
           python3 scripts/apply_engine_patches.py
       - name: Check shared map capture state and read-only protection
-        run: python3 -m unittest discover -s tests -p test_map_capture.py -v
+        run: |
+          python3 -m unittest discover -s tests -p test_map_capture.py -v
+          python3 -m unittest discover -s tests -p test_avatar_restore.py -v
       - name: Build engine and client from source
         working-directory: android
         run: ./gradlew --no-daemon assembleGitDebug

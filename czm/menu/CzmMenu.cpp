@@ -1703,8 +1703,8 @@ const char *CZM_AvatarPhoto( void )
 	if( !value || !value[0] )
 		return "";
 
-	// the file is checked once per name
-	if( strcmp( checked, value ))
+	// A pending download can appear later under the same filename.
+	if( strcmp( checked, value ) || !exists )
 	{
 		Q_strncpy( checked, value, sizeof( checked ));
 		exists = EngFuncs::FileExists( value, true ) != 0;

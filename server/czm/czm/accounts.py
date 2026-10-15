@@ -34,7 +34,11 @@ def valid_login(value):
 
 
 def valid_password(password):
-    if not 8 <= len(password) <= 128 or len(password.encode()) > 512 or "\x00" in password:
+    try:
+        encoded = password.encode("utf-8")
+    except UnicodeError:
+        raise AuthError("password") from None
+    if not 8 <= len(password) <= 128 or len(encoded) > 512 or "\x00" in password:
         raise AuthError("password")
 
 

@@ -111,6 +111,8 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(self.post("login", nick="Kuro", password="Password123").status_code, 200)
 
     def test_idle_expiry_and_bad_password_validation(self):
+        with self.assertRaises(accounts.AuthError):
+            accounts.valid_password("bad\ud800password")
         self.assertEqual(self.post("register", nick="Kuro", password="short", repeat="short").status_code, 400)
         self.assertEqual(self.post("register", nick="Kuro", password="Password123", repeat="other").status_code, 400)
         token = self.register()
