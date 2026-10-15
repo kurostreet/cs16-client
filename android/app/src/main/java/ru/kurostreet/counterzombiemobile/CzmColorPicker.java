@@ -38,6 +38,7 @@ final class CzmColorPicker {
             editor = d;
             LinearLayout row = new LinearLayout(a); row.setGravity(Gravity.CENTER_VERTICAL);
             Wheel wheel = new Wheel(a, ColorWheelData.hsv(red, green, blue));
+            wheel.setContentDescription(ru ? "Выбор цвета прицела" : "Choose crosshair color");
             row.addView(wheel, new LinearLayout.LayoutParams(0, -1, 1));
             LinearLayout side = new LinearLayout(a); side.setOrientation(LinearLayout.VERTICAL);
             side.setPadding(CzmDialog.dp(a, 12), 0, 0, 0);
@@ -93,13 +94,12 @@ final class CzmColorPicker {
         private int pointer = -1;
         Wheel(Activity a, float[] initial) {
             super(a); hsv = initial; setFocusable(true);
-            setContentDescription("HSV");
         }
         int color() { return ColorWheelData.rgb(hsv[0], hsv[1], hsv[2]); }
         @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
             cx = w / 2f; cy = h / 2f; radius = Math.max(1, Math.min(w, h) / 2f - CzmDialog.dp((Activity)getContext(), 10));
             colors = new SweepGradient(cx, cy, new int[]{Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA, Color.RED}, null);
-            white = new RadialGradient(cx, cy, radius, Color.WHITE, Color.TRANSPARENT, Shader.TileMode.CLAMP);
+            white = new RadialGradient(cx, cy, radius, Color.WHITE, 0x00ffffff, Shader.TileMode.CLAMP);
         }
         @Override protected void onDraw(Canvas canvas) {
             paint.setStyle(Paint.Style.FILL); paint.setShader(colors); canvas.drawCircle(cx, cy, radius, paint);
