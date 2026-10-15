@@ -32,7 +32,7 @@ GNU General Public License for more details.
 
 #define CZM_CONTACT_URL "mailto:kuro.street.inc@gmail.com"
 #define CZM_GROUP_URL "https://t.me/counter_zombie_mobile"
-#define CZM_SOURCE_URL "https://github.com/kurostreet/cs16-client"
+#define CZM_SOURCE_URL "https://github.com/kurostreet/czm"
 
 namespace
 {
@@ -882,7 +882,7 @@ void CCzmMainMenu::DrawAbout( void )
 		case 0: value = "kuro.street.inc@gmail.com"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 1: value = "t.me/counter_zombie_mobile"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 2: value = CZM_T( "about_site_soon" ); valueColor = PackRGBA( 250, 204, 21, 255 ); break;
-		case 3: value = "github.com/kurostreet/cs16-client"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
+		case 3: value = "github.com/kurostreet/czm"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 4: value = CZM_Version(); break;
 		case 5: value = date; break;
 		default: value = "Xash3D FWGS (GPL)"; break;

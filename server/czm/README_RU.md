@@ -45,7 +45,7 @@
 
 На сервере от root:
 
-    curl -fsSL https://raw.githubusercontent.com/kurostreet/cs16-client/<коммит>/server/czm/deploy/install.sh | bash -s <коммит>
+    curl -fsSL https://raw.githubusercontent.com/kurostreet/czm/<коммит>/server/czm/deploy/install.sh | bash -s <коммит>
 
 - Код ставится в `/opt/czm/releases/<коммит>`, ссылка `/opt/czm/current`, окружение `/opt/czm/venv`.
 - Настройки и секреты — `/etc/czm/env`: `CZM_BOT_TOKEN`, `CZM_BOT_API_URL`, `CZM_BOT_OWNER_IDS`, `CZM_PEPPER`, `CZM_STEAM_KEY`.

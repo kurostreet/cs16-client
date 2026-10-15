@@ -1,11 +1,11 @@
 #!/bin/bash
 # Install or update the Counter Zombie Mobile service on the VDS. As root:
-#   curl -fsSL https://raw.githubusercontent.com/kurostreet/cs16-client/<commit>/server/czm/deploy/install.sh | bash -s <commit>
+#   curl -fsSL https://raw.githubusercontent.com/kurostreet/czm/<commit>/server/czm/deploy/install.sh | bash -s <commit>
 # Secrets stay on the server in /etc/czm/env; the first install takes the bot from the
 # video project settings (/etc/fva/env) and makes a new pepper. Nothing is printed.
 set -euo pipefail
 COMMIT=${1:?usage: install.sh <commit>}
-REPO=https://raw.githubusercontent.com/kurostreet/cs16-client/$COMMIT/server/czm
+REPO=https://raw.githubusercontent.com/kurostreet/czm/$COMMIT/server/czm
 FILES="requirements.txt czm/__init__.py czm/config.py czm/db.py czm/profanity.py czm/links.py czm/service.py czm/api.py
        czm/bot.py czm/steam.py czm/main.py czm/cli.py czm/builds.py czm/assemble.py czm/apkpatch.py czm/mappics.py czm/tlds.txt
        deploy/czm.service deploy/czm.caddy deploy/install.sh

@@ -24,8 +24,8 @@ class Settings(BaseSettings):
 
     # automatic updates: GitHub Actions sends each new core APK (proved by its OIDC token),
     # the server adds the game data of the previous release, signs it and publishes it
-    build_repository_id: int = 1413538918       # kurostreet/cs16-client
-    build_repository: str = "kurostreet/cs16-client"
+    build_repository_id: int = 1413538918       # kurostreet/czm
+    build_repository: str = "kurostreet/czm"
     build_ref: str = "refs/heads/feature/mobile-launcher"
     build_workflow: str = ".github/workflows/build.yml"
     build_audience: str = "kontrafps.ru"
