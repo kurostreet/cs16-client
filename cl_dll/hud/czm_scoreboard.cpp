@@ -98,30 +98,56 @@ int CHudScoreboard::DrawCzmScoreboard( void )
 		return a < b;
 	});
 	const bool ru = Russian();
-	const int w = xend - xstart, h = yend - ystart;
+	const float requested = gEngfuncs.pfnGetCvarFloat( "czm_tab_style" );
+	const int style = requested >= 2 ? 2 : requested >= 1 ? 1 : 0;
+	int x = xstart, y0 = ystart, w = xend - xstart, h = yend - ystart;
 	if( w <= 0 || h <= 0 ) return 1;
-	const int pad = std::max( 6, h / 40 ), gap = pad * 2;
+	const int pad = std::max( 6, h / 40 ), gap = pad * ( style == 2 ? 3 : 2 );
 	int tw = 0, fontH = 0;
 	gEngfuncs.pfnDrawConsoleStringLen( "Ag", &tw, &fontH );
 	// Console metrics and all scoreboard coordinates are already in HUD units.
 	fontH = std::max( 8, fontH );
-	const int head = std::max( h / 7, fontH * 3 + pad );
-	const int columns = w > ScreenHeight * 0.9f ? 2 : 1;
+	const int head = std::max( style == 1 ? 0 : h / 7, fontH * 3 + pad * 3 );
+	int columns = style == 1 ? ( count <= 10 ? 1 : 2 ) : ( w > ScreenHeight * 0.9f ? 2 : 1 );
+	if( style == 1 )
+	{
+		int narrow = w * ( columns == 1 ? 0.72f : 0.92f );
+		x += ( w - narrow ) / 2; w = narrow;
+	}
+	// At large text scales use more columns instead of dropping players or overlapping text.
+	const int capacity = std::max( 1, ( h - head - pad * 2 - fontH * 2 ) / ( fontH + 1 ));
+	while( columns < 4 && count > columns * capacity ) columns++;
 	const int rows = std::max( 1, ( count + columns - 1 ) / columns );
 	const int cw = ( w - pad * 2 - gap * ( columns - 1 )) / columns;
-	const int rh = std::max( 1, ( h - head - pad * 2 - fontH * 2 ) / std::max( 16 / ( 3 - columns ), rows ));
-	FillRGBABlend( xstart, ystart, w, h, 10, 13, 19, 235 );
-	FillRGBA( xstart, ystart, w, std::max( 2, h / 180 ), 224, 35, 47, 255 );
+	const int available = h - head - pad * 2 - fontH * 2;
+	const int reserve = style == 0 ? std::max( columns == 1 ? 8 : ( MAX_PLAYERS + columns - 1 ) / columns, rows ) : rows;
+	int rh = std::max( 1, available / reserve );
+	if( available / rows >= fontH + 1 ) rh = std::max( rh, fontH + 1 );
+	if( style != 0 )
+	{
+		rh = std::min( rh, fontH + ( style == 1 ? std::max( 4, pad / 2 ) : pad * 2 ));
+		int fitted = std::min( h, head + rh * rows + pad * 2 + fontH * 2 );
+		y0 += ( h - fitted ) / 2; h = fitted;
+	}
+	if( style != 2 ) FillRGBABlend( x, y0, w, h, 10, 13, 19, style == 1 ? 245 : 235 );
+	else FillRGBABlend( x, y0, w, head - fontH - pad * 2, 10, 13, 19, 235 );
+	FillRGBA( x, y0, w, std::max( 2, h / 180 ), 224, 35, 47, 255 );
 	char buf[256];
 	snprintf( buf, sizeof( buf ), "%s  /  %d", ru ? "ИГРОКИ" : "PLAYERS", count );
-	Text( xstart + pad, ystart + pad, w * 2 / 3, buf, 255, 255, 255 );
-	Text( xstart + pad, ystart + pad + fontH + pad / 2, w - pad * 2,
+	Text( x + pad, y0 + pad, w * 2 / 3, buf, 255, 255, 255 );
+	Text( x + pad, y0 + pad + fontH + pad / 2, w - pad * 2,
 		gHUD.m_szServerName[0] ? gHUD.m_szServerName : "COUNTER ZOMBIE MOBILE", 158, 168, 185 );
 	for( int c = 0; c < columns; c++ )
 	{
-		const int left = xstart + pad + c * ( cw + gap );
+		const int left = x + pad + c * ( cw + gap );
 		const int nameW = cw * 0.57f, statW = cw * 0.13f;
-		const int hy = ystart + head - fontH - pad;
+		const int hy = y0 + head - fontH - pad;
+		if( style == 2 )
+		{
+			int used = std::max( 0, std::min( rows, count - c * rows ));
+			FillRGBABlend( left - pad / 2, hy - pad / 2, cw + pad, fontH + pad * 2 + used * rh, 10, 13, 19, 225 );
+			FillRGBA( left - pad / 2, hy - pad / 2, cw + pad, 1, 77, 85, 102, 220 );
+		}
 		Text( left, hy, nameW, ru ? "ИГРОК / СТАТУС" : "PLAYER / STATUS", 162, 171, 187 );
 		Text( left + nameW, hy, statW, ru ? "УБ." : "KILLS", 162, 171, 187, true );
 		Text( left + nameW + statW, hy, statW, ru ? "СМ." : "DEATHS", 162, 171, 187, true );
@@ -130,16 +156,16 @@ int CHudScoreboard::DrawCzmScoreboard( void )
 		{
 			int n = c * rows + row;
 			if( n >= count ) break;
-			const int id = players[n], y = ystart + head + row * rh;
+			const int id = players[n], y = y0 + head + row * rh;
 			const hud_player_info_t &p = g_PlayerInfoList[id];
 			const extra_player_info_t &extra = g_PlayerExtraInfo[id];
 			const int team = Team( id );
-			if( y + rh > yend - pad ) break;
-			FillRGBABlend( left, y, cw, rh - 1, p.thisplayer ? 90 : 24, p.thisplayer ? 24 : 28, p.thisplayer ? 34 : 38, p.thisplayer ? 220 : ( row % 2 ? 145 : 205 ));
-			FillRGBA( left, y, std::max( 2, pad / 3 ), rh - 1, team == 1 ? 233 : 75, team == 2 ? 167 : 84, team == 2 ? 245 : 101, 240 );
+			const int space = style == 2 ? std::max( 2, std::min( pad / 2, rh - fontH )) : 1;
+			FillRGBABlend( left, y, cw, std::max( 1, rh - space ), p.thisplayer ? 90 : 24, p.thisplayer ? 24 : 28, p.thisplayer ? 34 : 38, p.thisplayer ? 220 : ( row % 2 ? 145 : 205 ));
+			FillRGBA( left, y, std::max( 2, pad / 3 ), std::max( 1, rh - space ), team == 1 ? 233 : 75, team == 2 ? 167 : 84, team == 2 ? 245 : 101, 240 );
 			int ty = y + std::max( 0, ( rh - fontH ) / 2 );
-			const int icon = std::min( rh - 2, pad * 3 );
-			Text( left + pad, ty, icon, "?", 130, 144, 162 );
+			const int icon = style == 1 ? 0 : std::max( 0, std::min( rh - 2, pad * 3 ));
+			if( style != 1 ) Text( left + pad, ty, icon, "?", 130, 144, 162 );
 			const int nx = left + pad + icon;
 			Text( nx, ty, std::max( 0, nameW - pad - icon - pad ), p.name, p.thisplayer ? 255 : 225, p.thisplayer ? 238 : 230, p.thisplayer ? 240 : 238 );
 			// Status is conveyed by the stripe and a small live/dead indicator.
@@ -154,7 +180,8 @@ int CHudScoreboard::DrawCzmScoreboard( void )
 			Text( left + nameW + statW * 2, ty, cw - nameW - statW * 2, buf, p.ping > 180 ? 248 : 117, p.ping > 180 ? 113 : 212, p.ping > 180 ? 113 : 170, true );
 		}
 	}
-	Text( xstart + pad, yend - fontH - pad, w - pad * 2,
+	if( style == 2 ) FillRGBABlend( x, y0 + h - fontH - pad * 2, w, fontH + pad * 2, 10, 13, 19, 225 );
+	Text( x + pad, y0 + h - fontH - pad, w - pad * 2,
 		ru ? "КРАСНЫЕ / СИНИЕ / НАБЛЮДАТЕЛИ     •     ЗЕЛЁНЫЙ: ЖИВ   КРАСНЫЙ: ПОГИБ" : "RED / BLUE / SPECTATORS     •     GREEN: ALIVE   RED: DEAD", 145, 155, 174 );
 	return 1;
 }

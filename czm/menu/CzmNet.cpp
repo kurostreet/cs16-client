@@ -180,6 +180,39 @@ bool CZM_AccountEvent( CUtlString &body )
 	return found;
 }
 
+void CZM_ColorPickerShow( int r, int g, int b )
+{
+	JNIEnv *env;
+	jclass cls;
+	if( !CZM_Begin( &env, &cls )) return;
+	jmethodID m = CZM_Method( env, cls, "colorShow", "(IIIZ)V" );
+	if( m ) env->CallStaticVoidMethod( cls, m, (jint)r, (jint)g, (jint)b, (jboolean)CZM_IsRussian() );
+	CZM_End( env );
+}
+
+bool CZM_ColorPickerEvent( int &r, int &g, int &b )
+{
+	JNIEnv *env;
+	jclass cls;
+	bool found = false;
+	if( !CZM_Begin( &env, &cls )) return false;
+	jmethodID m = CZM_Method( env, cls, "colorEvent", "()[B" );
+	jbyteArray result = m ? (jbyteArray)env->CallStaticObjectMethod( cls, m ) : NULL;
+	if( result )
+	{
+		jsize n = env->GetArrayLength( result );
+		if( n > 0 && n < 32 )
+		{
+			char value[32], tail;
+			env->GetByteArrayRegion( result, 0, n, (jbyte *)value ); value[n] = 0;
+			found = sscanf( value, "%d %d %d %c", &r, &g, &b, &tail ) == 3
+				&& r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255;
+		}
+	}
+	CZM_End( env );
+	return found;
+}
+
 void CZM_StartupReady( void )
 {
 	static bool sent;
@@ -407,6 +440,8 @@ bool CZM_NetAvailable( void ) { return false; }
 void CZM_ServerAuthShow( const char *, const char * ) {}
 void CZM_AccountShow( const char *, const char * ) {}
 bool CZM_AccountEvent( CUtlString & ) { return false; }
+void CZM_ColorPickerShow( int, int, int ) {}
+bool CZM_ColorPickerEvent( int &, int &, int & ) { return false; }
 void CZM_StartupReady( void ) {}
 int CZM_NetRequest( const char *, const char *, const char *, const char * ) { return 0; }
 int CZM_NetUpload( const char *, const char *, const char *, const char * ) { return 0; }

@@ -270,6 +270,7 @@ void SetXhairColor( float v )
 {
 	char color[32];
 	int i = (int)v;
+	if( i < 0 || i >= (int)CZM_XHAIR_COLORS ) return;
 
 	snprintf( color, sizeof( color ), "%d %d %d", s_xhairColors[i].r, s_xhairColors[i].g, s_xhairColors[i].b );
 	EngFuncs::CvarSetString( "cl_crosshair_color", color );
@@ -311,6 +312,8 @@ float GetShopAuto( void ) { return GetCvar( "czm_shop_auto" ) != 0.0f; }
 void SetShopAuto( float v ) { SetCvar( "czm_shop_auto", v ); }
 float GetMenuCards( void ) { return GetCvar( "czm_menu_cards" ) != 0.0f; }
 void SetMenuCards( float v ) { SetCvar( "czm_menu_cards", v ); }
+float GetTabStyle( void ) { return bound( 0, (int)GetCvar( "czm_tab_style" ), 2 ); }
+void SetTabStyle( float v ) { SetCvar( "czm_tab_style", bound( 0, (int)v, 2 )); }
 
 /*
 =================
@@ -325,6 +328,7 @@ enum ERowType
 	ROW_BUTTONS,  // touch layout: edit and reset
 	ROW_COLORS,   // crosshair colours
 	ROW_XHAIR,    // crosshair preview
+	ROW_TABPREVIEW,
 	ROW_NICK,
 	ROW_ACCOUNT,
 	ROW_AVATARS,
@@ -396,7 +400,7 @@ const CzmRow s_game[] =
 	{ ROW_CHOICE, "s_lang", NULL, GetLang, SetLang, NULL, 0, 1, 1, 0, { "RU", "EN" }, 2 },
 	{ ROW_XHAIR, "s_xhair", "s_xhair_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_CHOICE, "s_xhair_size", NULL, GetXhairSize, SetXhairSize, NULL, 0, 3, 1, 0, { "opt_auto", "opt_small", "opt_medium", "opt_large" }, 4 },
-	{ ROW_COLORS, "s_xhair_color", NULL, GetXhairColor, SetXhairColor, NULL, 0, 0, 0, 0, {}, 0 },
+	{ ROW_COLORS, "s_xhair_color", "s_xhair_color_hint", GetXhairColor, SetXhairColor, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_SWITCH, "s_xhair_dyn", "s_xhair_dyn_hint", GetXhairDynamic, SetXhairDynamic, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SWITCH, "s_xhair_trans", NULL, GetXhairTrans, SetXhairTrans, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_CHOICE, "s_hand", NULL, GetHand, SetHand, NULL, 0, 1, 1, 0, { "opt_right", "opt_left" }, 2 },
@@ -404,6 +408,12 @@ const CzmRow s_game[] =
 	{ ROW_CHOICE, "s_shop", "s_shop_hint", GetShop, SetShop, NULL, 0, 2, 1, 0, { "opt_wheel", "opt_grid", "opt_classic" }, 3 },
 	{ ROW_SWITCH, "s_shop_auto", "s_shop_auto_hint", GetShopAuto, SetShopAuto, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SWITCH, "s_menucards", "s_menucards_hint", GetMenuCards, SetMenuCards, NULL, 0, 1, 1, 0, {}, 0 },
+};
+
+const CzmRow s_hud[] =
+{
+	{ ROW_CHOICE, "s_tab_style", "s_tab_style_hint", GetTabStyle, SetTabStyle, NULL, 0, 2, 1, 0, { "opt_tab_default", "opt_tab_compact", "opt_tab_tactical" }, 3 },
+	{ ROW_TABPREVIEW, "s_tab_preview", "s_tab_preview_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 };
 
 const CzmRow s_profile[] =
@@ -426,6 +436,7 @@ const struct
 	{ "tab_graphics", UI_DIR "icon_display.png", s_graphics, sizeof( s_graphics ) / sizeof( s_graphics[0] ) },
 	{ "tab_sound", UI_DIR "icon_sound.png", s_sound, sizeof( s_sound ) / sizeof( s_sound[0] ) },
 	{ "tab_game", UI_DIR "icon_target.png", s_game, sizeof( s_game ) / sizeof( s_game[0] ) },
+	{ "tab_hud", UI_DIR "icon_display.png", s_hud, sizeof( s_hud ) / sizeof( s_hud[0] ) },
 	{ "tab_profile", UI_DIR "icon_user.png", s_profile, sizeof( s_profile ) / sizeof( s_profile[0] ) },
 };
 
@@ -530,6 +541,7 @@ private:
 	void DrawSwitch( const CzmRect &r, bool on, bool dim );
 	void DrawChoice( int i, const RowLayout &l );
 	void DrawCrosshairPreview( const CzmRect &box );
+	void DrawTabPreview( const CzmRect &box );
 	void DrawConfirm( void );
 
 	int m_iTab;
@@ -682,6 +694,8 @@ void CCzmSettings::Layout( void )
 
 		if( row.type == ROW_XHAIR )
 			h = rowH * 1.6f;
+		else if( row.type == ROW_TABPREVIEW )
+			h = H * 0.56f;
 		else if( row.type == ROW_SPRAYS || row.type == ROW_AVATARS )
 		{
 			int card = H * 0.13f, cardGap = H * 0.022f;
@@ -712,7 +726,7 @@ void CCzmSettings::Layout( void )
 		case ROW_CHOICE:
 		{
 			int ch = H * 0.064f;
-			int cw = row.get == GetRenderer ? controlW : Q_min( controlW, (int)( row.numOptions * H * 0.16f ));
+			int cw = row.get == GetRenderer || row.get == GetTabStyle ? controlW : Q_min( controlW, (int)( row.numOptions * H * 0.16f ));
 			l.control = CZM_Rect( l.rect.x + l.rect.w - cw, l.rect.y + ( h - ch ) / 2, cw, ch );
 			for( int k = 0; k < row.numOptions; k++ )
 				l.parts[k] = CZM_Rect( l.control.x + l.control.w * k / row.numOptions, l.control.y,
@@ -740,7 +754,7 @@ void CCzmSettings::Layout( void )
 		case ROW_COLORS:
 		{
 			int d = H * 0.056f, cgap = H * 0.026f;
-			int count = CZM_XHAIR_COLORS;
+			int count = CZM_XHAIR_COLORS + 1;
 			int x = l.rect.x + l.rect.w - count * d - ( count - 1 ) * cgap;
 			for( int k = 0; k < count; k++ )
 				l.parts[k] = CZM_Rect( x + k * ( d + cgap ), l.rect.y + ( h - d ) / 2, d, d );
@@ -753,6 +767,9 @@ void CCzmSettings::Layout( void )
 			l.control = CZM_Rect( l.rect.x + l.rect.w - bw, l.rect.y + H * 0.015f, bw, h - H * 0.03f );
 			break;
 		}
+		case ROW_TABPREVIEW:
+			l.control = CZM_Rect( l.rect.x, l.rect.y + H * 0.14f, l.rect.w, h - H * 0.16f );
+			break;
 		case ROW_ACCOUNT:
 		case ROW_NICK:
 		{
@@ -925,6 +942,13 @@ void CCzmSettings::Activate( int hit )
 		case ROW_COLORS:
 			if( part >= 0 )
 			{
+				if( row.type == ROW_COLORS && part == (int)CZM_XHAIR_COLORS )
+				{
+					int r = 50, g = 250, b = 50;
+					sscanf( EngFuncs::GetCvarString( "cl_crosshair_color" ), "%d %d %d", &r, &g, &b );
+					CZM_ColorPickerShow( r, g, b );
+					break;
+				}
 				bool changed = row.set == SetRenderer && (int)row.get() != part;
 
 				row.set( part );
@@ -1221,6 +1245,45 @@ void CCzmSettings::DrawCrosshairPreview( const CzmRect &box )
 	FillClipped( cx + gap, cy - thick / 2, length, thick, color, m_clip );
 }
 
+void CCzmSettings::DrawTabPreview( const CzmRect &box )
+{
+	const int style = (int)GetTabStyle();
+	const int pad = Q_max( 4, (int)( H * 0.012f ));
+	HFont font = CZM_Font( CZMF_SMALL );
+	const int fh = CZM_FontHeight( font );
+	CZM_DrawCover( CZM_Image( "gfx/czm/loading_2.png" ), box.x, box.y, box.w, box.h );
+	FillClipped( box.x, box.y, box.w, box.h, PackRGBA( 0, 0, 0, 90 ), m_clip );
+	int w = style == 1 ? box.w * 0.72f : box.w - pad * 2;
+	int h = style == 1 ? box.h * 0.88f : box.h - pad * 2;
+	int x = box.x + ( box.w - w ) / 2, y = box.y + ( box.h - h ) / 2;
+	const int cols = style == 1 ? 1 : 2, rows = style == 1 ? 6 : 3;
+	const int head = fh * 2 + pad * 2, gap = style == 2 ? pad * 3 : pad;
+	const int cw = ( w - pad * 2 - gap * ( cols - 1 )) / cols;
+	const int rh = Q_max( 1, ( h - head - pad ) / rows );
+	if( style != 2 )
+		FillClipped( x, y, w, h, PackRGBA( 10, 13, 19, 235 ), m_clip );
+	FillClipped( x, y, w, 2, PackRGBA( 224, 35, 47, 255 ), m_clip );
+	CZM_DrawText( font, x + pad, y + pad, w - pad * 2, "COUNTER ZOMBIE MOBILE  /  6", CZM_White() );
+	for( int c = 0; c < cols; c++ )
+	{
+		int left = x + pad + c * ( cw + gap );
+		if( style == 2 )
+			FillClipped( left - pad / 2, y + head - fh - pad, cw + pad, h - head + fh + pad, PackRGBA( 10, 13, 19, 230 ), m_clip );
+		CZM_DrawText( font, left + pad, y + head - fh - pad, cw, CZM_T( "s_tab_style" ), PackRGBA( 160, 170, 187, 255 ));
+		for( int row = 0; row < rows; row++ )
+		{
+			int n = c * rows + row, ry = y + head + row * rh;
+			int inset = style == 2 ? pad / 2 : 1;
+			FillClipped( left, ry, cw, rh - inset, n == 1 ? PackRGBA( 90, 24, 34, 230 ) : PackRGBA( 24, 28, 38, 210 ), m_clip );
+			FillClipped( left, ry, 2, rh - inset, n < 3 ? PackRGBA( 233, 84, 101, 255 ) : PackRGBA( 75, 167, 245, 255 ), m_clip );
+			char name[48]; snprintf( name, sizeof( name ), "PLAYER %02d", n + 1 );
+			int ty = ry + Q_max( 0, ( rh - fh ) / 2 );
+			CZM_DrawText( font, left + pad, ty, cw * 0.55f, name, CZM_White() );
+			CZM_DrawText( font, left + cw * 0.65f, ty, cw * 0.32f, "12   4   48", PackRGBA( 150, 210, 180, 255 ));
+		}
+	}
+}
+
 void CCzmSettings::DrawRow( int i )
 {
 	const CzmRow &row = Row( i );
@@ -1229,7 +1292,7 @@ void CCzmSettings::DrawRow( int i )
 	HFont hintFont = CZM_Font( CZMF_SMALL );
 	bool dim = !RowActive( i );
 	const char *hint = row.hint ? CZM_T( row.hint ) : NULL;
-	bool cards = row.type == ROW_SPRAYS || row.type == ROW_AVATARS;
+	bool cards = row.type == ROW_SPRAYS || row.type == ROW_AVATARS || row.type == ROW_TABPREVIEW;
 	int labelW = ( cards ? l.rect.w : l.control.x - l.rect.x - H * 0.03f );
 	int labelH = CZM_FontHeight( labelFont ), hintH = CZM_FontHeight( hintFont );
 	int blockH = labelH + ( hint ? hintH + H * 0.008f : 0 );
@@ -1299,18 +1362,24 @@ void CCzmSettings::DrawRow( int i )
 			const CzmRect &p = l.parts[k];
 			int ring = Q_max( 3, (int)( H * 0.007f ));
 
-			if( k == current )
+			if( k == current || ( current < 0 && k == (int)CZM_XHAIR_COLORS ))
 				CZM_DrawImage( UI_DIR "dot.png", p.x - ring, p.y - ring, p.w + ring * 2, p.h + ring * 2 );
 			else
 				CZM_DrawImage( UI_DIR "dot.png", p.x - 1, p.y - 1, p.w + 2, p.h + 2, PackRGBA( 0, 0, 0, 160 ));
 
-			CZM_DrawImage( UI_DIR "dot.png", p.x, p.y, p.w, p.h,
-				PackRGBA( s_xhairColors[k].r, s_xhairColors[k].g, s_xhairColors[k].b, IsPressed( HIT_ROW + i * 20 + 1 + k ) ? 170 : 255 ));
+			if( k == (int)CZM_XHAIR_COLORS )
+				CZM_DrawImage( UI_DIR "color_wheel.png", p.x, p.y, p.w, p.h, CZM_White( IsPressed( HIT_ROW + i * 20 + 1 + k ) ? 170 : 255 ));
+			else
+				CZM_DrawImage( UI_DIR "dot.png", p.x, p.y, p.w, p.h,
+					PackRGBA( s_xhairColors[k].r, s_xhairColors[k].g, s_xhairColors[k].b, IsPressed( HIT_ROW + i * 20 + 1 + k ) ? 170 : 255 ));
 		}
 		break;
 	}
 	case ROW_XHAIR:
 		DrawCrosshairPreview( l.control );
+		break;
+	case ROW_TABPREVIEW:
+		DrawTabPreview( l.control );
 		break;
 	case ROW_ACCOUNT:
 		CZM_DrawButton( UI_DIR "button_secondary.png", l.control, CZM_T( "s_account_open" ), CZM_White(),
@@ -1423,6 +1492,14 @@ void CCzmSettings::DrawConfirm( void )
 
 void CCzmSettings::Draw()
 {
+	int r, g, b;
+	if( CZM_ColorPickerEvent( r, g, b ))
+	{
+		char color[32];
+		snprintf( color, sizeof( color ), "%d %d %d", r, g, b );
+		EngFuncs::CvarSetString( "cl_crosshair_color", color );
+		Save();
+	}
 	HFont titleFont = CZM_Font( CZMF_PANEL_TITLE );
 	int iconSize;
 

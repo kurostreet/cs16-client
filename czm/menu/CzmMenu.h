@@ -198,6 +198,7 @@ enum
 	CZM_TAB_GRAPHICS,
 	CZM_TAB_SOUND,
 	CZM_TAB_GAME,
+	CZM_TAB_HUD,
 	CZM_TAB_PROFILE,
 	CZM_TAB_COUNT
 };
@@ -257,6 +258,8 @@ bool CZM_NetAvailable( void );
 void CZM_ServerAuthShow( const char *address, const char *name );
 void CZM_AccountShow( const char *key, const char *nick );
 bool CZM_AccountEvent( CUtlString &body );
+void CZM_ColorPickerShow( int r, int g, int b );
+bool CZM_ColorPickerEvent( int &r, int &g, int &b );
 void CZM_OnlineAvatarChanged( void );
 void CZM_StartupReady( void );
 // a request number, 0 if there is no network layer; body is UTF-8 JSON or ""

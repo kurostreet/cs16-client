@@ -4,12 +4,18 @@ package ru.kurostreet.counterzombiemobile;
 import android.app.Activity;
 import android.app.Dialog;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PixelFormat;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.text.method.PasswordTransformationMethod;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
@@ -17,8 +23,10 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ImageButton;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import java.util.ArrayList;
 
 final class CzmDialog extends Dialog {
     static final int RED = Color.rgb(221, 31, 39), MUTED = Color.rgb(155, 163, 177);
@@ -27,6 +35,8 @@ final class CzmDialog extends Dialog {
     final Button cancel, submit;
     final TextView error;
     private final LinearLayout root;
+    private final boolean russian;
+    private final ArrayList<Runnable> hidePasswords = new ArrayList<>();
 
     static int dp(Activity a, int value) { return Math.round(value * a.getResources().getDisplayMetrics().density); }
     static GradientDrawable shape(Activity a, int color, int border, int radius) {
@@ -35,8 +45,11 @@ final class CzmDialog extends Dialog {
         return d;
     }
 
-    CzmDialog(Activity a, String title, String subtitle, String action, String back) {
-        super(a); activity = a;
+    CzmDialog(Activity a, String title, String subtitle, String action, String back, boolean ru) {
+        this(a, title, subtitle, action, back, ru, true);
+    }
+    CzmDialog(Activity a, String title, String subtitle, String action, String back, boolean ru, boolean sensitive) {
+        super(a); activity = a; russian = ru;
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         root = new LinearLayout(a); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(a, 18), dp(a, 12), dp(a, 18), dp(a, 12));
@@ -67,7 +80,8 @@ final class CzmDialog extends Dialog {
         Window w = getWindow();
         if (w != null) {
             w.setBackgroundDrawableResource(android.R.color.transparent);
-            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND | WindowManager.LayoutParams.FLAG_SECURE);
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            if (sensitive) w.addFlags(WindowManager.LayoutParams.FLAG_SECURE);
             WindowManager.LayoutParams attrs = w.getAttributes(); attrs.dimAmount = .68f; w.setAttributes(attrs);
             w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         }
@@ -98,12 +112,66 @@ final class CzmDialog extends Dialog {
         e.setSingleLine(true); e.setPadding(dp(activity, 12), 0, dp(activity, 12), 0);
         e.setInputType(InputType.TYPE_CLASS_TEXT | (password ? InputType.TYPE_TEXT_VARIATION_PASSWORD : InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS));
         e.setFilters(new InputFilter[] {new InputFilter.LengthFilter(max)});
-        e.setBackground(shape(activity, Color.rgb(24, 28, 36), Color.rgb(61, 67, 80), 10));
         if (Build.VERSION.SDK_INT >= 26) e.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-        body.addView(e, new LinearLayout.LayoutParams(-1, dp(activity, 44))); return e;
+        if (password) {
+            LinearLayout row = new LinearLayout(activity); row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setBackground(shape(activity, Color.rgb(24, 28, 36), Color.rgb(61, 67, 80), 10));
+            e.setBackgroundColor(Color.TRANSPARENT);
+            row.addView(e, new LinearLayout.LayoutParams(0, -1, 1));
+            ImageButton eye = new ImageButton(activity); eye.setBackgroundColor(Color.TRANSPARENT);
+            EyeIcon icon = new EyeIcon(); eye.setImageDrawable(icon); eye.setPadding(dp(activity, 10), dp(activity, 10), dp(activity, 10), dp(activity, 10));
+            eye.setContentDescription(russian ? "Показать пароль" : "Show password");
+            Runnable hide = () -> {
+                int start = e.getSelectionStart(), end = e.getSelectionEnd();
+                e.setTransformationMethod(PasswordTransformationMethod.getInstance());
+                if (start >= 0 && end >= 0) e.setSelection(Math.min(start, e.length()), Math.min(end, e.length()));
+                icon.visible = false; icon.invalidateSelf();
+                eye.setContentDescription(russian ? "Показать пароль" : "Show password");
+            };
+            hidePasswords.add(hide);
+            eye.setOnClickListener(v -> {
+                if (icon.visible) { hide.run(); return; }
+                int start = e.getSelectionStart(), end = e.getSelectionEnd();
+                // Keep the password input type: revealing text must not enable suggestions.
+                e.setTransformationMethod(null);
+                if (start >= 0 && end >= 0) e.setSelection(Math.min(start, e.length()), Math.min(end, e.length()));
+                icon.visible = true; icon.invalidateSelf();
+                eye.setContentDescription(russian ? "Скрыть пароль" : "Hide password");
+            });
+            row.addView(eye, new LinearLayout.LayoutParams(dp(activity, 44), dp(activity, 44)));
+            body.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 44)));
+        } else {
+            e.setBackground(shape(activity, Color.rgb(24, 28, 36), Color.rgb(61, 67, 80), 10));
+            body.addView(e, new LinearLayout.LayoutParams(-1, dp(activity, 44)));
+        }
+        return e;
     }
     void fail(String message) { error.setText(message); error.setVisibility(View.VISIBLE); }
     void busy(boolean value) { submit.setEnabled(!value); cancel.setEnabled(!value); setCancelable(!value); }
+
+    private void maskPasswords() { for (Runnable hide : hidePasswords) hide.run(); }
+    @Override public void dismiss() { maskPasswords(); super.dismiss(); }
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (!focused) maskPasswords();
+    }
+
+    private static final class EyeIcon extends Drawable {
+        boolean visible;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        @Override public void draw(Canvas canvas) {
+            canvas.save(); canvas.translate(getBounds().left, getBounds().top);
+            canvas.scale(getBounds().width() / 24f, getBounds().height() / 24f);
+            paint.setColor(visible ? Color.WHITE : MUTED); paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(1.7f);
+            Path eye = new Path(); eye.moveTo(2, 12); eye.cubicTo(7, 3, 17, 3, 22, 12); eye.cubicTo(17, 21, 7, 21, 2, 12);
+            canvas.drawPath(eye, paint); canvas.drawCircle(12, 12, 3, paint);
+            if (visible) canvas.drawLine(4, 3, 21, 21, paint);
+            canvas.restore();
+        }
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
+        @Override public void setColorFilter(android.graphics.ColorFilter filter) { paint.setColorFilter(filter); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
 
     @Override public void show() {
         super.show();

@@ -121,6 +121,7 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "tab_graphics", "Графика", "Graphics" },
 	{ "tab_sound", "Звук", "Sound" },
 	{ "tab_game", "Игра", "Game" },
+	{ "tab_hud", "HUD", "HUD" },
 	{ "tab_profile", "Профиль", "Profile" },
 	{ "s_look", "Обзор", "Look" },
 	{ "s_look_hint", "Как быстро поворачивается камера", "How fast the camera turns" },
@@ -192,6 +193,14 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "opt_medium", "Средний", "Medium" },
 	{ "opt_large", "Большой", "Large" },
 	{ "s_xhair_color", "Цвет прицела", "Crosshair color" },
+	{ "s_xhair_color_hint", "Радужный круг — любой цвет", "Rainbow wheel — any color" },
+	{ "s_tab_style", "Таблица игроков", "Player scoreboard" },
+	{ "s_tab_style_hint", "Оформление окна TAB в матче", "The TAB scoreboard during a match" },
+	{ "s_tab_preview", "Предпросмотр", "Preview" },
+	{ "s_tab_preview_hint", "Команды, статус и статистика во всех вариантах", "Teams, status and statistics in every style" },
+	{ "opt_tab_default", "Обычный", "Default" },
+	{ "opt_tab_compact", "Компактный", "Compact" },
+	{ "opt_tab_tactical", "Тактический", "Tactical" },
 	{ "s_xhair_dyn", "Динамический прицел", "Dynamic crosshair" },
 	{ "s_xhair_dyn_hint", "Расходится при беге и прыжке. Выключи — будет маленький и ровный", "Spreads when running and jumping. Off keeps it small and still" },
 	{ "s_xhair_trans", "Прозрачный прицел", "Translucent crosshair" },
@@ -340,6 +349,7 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_shop", "1", FCVAR_ARCHIVE );       // 1 wheel, 2 grid
 	EngFuncs::CvarRegister( "czm_shop_auto", "0", FCVAR_ARCHIVE );  // open the shop when a round starts
 	EngFuncs::CvarRegister( "czm_menu_cards", "1", FCVAR_ARCHIVE ); // server menus as cards
+	EngFuncs::CvarRegister( "czm_tab_style", "0", FCVAR_ARCHIVE ); // keep the current scoreboard by default
 	EngFuncs::CvarRegister( "czm_avatar", "", FCVAR_ARCHIVE );       // "", "1".."10" or "photo"
 	EngFuncs::CvarRegister( "czm_avatar_photo", "", FCVAR_ARCHIVE ); // the player's own photo file
 	EngFuncs::CvarRegister( "czm_avatar_sent", "", FCVAR_ARCHIVE );  // the photo the service already has

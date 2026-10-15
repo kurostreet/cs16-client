@@ -54,6 +54,8 @@ public final class CzmNet {
 
     public static void accountShow(String legacy, String nick, boolean russian) { CzmAccount.show(legacy, nick, russian); }
     public static byte[] accountEvent() { return CzmAccount.event(); }
+    public static void colorShow(int r, int g, int b, boolean ru) { CzmColorPicker.show(r, g, b, ru); }
+    public static byte[] colorEvent() { return CzmColorPicker.event(); }
 
     public static byte[] serverUserinfo(String address, byte[] base, int limit) {
         return CzmServerAuth.userinfo(address, new String(base, StandardCharsets.UTF_8), limit).getBytes(StandardCharsets.UTF_8);

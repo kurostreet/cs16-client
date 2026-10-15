@@ -133,7 +133,7 @@ public final class CzmServerAuth {
             try { address = ServerAuthData.address(endpoint); }
             catch (Exception e) { Toast.makeText(activity, ru ? "Неверный адрес сервера" : "Invalid server address", Toast.LENGTH_LONG).show(); return; }
             CzmDialog dialog = new CzmDialog(activity, ru ? "Админка/VIP" : "Admin/VIP", name + " · " + address,
-                ru ? "Сохранить" : "Save", ru ? "Отмена" : "Cancel");
+                ru ? "Сохранить" : "Save", ru ? "Отмена" : "Cancel", ru);
             editor = dialog;
             EditText parameter = dialog.field(ru ? "Параметр сервера" : "Server parameter", false, 31);
             EditText password = dialog.field(ru ? "Пароль админа/VIP" : "Admin/VIP password", true, 63);

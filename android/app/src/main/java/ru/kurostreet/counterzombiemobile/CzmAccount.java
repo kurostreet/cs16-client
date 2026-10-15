@@ -155,7 +155,7 @@ final class CzmAccount {
     }
     private static CzmDialog panel(Activity a, String title, String subtitle, String action, boolean ru) {
         if (editor != null) editor.dismiss();
-        CzmDialog d = new CzmDialog(a, title, subtitle, action, ru ? "Закрыть" : "Close"); editor = d;
+        CzmDialog d = new CzmDialog(a, title, subtitle, action, ru ? "Закрыть" : "Close", ru); editor = d;
         d.setOnDismissListener(v -> { if (editor == d) editor = null; });
         return d;
     }
