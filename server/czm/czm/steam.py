@@ -3,7 +3,7 @@
 Valve's old UDP master is gone; Steam knows the servers through its Web API
 (IGameServersService/GetServerList, appid 10), which needs the owner's key.
 The list is written in the format of the engine's static masters ("gs ip:port"),
-the game reads it from http://kontrafps.ru/server-list/v1/servers/cstrike.
+the game reads it from http://counter-zombie.ru/server-list/v1/servers/cstrike.
 """
 import asyncio
 import logging

@@ -65,8 +65,8 @@ def brand_base_menu(source):
 \tfor( int i = 0; i < SND_COUNT; i++ )
 \t{
 \t\t// Scrolling and pointer hover stay quiet; button actions use the same tap.
-\t\tif( i != SND_MOVE && i != SND_GLOW && i != SND_ROLLOVER && i != SND_NULL )
-\t\t\tQ_strncpy( uiStatic.sounds[i], "czm/tapscroll.mp3", sizeof( uiStatic.sounds[i] ));
+\t\tif( i != SND_MOVE && i != SND_ROLLOVER && i != SND_NULL )
+\t\t\tQ_strncpy( uiStatic.sounds[i], "czm/tapscroll.wav", sizeof( uiStatic.sounds[i] ));
 \t}
 }
 ''' + source[end:]

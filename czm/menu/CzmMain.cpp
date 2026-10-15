@@ -32,6 +32,7 @@ GNU General Public License for more details.
 
 #define CZM_CONTACT_URL "mailto:kuro.street.inc@gmail.com"
 #define CZM_GROUP_URL "https://t.me/counter_zombie_mobile"
+#define CZM_SITE_URL "https://counter-zombie.ru"
 #define CZM_SOURCE_URL "https://github.com/kurostreet/czm"
 
 namespace
@@ -106,6 +107,7 @@ private:
 		HIT_SETUP_GO,
 		HIT_ABOUT_TELEGRAM,
 		HIT_ABOUT_GROUP,
+		HIT_ABOUT_SITE,
 		HIT_UPDATE,
 		HIT_ABOUT_SOURCE,
 		HIT_NAV,                    // 4 navigation items
@@ -343,6 +345,8 @@ int CCzmMainMenu::HitTest( void ) const
 				return HIT_ABOUT_TELEGRAM;
 			if( m_overlay == OV_ABOUT && m_aboutRows[1].HasCursor( ))
 				return HIT_ABOUT_GROUP;
+			if( m_overlay == OV_ABOUT && m_aboutRows[2].HasCursor( ))
+				return HIT_ABOUT_SITE;
 			if( m_overlay == OV_ABOUT && m_aboutRows[3].HasCursor( ))
 				return HIT_ABOUT_SOURCE;
 			if( m_overlay == OV_BELL && CZM_Update() && m_updateButton.Grown( grow ).HasCursor( ))
@@ -401,6 +405,9 @@ void CCzmMainMenu::Activate( int hit )
 		break;
 	case HIT_ABOUT_GROUP:
 		EngFuncs::ShellExecute( CZM_GROUP_URL, NULL, false );
+		break;
+	case HIT_ABOUT_SITE:
+		EngFuncs::ShellExecute( CZM_SITE_URL, NULL, false );
 		break;
 	case HIT_ABOUT_SOURCE:
 		EngFuncs::ShellExecute( CZM_SOURCE_URL, NULL, false );
@@ -869,8 +876,9 @@ void CCzmMainMenu::DrawAbout( void )
 	for( int i = 0; i < CZM_ABOUT_ROWS; i++ )
 	{
 		const CzmRect &r = m_aboutRows[i];
-		bool link = i <= 1 || i == 3;
-		bool pressed = ( i == 0 && IsPressed( HIT_ABOUT_TELEGRAM )) || ( i == 1 && IsPressed( HIT_ABOUT_GROUP )) || ( i == 3 && IsPressed( HIT_ABOUT_SOURCE ));
+		bool link = i <= 3;
+		bool pressed = ( i == 0 && IsPressed( HIT_ABOUT_TELEGRAM )) || ( i == 1 && IsPressed( HIT_ABOUT_GROUP ))
+			|| ( i == 2 && IsPressed( HIT_ABOUT_SITE )) || ( i == 3 && IsPressed( HIT_ABOUT_SOURCE ));
 		int chip = r.h * 0.62f, icon = chip * 0.52f, chevron = r.h * 0.30f;
 		int labelX = r.x + chip + H * 0.022f, valueRight = r.x + r.w - ( link ? chevron + H * 0.012f : 0 );
 		const char *value;
@@ -881,7 +889,7 @@ void CCzmMainMenu::DrawAbout( void )
 		{
 		case 0: value = "kuro.street.inc@gmail.com"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 1: value = "t.me/counter_zombie_mobile"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
-		case 2: value = CZM_T( "about_site_soon" ); valueColor = PackRGBA( 250, 204, 21, 255 ); break;
+		case 2: value = "counter-zombie.ru"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 3: value = "github.com/kurostreet/czm"; valueColor = PackRGBA( 125, 196, 255, 255 ); break;
 		case 4: value = CZM_Version(); break;
 		case 5: value = date; break;

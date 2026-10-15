@@ -70,13 +70,13 @@ jobs:
           grep -F "application-label:'Counter Zombie Mobile 32 players'" apk-info.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK_PATH"
           python - <<'PY'
-          import os, json, hashlib
+          import os, json, hashlib, io, wave, array
           from pathlib import Path
           from zipfile import ZipFile
           with ZipFile(os.environ["APK_PATH"]) as apk:
               for name in ["gfx/vgui/czm_logo.tga", "gfx/shell/strings.lst", "touch/buy.cfg",
                            "gfx/czm/menu_bg.png", "gfx/czm/title.png", "gfx/czm/fade_left.png", "gfx/czm/fade_bottom.png",
-                           "gfx/czm/loading_1.png", "gfx/czm/loading_5.png", "media/czm_sound.mp3", "sound/czm/tapscroll.mp3", "gfx/fonts/czm/InterDisplay-Black.otf",
+                           "gfx/czm/loading_1.png", "gfx/czm/loading_5.png", "media/czm_sound.mp3", "sound/czm/tapscroll.wav", "gfx/fonts/czm/InterDisplay-Black.otf",
                            "gfx/fonts/czm/Inter-SemiBold.otf", "gfx/fonts/czm/Inter-Medium.otf",
                            "gfx/fonts/czm/InterDisplay-BlackItalic.otf", "gfx/czm/ui/tile_attack.png",
                            "gfx/czm/ui/tile_escape.png", "gfx/czm/ui/tile_boss.png", "gfx/czm/ui/panel.png",
@@ -89,6 +89,10 @@ jobs:
                            "gfx/czm/ui/white.png", "gfx/czm/maps/_zombie.png", "gfx/czm/maps/_classic.png",
                            "gfx/czm/maps/zm_3rooms.png", "gfx/czm/avatars/avatar_01.png", "gfx/czm/avatars/avatar_10.png"]:
                   assert apk.read("assets/" + name) == Path("3rdparty/cs16client-extras", name).read_bytes(), name
+              with wave.open(io.BytesIO(apk.read("assets/sound/czm/tapscroll.wav"))) as tap:
+                  assert (tap.getnchannels(), tap.getsampwidth(), tap.getframerate(), tap.getcomptype()) == (1, 2, 44100, "NONE")
+                  assert 0.05 < tap.getnframes() / tap.getframerate() < 1.0
+                  assert max(abs(v) for v in array.array("h", tap.readframes(tap.getnframes()))) > 1000
               for abi, suffix in [("arm64-v8a", "arm64"), ("armeabi-v7a", "armv7l"), ("x86", "i386")]:
                   for library in ["SDL2", "xash", "filesystem_stdio", "ref_gles1", "ref_gl4es", "ref_gles3compat",
                                   "client_android_" + suffix, "cs_android_" + suffix,
@@ -105,6 +109,7 @@ jobs:
                   assert b"menu_czmservers" in menu and b"czm_srv_filters" in menu and b"favorite_servers.lst" in menu, abi
                   assert b"czmavatar://pick?file=%s" in menu and b"czm_avatar_photo" in menu, abi
                   assert b"menu_czmchat" in menu and b"/api/v1/hello" in menu and b"ru/kurostreet/counterzombiemobile/CzmNet" in menu, abi
+                  assert b"czm/tapscroll.wav" in menu and b"https://counter-zombie.ru%s" in menu, abi
                   engine = apk.read("lib/" + abi + "/libxash.so")
                   assert b"czm_loading_enable" in engine and b"czm_loading_error" in engine, abi
                   assert b"czm_queryserver" in engine and b"czm_mictest" in engine, abi

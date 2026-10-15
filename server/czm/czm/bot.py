@@ -51,7 +51,7 @@ class RelaySession(AiohttpSession):
 
     async def create_session(self):
         session = await super().create_session()
-        session.headers["User-Agent"] = "CounterZombieMobileBot/1.0 (+https://kontrafps.ru)"
+        session.headers["User-Agent"] = "CounterZombieMobileBot/1.0 (+https://counter-zombie.ru)"
         return session
 
 

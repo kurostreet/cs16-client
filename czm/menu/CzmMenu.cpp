@@ -104,7 +104,6 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "about_tg", "Связь с разработчиком", "Contact the developer" },
 	{ "about_group", "Группа игры", "Game community" },
 	{ "about_site", "Сайт проекта", "Project website" },
-	{ "about_site_soon", "Скоро!", "Coming soon!" },
 	{ "about_source", "Исходный код", "Source code" },
 	{ "about_version", "Версия приложения", "App version" },
 	{ "about_updated", "Последнее обновление", "Last update" },
@@ -779,7 +778,7 @@ static void CZM_DrawTitle( int x, int y, int h )
 =================
 servers
 
-Temporary list for development; later it comes from kontrafps.ru.
+Fallback list used until the engine receives the master server replies.
 =================
 */
 #define CZM_HOME_FILE "home_servers.lst"

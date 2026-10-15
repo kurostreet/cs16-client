@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CZM_", extra="ignore")
 
     data_dir: Path = Path("/var/lib/czm")       # database, avatars, APK files, server list
-    public_url: str = "https://kontrafps.ru"   # where players reach the service
+    public_url: str = "https://counter-zombie.ru"   # where players reach the service
     pepper: str = "change-me"                  # mixed into stored key and device hashes
 
     # Telegram bot of the owner: complaints, bans, news, releases

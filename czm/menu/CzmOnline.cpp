@@ -1,5 +1,5 @@
 /*
-CzmOnline.cpp - Counter Zombie Mobile: the player on our service (kontrafps.ru)
+CzmOnline.cpp - Counter Zombie Mobile: the player on our service (counter-zombie.ru)
 Copyright (C) 2026 Counter Zombie Mobile authors
 
 This program is free software: you can redistribute it and/or modify
@@ -79,7 +79,7 @@ const char *CZM_OnlineUrl( const char *path )
 	static int which;
 
 	which ^= 1;
-	snprintf( url[which], sizeof( url[0] ), "https://kontrafps.ru%s", path );
+	snprintf( url[which], sizeof( url[0] ), "https://counter-zombie.ru%s", path );
 	return url[which];
 }
 

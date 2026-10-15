@@ -50,6 +50,8 @@ class UpdateApiTests(unittest.TestCase):
         self.assertEqual(response["patch_size"], 20)
         self.assertEqual(response["size"], 100)
         self.assertTrue(response["url"].endswith(".apk"))
+        self.assertTrue(response["url"].startswith(get_settings().public_url + "/dl/"))
+        self.assertTrue(response["patch_url"].startswith(get_settings().public_url + "/dl/"))
         self.assertEqual(response["sha256"], "a" * 64)
         self.assertEqual(response["base_sha256"], "b" * 64)
         hello = self.client.post("/api/v1/hello", json={"key": "test-hello-secret-key-for-updates", "nick": "Test", "code": 100})
