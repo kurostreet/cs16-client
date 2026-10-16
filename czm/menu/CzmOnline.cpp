@@ -278,6 +278,7 @@ void CZM_OnlineAvatarChanged( void )
 
 void CZM_OnlineFrame( void )
 {
+	CZM_HudEditorFrame();
 	double now = EngFuncs::DoubleTime();
 	int status;
 	CUtlString body;
@@ -352,6 +353,13 @@ void CZM_OnlineFrame( void )
 			s_online.photoRetry = now + RETRY_AFTER;
 		}
 	}
+    { CUtlString request;if(CZM_WidgetEvent(request)) {
+        char address[64],protocol[8],tail;
+        if(sscanf(request.Get(),"%63s %7s %c",address,protocol,&tail)==2 && strspn(address,"0123456789.:")==strlen(address) && (!strcmp(protocol,"gs")||!strcmp(protocol,"49"))) {
+            EngFuncs::CvarSetString("czm_connect_adr",address);EngFuncs::CvarSetString("czm_connect_name",address);EngFuncs::ClientCmdF(false,"connect \"%s\" %s\n",address,protocol);
+        }
+    }}
+	CZM_CloudFrame();
 	CZM_MapPicturesFrame();
 
 	if( s_online.helloId )

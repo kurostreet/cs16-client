@@ -54,6 +54,20 @@ CREATE TABLE IF NOT EXISTS auth_codes (
     PRIMARY KEY(player, purpose)
 );
 
+CREATE TABLE IF NOT EXISTS player_settings (
+    player INTEGER PRIMARY KEY REFERENCES accounts(player),
+    revision INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    updated INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings_history (
+    player INTEGER NOT NULL REFERENCES accounts(player),
+    revision INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    updated INTEGER NOT NULL,
+    PRIMARY KEY(player,revision)
+);
+
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY,
     room TEXT NOT NULL,

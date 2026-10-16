@@ -146,6 +146,10 @@ final class CzmDialog extends Dialog {
         }
         return e;
     }
+    EditText codeField(String label) {
+        note(label);CzmCodeInput code=new CzmCodeInput(activity,russian);
+        body.addView(code,new LinearLayout.LayoutParams(-1,dp(activity,52)));return code;
+    }
     void fail(String message) { error.setText(message); error.setVisibility(View.VISIBLE); }
     void busy(boolean value) { submit.setEnabled(!value); cancel.setEnabled(!value); setCancelable(!value); }
 

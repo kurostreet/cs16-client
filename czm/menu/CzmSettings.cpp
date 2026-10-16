@@ -333,6 +333,8 @@ enum ERowType
 	ROW_ACCOUNT,
 	ROW_AVATARS,
 	ROW_SPRAYS,
+	ROW_LAYOUTS,
+	ROW_HUDEDIT,
 	ROW_MIC,      // microphone test: level meter and a start/stop button
 };
 
@@ -360,6 +362,7 @@ struct CzmRow
 
 const CzmRow s_controls[] =
 {
+	{ ROW_LAYOUTS, "s_layouts", "s_layouts_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_SLIDER, "s_look", "s_look_hint", GetLook, SetLook, NULL, 0.5f, 10.0f, 0.1f, FMT_DECIMAL, {}, 0 },
 	{ ROW_SLIDER, "s_zoom", "s_zoom_hint", GetZoom, SetZoom, NULL, 0.2f, 3.0f, 0.05f, FMT_DECIMAL, {}, 0 },
 	{ ROW_SLIDER, "s_move", "s_move_hint", GetMove, SetMove, NULL, 1.0f, 10.0f, 1.0f, FMT_INT, {}, 0 },
@@ -412,6 +415,7 @@ const CzmRow s_game[] =
 
 const CzmRow s_hud[] =
 {
+	{ ROW_HUDEDIT, "s_hud_edit", "s_hud_edit_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 	{ ROW_CHOICE, "s_tab_style", "s_tab_style_hint", GetTabStyle, SetTabStyle, NULL, 0, 2, 1, 0, { "opt_tab_default", "opt_tab_compact", "opt_tab_tactical" }, 3 },
 	{ ROW_TABPREVIEW, "s_tab_preview", "s_tab_preview_hint", NULL, NULL, NULL, 0, 0, 0, 0, {}, 0 },
 };
@@ -770,6 +774,8 @@ void CCzmSettings::Layout( void )
 		case ROW_TABPREVIEW:
 			l.control = CZM_Rect( l.rect.x, l.rect.y + H * 0.14f, l.rect.w, h - H * 0.16f );
 			break;
+		case ROW_LAYOUTS:
+		case ROW_HUDEDIT:
 		case ROW_ACCOUNT:
 		case ROW_NICK:
 		{
@@ -856,6 +862,8 @@ int CCzmSettings::HitTest( void ) const
 			break;
 		case ROW_SWITCH:
 			return HIT_ROW + i * 20; // the whole row toggles
+		case ROW_LAYOUTS:
+		case ROW_HUDEDIT:
 		case ROW_ACCOUNT:
 		case ROW_NICK:
 			if( l.control.Grown( grow ).Contains( x, y ))
@@ -974,6 +982,12 @@ void CCzmSettings::Activate( int hit )
 				CZM_OpenTouchEditor();
 			else if( part == 1 )
 				m_bConfirm = true;
+			break;
+		case ROW_LAYOUTS:
+			CZM_LayoutsShow();
+			break;
+		case ROW_HUDEDIT:
+			CZM_OpenHudEditor();
 			break;
 		case ROW_ACCOUNT:
 			CZM_AccountShow( CZM_OnlineKey(), EngFuncs::GetCvarString( "name" ));
@@ -1395,6 +1409,8 @@ void CCzmSettings::DrawRow( int i )
 	case ROW_TABPREVIEW:
 		DrawTabPreview( l.control );
 		break;
+	case ROW_LAYOUTS:
+	case ROW_HUDEDIT:
 	case ROW_ACCOUNT:
 		CZM_DrawButton( UI_DIR "button_secondary.png", l.control, CZM_T( "s_account_open" ), CZM_White(),
 			IsPressed( HIT_ROW + i * 20 ), CZMF_TILE_STATUS );

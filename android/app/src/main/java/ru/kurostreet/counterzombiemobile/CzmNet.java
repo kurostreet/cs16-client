@@ -56,6 +56,22 @@ public final class CzmNet {
     public static byte[] accountEvent() { return CzmAccount.event(); }
     public static void colorShow(int r, int g, int b, boolean ru) { CzmColorPicker.show(r, g, b, ru); }
     public static byte[] colorEvent() { return CzmColorPicker.event(); }
+    public static void hudShow(byte[] body, boolean ru) { CzmHudEditor.show(body,ru); }
+    public static byte[] hudEvent() { return CzmHudEditor.event(); }
+    public static byte[] cloudEvent() { byte[] event=CzmCloud.event();return event!=null?event:CzmLayoutActivity.event(); }
+    public static void layoutsShow() { Context ctx=context();if(ctx instanceof android.app.Activity)((android.app.Activity)ctx).runOnUiThread(()->ctx.startActivity(new Intent(ctx,CzmLayoutActivity.class))); }
+    public static void cloudApplied(int request, boolean success) { CzmCloud.applied(request,success); }
+    private static String widgetPending="";
+    public static synchronized byte[] widgetEvent() { if(widgetPending.isEmpty())return null;byte[] out=widgetPending.getBytes(StandardCharsets.UTF_8);widgetPending="";return out; }
+    static void widgetConfirm(android.app.Activity a,Intent intent) {
+        String address=intent.getStringExtra("czm_server"),protocol=intent.getStringExtra("czm_protocol");
+        intent.removeExtra("czm_server");intent.removeExtra("czm_protocol");
+        if(!ServerQuery.valid(address)||!("gs".equals(protocol)||"49".equals(protocol)))return;
+        boolean ru=java.util.Locale.getDefault().getLanguage().equals("ru");
+        CzmDialog d=new CzmDialog(a,ru?"Подключиться к серверу?":"Connect to server?",address,ru?"Подключиться":"Connect",ru?"Отмена":"Cancel",ru,false);
+        d.submit.setOnClickListener(v->{synchronized(CzmNet.class){widgetPending=address+" "+protocol;}d.dismiss();});d.show();
+    }
+
 
     public static byte[] serverUserinfo(String address, byte[] base, int limit) {
         return CzmServerAuth.userinfo(address, new String(base, StandardCharsets.UTF_8), limit).getBytes(StandardCharsets.UTF_8);

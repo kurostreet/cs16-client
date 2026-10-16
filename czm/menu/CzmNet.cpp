@@ -180,6 +180,89 @@ bool CZM_AccountEvent( CUtlString &body )
 	return found;
 }
 
+void CZM_LayoutsShow( void ) { JNIEnv *env;jclass cls;if(!CZM_Begin(&env,&cls))return;jmethodID m=CZM_Method(env,cls,"layoutsShow","()V");if(m)env->CallStaticVoidMethod(cls,m);CZM_End(env); }
+
+void CZM_HudEditorShow( const char *body )
+{
+ JNIEnv *env;jclass cls;
+ if(!CZM_Begin(&env,&cls)) return;
+ jmethodID m=CZM_Method(env,cls,"hudShow","([BZ)V");
+ if(m) { jbyteArray data=env->NewByteArray(strlen(body));env->SetByteArrayRegion(data,0,strlen(body),(const jbyte *)body);env->CallStaticVoidMethod(cls,m,data,(jboolean)CZM_IsRussian()); }
+ CZM_End(env);
+}
+
+bool CZM_HudEditorEvent( CUtlString &body )
+{
+	JNIEnv *env;
+	jclass cls;
+	bool found = false;
+	if( !CZM_Begin( &env, &cls )) return false;
+	jmethodID m = CZM_Method( env, cls, "hudEvent", "()[B" );
+	jbyteArray result = m ? (jbyteArray)env->CallStaticObjectMethod( cls, m ) : NULL;
+	if( result )
+	{
+		jsize n = env->GetArrayLength( result );
+		if( n > 0 && n < 4096 )
+		{
+			char value[4096];
+			env->GetByteArrayRegion( result, 0, n, (jbyte *)value ); value[n] = 0;
+			body.Set( value ); found = true;
+		}
+	}
+	CZM_End( env );
+	return found;
+}
+
+bool CZM_WidgetEvent( CUtlString &body )
+{
+	JNIEnv *env;
+	jclass cls;
+	bool found = false;
+	if( !CZM_Begin( &env, &cls )) return false;
+	jmethodID m = CZM_Method( env, cls, "widgetEvent", "()[B" );
+	jbyteArray result = m ? (jbyteArray)env->CallStaticObjectMethod( cls, m ) : NULL;
+	if( result )
+	{
+		jsize n = env->GetArrayLength( result );
+		if( n > 0 && n < 256 )
+		{
+			char value[4096];
+			env->GetByteArrayRegion( result, 0, n, (jbyte *)value ); value[n] = 0;
+			body.Set( value ); found = true;
+		}
+	}
+	CZM_End( env );
+	return found;
+}
+
+bool CZM_CloudEvent( CUtlString &body )
+{
+	JNIEnv *env;
+	jclass cls;
+	bool found = false;
+	if( !CZM_Begin( &env, &cls )) return false;
+	jmethodID m = CZM_Method( env, cls, "cloudEvent", "()[B" );
+	jbyteArray result = m ? (jbyteArray)env->CallStaticObjectMethod( cls, m ) : NULL;
+	if( result )
+	{
+		jsize n = env->GetArrayLength( result );
+		if( n > 0 && n < 262144 )
+		{
+			char *value=(char *)malloc(n+1);
+            if(!value){CZM_End(env);return false;}
+			env->GetByteArrayRegion( result, 0, n, (jbyte *)value ); value[n] = 0;
+			body.Set( value ); free(value); found = true;
+		}
+	}
+	CZM_End( env );
+	return found;
+}
+void CZM_CloudApplied( int request, bool success ) {
+ JNIEnv *env;jclass cls;if(!CZM_Begin(&env,&cls))return;
+ jmethodID m=CZM_Method(env,cls,"cloudApplied","(IZ)V");if(m)env->CallStaticVoidMethod(cls,m,(jint)request,(jboolean)success);CZM_End(env);
+}
+
+
 void CZM_ColorPickerShow( int r, int g, int b )
 {
 	JNIEnv *env;
@@ -440,6 +523,12 @@ bool CZM_NetAvailable( void ) { return false; }
 void CZM_ServerAuthShow( const char *, const char * ) {}
 void CZM_AccountShow( const char *, const char * ) {}
 bool CZM_AccountEvent( CUtlString & ) { return false; }
+void CZM_HudEditorShow( const char * ) {}
+void CZM_LayoutsShow( void ) {}
+bool CZM_HudEditorEvent( CUtlString & ) { return false; }
+bool CZM_WidgetEvent( CUtlString & ) { return false; }
+bool CZM_CloudEvent( CUtlString & ) { return false; }
+void CZM_CloudApplied( int, bool ) {}
 void CZM_ColorPickerShow( int, int, int ) {}
 bool CZM_ColorPickerEvent( int &, int &, int & ) { return false; }
 void CZM_StartupReady( void ) {}

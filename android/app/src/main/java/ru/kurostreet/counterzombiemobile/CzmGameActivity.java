@@ -39,6 +39,7 @@ public final class CzmGameActivity extends XashActivity implements AudioManager.
         ui.post(() -> {
             if (ready || startup == null || isFinishing()) return;
             ready = true;
+            CzmNet.widgetConfirm(this,getIntent());
             // Let the first native frame reach the surface before fading its cover.
             startup.postOnAnimation(() -> startup.postOnAnimation(() -> {
                 if (startup == null) return;
@@ -50,6 +51,8 @@ public final class CzmGameActivity extends XashActivity implements AudioManager.
             }));
         });
     }
+
+    @Override protected void onNewIntent(android.content.Intent intent) { super.onNewIntent(intent);setIntent(intent);if(ready)CzmNet.widgetConfirm(this,intent); }
 
     private void updateAudio() {
         ui.removeCallbacks(silence);

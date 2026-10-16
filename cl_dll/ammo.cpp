@@ -1,3 +1,4 @@
+#include "hud/czm_hud.h"
 /***
 *
 *	Copyright (c) 1996-2002, Valve LLC. All rights reserved.
@@ -1089,6 +1090,12 @@ int CHudAmmo::Draw(float flTime)
 	if ((pw->iAmmoType < 0) && (pw->iAmmo2Type < 0))
 		return 0;
 
+	char czmAmmo[48];
+	int reserve = pw->iAmmoType >= 0 ? gWR.CountAmmo(pw->iAmmoType) : 0;
+	if( pw->iClip >= 0 ) snprintf(czmAmmo,sizeof(czmAmmo),"%d / %d",pw->iClip,reserve);
+	else snprintf(czmAmmo,sizeof(czmAmmo),"%d",reserve);
+	if( pw->iAmmo2Type > 0 && gWR.CountAmmo(pw->iAmmo2Type)>0 ) { size_t used=strlen(czmAmmo);snprintf(czmAmmo+used,sizeof(czmAmmo)-used," + %d",gWR.CountAmmo(pw->iAmmo2Type)); }
+	if( CZM_HudDraw(CzmHud::AMMO,czmAmmo,pw->iClip==0 && reserve==0) ) return 1;
 	int iFlags = DHN_DRAWZERO; // draw 0 values
 
 	AmmoWidth = gHUD.GetSpriteRect(gHUD.m_HUD_number_0).Width();

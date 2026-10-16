@@ -25,6 +25,9 @@ GNU General Public License for more details.
 #include "BaseWindow.h"
 #include "FontManager.h"
 #include "CzmMenu.h"
+#include "../../common/czm_hud_layout.h"
+#include "CzmJson.h"
+#include "../../common/czm_settings_names.h"
 
 // The engine publishes loading progress through these cvars (engine/client/czm_loading.c).
 // Stage numbers must match the engine.
@@ -321,6 +324,10 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "upd_cancel", "Отмена", "Cancel" },
 	{ "news_loading", "Загружаем новости…", "Loading news…" },
 	// first start
+	{ "s_layouts", "Обмен раскладками", "Share layouts" },
+	{ "s_layouts_hint", "Поделиться файлом · импорт с просмотром · отмена", "Share file · preview before import · undo" },
+	{ "s_hud_edit", "Интерфейс в матче", "In-match HUD" },
+	{ "s_hud_edit_hint", "Три оформления · положение · размер · прозрачность", "Three styles · positions · size · opacity" },
 	{ "setup_title", "Добро пожаловать!", "Welcome!" },
 	{ "setup_text", "Выбери язык и придумай ник", "Choose a language and a nickname" },
 	{ "setup_go", "Играть", "Play" },
@@ -350,6 +357,13 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_shop", "1", FCVAR_ARCHIVE );       // 1 wheel, 2 grid
 	EngFuncs::CvarRegister( "czm_shop_auto", "0", FCVAR_ARCHIVE );  // open the shop when a round starts
 	EngFuncs::CvarRegister( "czm_menu_cards", "1", FCVAR_ARCHIVE ); // server menus as cards
+	EngFuncs::CvarRegister( "czm_hud_style", "0", FCVAR_ARCHIVE );
+	for( int i=0;i<CzmHud::COUNT;i++ ) for( int k=0;k<4;k++ ) {
+		const char *fields[]={"x","y","scale","opacity"};char name[64],value[32];
+		CzmHud::Key(name,sizeof(name),i,fields[k]);
+		snprintf(value,sizeof(value),"%.4f",k<2?CzmHud::defaults[i][k]:1.f);
+		EngFuncs::CvarRegister(name,value,FCVAR_ARCHIVE);
+	}
 	EngFuncs::CvarRegister( "czm_tab_style", "0", FCVAR_ARCHIVE ); // keep the current scoreboard by default
 	EngFuncs::CvarRegister( "czm_avatar", "", FCVAR_ARCHIVE );       // "", "1".."10" or "photo"
 	EngFuncs::CvarRegister( "czm_avatar_photo", "", FCVAR_ARCHIVE ); // the player's own photo file
@@ -1861,4 +1875,57 @@ void CZM_ApplyStartupSettings( void )
 	EngFuncs::CvarSetValue( "cl_allowdownload", 1.0f );
 
 	CZM_TouchStartup();
+}
+
+void CZM_OpenHudEditor( void )
+{
+ CUtlString json; char part[256];
+ snprintf(part,sizeof(part),"{\"style\":%d,\"blocks\":{",(int)CzmHud::Clamp(EngFuncs::GetCvarFloat("czm_hud_style"),0,2,0));json=part;
+ for(int i=0;i<CzmHud::COUNT;i++) {
+  char key[64];float values[4];const char *fields[]={"x","y","scale","opacity"};
+  for(int k=0;k<4;k++){CzmHud::Key(key,sizeof(key),i,fields[k]);float lo=k==2?.65f:k==3?.25f:.01f,hi=k==2?1.6f:k==3?1:.99f;values[k]=CzmHud::Clamp(EngFuncs::GetCvarFloat(key),lo,hi,k<2?CzmHud::defaults[i][k]:1);}
+  snprintf(part,sizeof(part),"%s\"%s\":{\"x\":%.4f,\"y\":%.4f,\"scale\":%.4f,\"opacity\":%.4f}",i?",":"",CzmHud::keys[i],values[0],values[1],values[2],values[3]);json+=part;
+ }
+ json+="}}";CZM_HudEditorShow(json.Get());
+}
+void CZM_HudEditorFrame( void )
+{
+ CUtlString body;if(!CZM_HudEditorEvent(body))return;
+ CzmJson j;if(!j.Parse(body.Get()))return;int style=j.Get(0,"style"),blocks=j.Get(0,"blocks");
+ if(j.Type(style)!=CzmJson::T_NUMBER || j.Type(blocks)!=CzmJson::T_OBJECT)return;
+ float values[CzmHud::COUNT][4];const char *fields[]={"x","y","scale","opacity"};
+ for(int i=0;i<CzmHud::COUNT;i++) for(int k=0;k<4;k++) {
+  int n=j.Get(j.Get(blocks,CzmHud::keys[i]),fields[k]);if(j.Type(n)!=CzmJson::T_NUMBER)return;
+  values[i][k]=CzmHud::Clamp(j.Number(n),k==2?.65f:k==3?.25f:.01f,k==2?1.6f:k==3?1:.99f,k<2?CzmHud::defaults[i][k]:1);
+ }
+ EngFuncs::CvarSetValue("czm_hud_style",CzmHud::Clamp(j.Number(style),0,2,0));
+ for(int i=0;i<CzmHud::COUNT;i++)for(int k=0;k<4;k++){char key[64];CzmHud::Key(key,sizeof(key),i,fields[k]);EngFuncs::CvarSetValue(key,values[i][k]);}
+ EngFuncs::ClientCmd(false,"host_writeconfig\n");
+}
+
+void CZM_CloudFrame( void )
+{
+ CUtlString body;if(!CZM_CloudEvent(body))return;
+ CzmJson j;if(!j.Parse(body.Get()))return;
+ int cvars=j.Get(0,"cvars"),files=j.Get(0,"files");
+ const int request=(int)j.Number(j.Get(0,"cloudId"));
+ if(j.Type(cvars)!=CzmJson::T_OBJECT || j.Type(files)!=CzmJson::T_OBJECT){if(request>0)CZM_CloudApplied(request,false);return;}
+ // The Java boundary validates the data schema and constructs commands from allowlisted actions.
+ CUtlString backup[3];bool existed[3]={false,false,false},written[3]={false,false,false};bool success=true;
+ for(int i=1;i<=3;i++) {
+  char index[8],path[80];snprintf(index,sizeof(index),"%d",i);int n=j.Get(files,index);if(j.Type(n)!=CzmJson::T_STRING)continue;
+  snprintf(path,sizeof(path),"touch_profiles/czm_scheme%d.cfg",i);const char *cfg=j.String(n);
+  int length=0;byte *old=EngFuncs::COM_LoadFile(path,&length);existed[i-1]=old!=NULL;
+  if(old){backup[i-1].SetDirect((char *)old,length);EngFuncs::COM_FreeFile(old);}
+  written[i-1]=true;
+  if(!EngFuncs::COM_SaveFile(path,(void *)cfg,strlen(cfg))){success=false;break;}
+ }
+ if(!success){
+  for(int i=0;i<3;i++)if(written[i]){char path[80];snprintf(path,sizeof(path),"touch_profiles/czm_scheme%d.cfg",i+1);if(existed[i])EngFuncs::COM_SaveFile(path,backup[i].Get(),backup[i].Length());else EngFuncs::DeleteFile(path);}
+  if(request>0)CZM_CloudApplied(request,false);return;
+ }
+ for(size_t i=0;i<sizeof(czm_settings_names)/sizeof(czm_settings_names[0]);i++) {
+  int n=j.Get(cvars,czm_settings_names[i]);if(j.Type(n)==CzmJson::T_STRING)EngFuncs::CvarSetString(czm_settings_names[i],j.String(n));
+ }
+ CZM_SetTouchScheme(CZM_TouchScheme(),false);EngFuncs::ClientCmd(true,"host_writeconfig\n");if(request>0)CZM_CloudApplied(request,true);
 }

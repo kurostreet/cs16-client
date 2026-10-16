@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="12dp" android:background="@drawable/czm_widget_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:id="@+id/widget_title" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="CZM  /  SERVERS" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="13sp" />
+        <TextView android:id="@+id/widget_refresh" android:layout_width="44dp" android:layout_height="36dp" android:gravity="center" android:text="↻" android:textColor="#F13B49" android:textSize="28sp" android:contentDescription="Refresh" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_server1" style="@style/CzmWidgetRow" />
+    <TextView android:id="@+id/widget_server2" style="@style/CzmWidgetRow" />
+    <TextView android:id="@+id/widget_server3" style="@style/CzmWidgetRow" />
+    <TextView android:id="@+id/widget_empty" style="@style/CzmWidgetRow" android:text="CZM" />
+    <TextView android:id="@+id/widget_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="10sp" android:textColor="#A2AABC" android:paddingTop="5dp" />
+</LinearLayout>

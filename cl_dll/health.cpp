@@ -1,3 +1,4 @@
+#include "hud/czm_hud.h"
 /***
 *
 *	Copyright (c) 1996-2002, Valve LLC. All rights reserved.
@@ -270,6 +271,11 @@ void CHudHealth::DrawHealthBar( float flTime )
 	// Only draw health if we have the suit.
 	if (gHUD.m_iWeaponBits & (1<<(WEAPON_SUIT)))
 	{
+		int health = m_iHealth;
+		cl_entity_t *local = gEngfuncs.GetLocalPlayer();
+		if( local && local->index >= 1 && local->index <= MAX_PLAYERS && g_PlayerExtraInfo[local->index].sb_health > 255 ) health = g_PlayerExtraInfo[local->index].sb_health;
+		if( gHUD.m_iHideHUDDisplay & HIDEHUD_ALL ) return;
+		if( CZM_HudNumber(CzmHud::HEALTH,health,health<=25) ) return;
 		HealthWidth = gHUD.GetSpriteRect(gHUD.m_HUD_number_0).Width();
 		int CrossWidth = gHUD.GetSpriteRect(m_HUD_cross).Width();
 

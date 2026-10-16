@@ -1,3 +1,4 @@
+#include "hud/czm_hud.h"
 /*
 timer.cpp -- HUD timer, progress bars, etc
 Copyright (C) 2015-2016 a1batross
@@ -70,6 +71,8 @@ int CHudTimer::Draw( float fTime )
 	int minutes = max( 0, (int)( m_iTime + m_fStartTime - gHUD.m_flTime ) / 60);
 	int seconds = max( 0, (int)( m_iTime + m_fStartTime - gHUD.m_flTime ) - (minutes * 60));
 
+	char czmTime[32]; snprintf(czmTime,sizeof(czmTime),"%d:%02d",minutes,seconds);
+	if( CZM_HudDraw(CzmHud::TIMER,czmTime,minutes*60+seconds<=20) ) return 1;
 	if( minutes * 60 + seconds > 20 )
 	{
 		DrawUtils::UnpackRGB( r, g, b, gHUD.m_iDefaultHUDColor );

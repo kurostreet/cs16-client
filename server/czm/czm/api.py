@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from PIL import Image
 from pydantic import BaseModel, Field
 
-from . import service, mappics, accounts
+from . import service, mappics, accounts, settings
 from .config import get_settings
 from .db import db
 
@@ -284,3 +284,23 @@ async def download_latest():
         return JSONResponse({"error": "unavailable"}, status_code=503,
                             headers={**headers, "Retry-After": "60"})
     return RedirectResponse(url, status_code=307, headers=headers)
+
+
+class SettingsIn(BaseModel):
+    revision: int = Field(ge=0,le=2147483647)
+    payload: dict
+
+@router.get("/settings")
+async def get_account_settings(x_czm_key: str | None = Header(default=None)):
+    try:
+        return JSONResponse(await in_db(settings.load,x_czm_key or ""),headers={"Cache-Control":"no-store"})
+    except accounts.AuthError as e:
+        return JSONResponse({"error":e.code},status_code=e.status,headers={"Cache-Control":"no-store"})
+
+@router.post("/settings")
+async def save_account_settings(body: SettingsIn,x_czm_key: str | None = Header(default=None)):
+    def run(conn):
+        try:return 200,settings.save(conn,x_czm_key or "",body.revision,body.payload)
+        except accounts.AuthError as e:return e.status,{"error":e.code}
+    status,result=await in_db(run)
+    return JSONResponse(result,status_code=status,headers={"Cache-Control":"no-store"})

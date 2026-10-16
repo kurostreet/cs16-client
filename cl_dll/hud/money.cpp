@@ -1,3 +1,4 @@
+#include "hud/czm_hud.h"
 /*
 money.cpp -- Money HUD Widget
 Copyright (C) 2015-2016 a1batross
@@ -70,6 +71,7 @@ int CHudMoney::Draw(float flTime)
 	if( g_iUser1 == OBS_IN_EYE )
 		return 1;
 
+	if( CZM_HudNumber(CzmHud::MONEY,m_iMoneyCount,m_iBlinkAmt>0) ) return 1;
 	int r, g, b, alphaBalance;
 	m_fFade -= gHUD.m_flTimeDelta;
 	if( m_fFade < 0)

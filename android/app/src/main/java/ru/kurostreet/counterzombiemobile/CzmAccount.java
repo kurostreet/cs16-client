@@ -21,6 +21,7 @@ final class CzmAccount {
     private static boolean loaded, synced;
     private static int generation;
     private static CzmDialog editor;
+    private static final java.util.Map<String,Long> mailAt=new java.util.HashMap<>();
     private CzmAccount() {}
 
     static boolean serviceUrl(String address) {
@@ -59,11 +60,13 @@ final class CzmAccount {
         try { event = new JSONObject().put("profile", profile).toString(); }
         catch (Exception ignored) {}
         synced = true;
+        CzmCloud.account(profile.optInt("id"));
     }
     private static synchronized void clear(String expected) throws Exception {
         if (!token.equals(expected)) return;
         CzmServerAuth.session(SDLActivity.getContext(), "");
         token = ""; synced = false; ++generation; event = "{\"guest\":true}";
+        CzmCloud.clear();
     }
     private static void expired(String expected) {
         try { clear(expected); } catch (Exception ignored) {}
@@ -185,7 +188,7 @@ final class CzmAccount {
             : (ru ? "Один профиль на всех ваших устройствах" : "One profile on all your devices"),
             recovery ? (ru ? "Получить код" : "Get code") : reset ? (ru ? "Сменить пароль" : "Reset password") : register ? (ru ? "Создать" : "Create") : (ru ? "Войти" : "Sign in"), ru);
         EditText login = d.field(ru ? "Ник для входа" : "Login nickname", false, 24); login.setText(register || recovery || reset ? nick : "");
-        EditText code = reset ? d.field(ru ? "Код из письма" : "Email code", false, 6) : null;
+        EditText code = reset ? d.codeField(ru ? "Код из письма" : "Email code") : null;
         if (code != null) code.setInputType(InputType.TYPE_CLASS_NUMBER);
         EditText password = recovery ? null : d.field(ru ? "Пароль · минимум 8 символов" : "Password · at least 8 characters", true, 128);
         EditText repeat = register || reset ? d.field(ru ? "Повтор пароля" : "Repeat password", true, 128) : null;
@@ -199,6 +202,9 @@ final class CzmAccount {
             d.link(ru ? "Создать аккаунт" : "Create an account", v -> form(a, legacy, nick, "register", ru));
             d.link(ru ? "Забыли пароль?" : "Forgot password?", v -> form(a, legacy, login.getText().toString(), "recover", ru));
         }
+        if(reset) resend(d,"recover:"+login.getText().toString().toLowerCase(java.util.Locale.ROOT),ru,()->{
+            try {send(d,"recover","",new JSONObject().put("nick",login.getText().toString()),ru,result->mailAt.put("recover:"+login.getText().toString().toLowerCase(java.util.Locale.ROOT),android.os.SystemClock.elapsedRealtime()+60000));}catch(Exception e){d.fail(error("network",ru));}
+        });
         if (register || recovery || reset) d.link(ru ? "Назад ко входу" : "Back to sign in", v -> form(a, legacy, nick, "login", ru));
         d.submit.setOnClickListener(v -> {
             try {
@@ -209,6 +215,7 @@ final class CzmAccount {
                 if (repeat != null && !password.getText().toString().equals(repeat.getText().toString())) { d.fail(error("repeat", ru)); return; }
                 send(d, mode, register ? legacy : "", body, ru, result -> {
                     if (recovery) {
+                        mailAt.put("recover:"+login.getText().toString().toLowerCase(java.util.Locale.ROOT),android.os.SystemClock.elapsedRealtime()+60000);
                         form(a, legacy, login.getText().toString(), "reset", ru);
                         editor.note(ru ? "Если у аккаунта есть подтверждённая почта, код отправлен. Проверьте также «Спам»." : "If the account has a verified email, a code was sent. Also check Spam.");
                     } else if (reset) {
@@ -231,6 +238,7 @@ final class CzmAccount {
 
     private static void details(Activity a, String legacy, String nick, String credential, JSONObject info, boolean ru) {
         CzmDialog d = panel(a, ru ? "Аккаунт CZM" : "CZM account", info.optString("login") + " · ID " + info.optInt("id"), ru ? "Выйти" : "Sign out", ru);
+        d.link(ru ? "Настройки в облаке" : "Cloud settings", v -> CzmCloud.show(a,ru));
         d.note((ru ? "Почта для восстановления: " : "Recovery email: ") + (info.optString("email").isEmpty() ? (ru ? "не привязана" : "not linked") : info.optString("email")));
         if (!info.optBoolean("mail_ready")) d.note(ru ? "Отправка писем ещё не настроена. Восстановление пока недоступно. Сохраните пароль."
             : "Email delivery is not configured yet. Recovery is unavailable. Keep your password safe.");
@@ -244,18 +252,26 @@ final class CzmAccount {
         d.show();
     }
 
-    private static void email(Activity a, String legacy, String nick, String credential, boolean ru, boolean confirm) {
+    private static void resend(CzmDialog d,String key,boolean ru,Runnable action) {
+        android.widget.Button button=d.link(ru?"Отправить код ещё раз":"Resend code",v->action.run());
+        button.post(new Runnable(){public void run(){if(!d.isShowing())return;long seconds=Math.max(0,((mailAt.containsKey(key)?mailAt.get(key):0L)-android.os.SystemClock.elapsedRealtime()+999)/1000);button.setEnabled(seconds==0&&d.submit.isEnabled());button.setText(seconds>0?(ru?"Отправить ещё раз через ":"Resend in ")+seconds+(ru?" сек.":" sec."):(ru?"Отправить код ещё раз":"Resend code"));button.postDelayed(this,1000);}});
+    }
+    private static void email(Activity a, String legacy, String nick, String credential, boolean ru, boolean confirm) { email(a,legacy,nick,credential,ru,confirm,""); }
+    private static void email(Activity a, String legacy, String nick, String credential, boolean ru, boolean confirm,String target) {
         CzmDialog d = panel(a, ru ? "Почта для восстановления" : "Recovery email", confirm ? (ru ? "Введите код из письма" : "Enter the email code") : "",
             confirm ? (ru ? "Подтвердить" : "Confirm") : (ru ? "Получить код" : "Get code"), ru);
-        EditText input = d.field(confirm ? (ru ? "Код" : "Code") : "Email", false, confirm ? 6 : 254);
+        EditText input = confirm ? d.codeField(ru ? "Код из письма" : "Email code") : d.field("Email", false, 254);
         input.setInputType(confirm ? InputType.TYPE_CLASS_NUMBER : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-        if (!confirm) d.link(ru ? "У меня уже есть код" : "I already have a code", v -> email(a, legacy, nick, credential, ru, true));
+        if(!confirm)input.setText(target);
+        if (!confirm) d.link(ru ? "У меня уже есть код" : "I already have a code", v -> email(a, legacy, nick, credential, ru, true,input.getText().toString()));
+        if(confirm&&!target.isEmpty())resend(d,"email:"+credential+target,ru,()->{try{send(d,"email",credential,new JSONObject().put("email",target),ru,result->mailAt.put("email:"+credential+target,android.os.SystemClock.elapsedRealtime()+60000));}catch(Exception e){d.fail(error("network",ru));}});
         d.submit.setOnClickListener(v -> {
             try {
                 send(d, confirm ? "email-confirm" : "email", credential, new JSONObject().put(confirm ? "code" : "email", input.getText().toString()), ru,
-                    result -> { if (confirm) details(a, legacy, nick, credential, result, ru); else email(a, legacy, nick, credential, ru, true); });
+                    result -> { if (confirm) details(a, legacy, nick, credential, result, ru); else {String address=input.getText().toString();mailAt.put("email:"+credential+address,android.os.SystemClock.elapsedRealtime()+60000);email(a, legacy, nick, credential, ru, true,address);} });
             } catch (Exception e) { d.fail(error("email", ru)); }
         });
+        if(confirm)input.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){}public void afterTextChanged(android.text.Editable text){if(text.length()==6&&d.isShowing()&&d.submit.isEnabled())d.submit.performClick();}});
         d.show();
     }
 }

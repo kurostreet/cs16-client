@@ -21,6 +21,7 @@
 #include <new>
 
 #include "hud.h"
+#include "hud/czm_hud.h"
 #include "cl_util.h"
 #include <string.h>
 #include <stdio.h>
@@ -563,6 +564,7 @@ void CHud :: VidInit( void )
 	m_iFontWidth  = GetSpriteRect(m_HUD_number_0).Width();
 	m_iFontHeight = GetSpriteRect(m_HUD_number_0).Height();
 
+	CZM_HudVidInit();
 	m_hGasPuff = SPR_Load("sprites/gas_puff_01.spr");
 
 	for( HUDLIST *pList = m_pHudList; pList; pList = pList->pNext )

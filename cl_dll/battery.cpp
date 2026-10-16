@@ -1,3 +1,4 @@
+#include "hud/czm_hud.h"
 /***
 *
 *	Copyright (c) 1996-2002, Valve LLC. All rights reserved.
@@ -77,6 +78,8 @@ int CHudBattery::Draw( float flTime )
 	if (!(gHUD.m_iWeaponBits & (1<<(WEAPON_SUIT)) ))
 		return 1;
 
+	if( gHUD.m_iHideHUDDisplay & HIDEHUD_ALL ) return 1;
+	if( CZM_HudNumber(CzmHud::ARMOR,m_iBat) ) return 1;
 	int r, g, b, x, y, a;
 	wrect_t rc;
 

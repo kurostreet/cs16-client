@@ -81,6 +81,8 @@ public class MainActivity extends Activity {
         if (!resumed || launched || installation == null) return;
         launched = true;
         startActivity(new Intent(this, CzmGameActivity.class)
+                .putExtra("czm_server", getIntent().getStringExtra("czm_server"))
+                .putExtra("czm_protocol", getIntent().getStringExtra("czm_protocol"))
                 .putExtra("gamedir", "cstrike")
                 .putExtra("gamelibdir", getApplicationInfo().nativeLibraryDir)
                 .putExtra("basedir", installation.writable.getAbsolutePath())
