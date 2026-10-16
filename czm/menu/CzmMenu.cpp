@@ -1162,14 +1162,19 @@ bool CZM_DrawMenuBackground( Point pos, Size size )
 		return true;
 	}
 
-	HIMAGE environment=0,foreground=0;
-	if(EngFuncs::GetCvarFloat("czm_parallax")!=0){environment=CZM_Image("gfx/czm/menu_environment.png");foreground=CZM_Image("gfx/czm/menu_foreground.png");}
-	if(environment&&foreground){
+	HIMAGE environment=0,soldier=0,zombies=0;
+	if(EngFuncs::GetCvarFloat("czm_parallax")!=0){
+		environment=CZM_Image("gfx/czm/menu_environment.png");
+		soldier=CZM_Image("gfx/czm/menu_ct.png");
+		zombies=CZM_Image("gfx/czm/menu_zombies.png");
+	}
+	if(environment&&soldier&&zombies){
 		float t=uiStatic.realTime*.001f,w=size.w,h=size.h;
 		float x=sinf(t*.17f),y=sinf(t*.13f);
 		UI::Scissor::PushScissor(pos.x,pos.y,size.w,size.h);
 		CZM_DrawParallaxLayer(environment,pos.x,pos.y,size.w,size.h,x*w*.0025f,y*h*.002f,false);
-		CZM_DrawParallaxLayer(foreground,pos.x,pos.y,size.w,size.h,-x*w*.005f,-y*h*.003f,true);
+		CZM_DrawParallaxLayer(soldier,pos.x,pos.y,size.w,size.h,-x*w*.001f,-y*h*.001f,true);
+		CZM_DrawParallaxLayer(zombies,pos.x,pos.y,size.w,size.h,-x*w*.005f,-y*h*.003f,true);
 		// A few low-alpha light wisps and sparks, with no moving controls or text.
 		for(int i=0;i<3;i++){
 			int px=pos.x+(int)(w*(.15f+.31f*i+.025f*sinf(t*.12f+i)));
