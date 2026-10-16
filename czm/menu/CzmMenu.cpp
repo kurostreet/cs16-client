@@ -24,6 +24,7 @@ GNU General Public License for more details.
 #include "Utils.h"
 #include "BaseWindow.h"
 #include "FontManager.h"
+#include "Scissor.h"
 #include "CzmMenu.h"
 #include "../../common/czm_hud_layout.h"
 #include "CzmJson.h"
@@ -149,6 +150,8 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "reset_confirm", "Сбросить раскладку кнопок?", "Reset the button layout?" },
 	{ "reset_done", "Раскладка кнопок сброшена", "Button layout reset" },
 	{ "s_brightness", "Яркость", "Brightness" },
+	{ "s_parallax", "Живой фон меню", "Animated menu background" },
+	{ "s_parallax_hint", "Мягкое движение слоёв и света", "Gentle motion of layers and light" },
 	{ "s_fps", "Лимит FPS", "FPS limit" },
 	{ "s_fps_hint", "Больше — плавнее, но телефон греется", "Higher is smoother but warms the phone" },
 	{ "s_render", "Режим отрисовки", "Rendering mode" },
@@ -358,6 +361,7 @@ void CZM_Init( void )
 	EngFuncs::CvarRegister( "czm_shop_auto", "0", FCVAR_ARCHIVE );  // open the shop when a round starts
 	EngFuncs::CvarRegister( "czm_menu_cards", "1", FCVAR_ARCHIVE ); // server menus as cards
 	EngFuncs::CvarRegister( "czm_hud_style", "0", FCVAR_ARCHIVE );
+	EngFuncs::CvarRegister( "czm_parallax", "1", FCVAR_ARCHIVE );
 	for( int i=0;i<CzmHud::COUNT;i++ ) for( int k=0;k<4;k++ ) {
 		const char *fields[]={"x","y","scale","opacity"};char name[64],value[32];
 		CzmHud::Key(name,sizeof(name),i,fields[k]);
@@ -1128,6 +1132,16 @@ menu background
 */
 static bool s_bGameVisible;
 
+static void CZM_DrawParallaxLayer( HIMAGE image, int x, int y, int w, int h, float dx, float dy, bool alpha )
+{
+ int iw=EngFuncs::PIC_Width(image),ih=EngFuncs::PIC_Height(image);if(iw<=0||ih<=0)return;
+ float scale=Q_max((float)w/iw,(float)h/ih)*1.045f;
+ int dw=(int)ceilf(iw*scale),dh=(int)ceilf(ih*scale);
+ EngFuncs::PIC_Set(image,255,255,255,255);
+ if(alpha)EngFuncs::PIC_DrawTrans(x+(w-dw)/2+(int)dx,y+(h-dh)/2+(int)dy,dw,dh);
+ else EngFuncs::PIC_Draw(x+(w-dw)/2+(int)dx,y+(h-dh)/2+(int)dy,dw,dh);
+}
+
 void CZM_SetGameVisible( bool visible )
 {
 	s_bGameVisible = visible;
@@ -1148,7 +1162,29 @@ bool CZM_DrawMenuBackground( Point pos, Size size )
 		return true;
 	}
 
-	CZM_DrawCover( art, pos.x, pos.y, size.w, size.h );
+	HIMAGE environment=0,foreground=0;
+	if(EngFuncs::GetCvarFloat("czm_parallax")!=0){environment=CZM_Image("gfx/czm/menu_environment.png");foreground=CZM_Image("gfx/czm/menu_foreground.png");}
+	if(environment&&foreground){
+		float t=uiStatic.realTime*.001f,w=size.w,h=size.h;
+		float x=sinf(t*.17f),y=sinf(t*.13f);
+		UI::Scissor::PushScissor(pos.x,pos.y,size.w,size.h);
+		CZM_DrawParallaxLayer(environment,pos.x,pos.y,size.w,size.h,x*w*.0025f,y*h*.002f,false);
+		CZM_DrawParallaxLayer(foreground,pos.x,pos.y,size.w,size.h,-x*w*.005f,-y*h*.003f,true);
+		// A few low-alpha light wisps and sparks, with no moving controls or text.
+		for(int i=0;i<3;i++){
+			int px=pos.x+(int)(w*(.15f+.31f*i+.025f*sinf(t*.12f+i)));
+			int py=pos.y+(int)(h*(.72f+.03f*sinf(t*.16f+i*2)));
+			CZM_DrawImage("gfx/czm/ui/dot.png",px-(int)(w*.22f),py,(int)(w*.44f),(int)(h*.32f),i==0?PackRGBA(55,128,210,9):PackRGBA(245,86,47,8),true);
+		}
+		for(int i=0;i<12;i++){
+			float a=fmodf(t*(.025f+i*.0008f)+i*.073f,1.0f);
+			int px=pos.x+(int)(w*(.12f+fmodf(i*.137f, .83f)+.008f*sinf(t*.7f+i)));
+			int py=pos.y+(int)(h*(1.02f-a*.75f));
+			int s=Q_max(2,(int)(h*.004f));
+			CZM_DrawImage("gfx/czm/ui/dot.png",px,py,s,s,PackRGBA(255,131,70,(int)(65*sinf(a*3.14159265f))),true);
+		}
+		UI::Scissor::PopScissor();
+	}else CZM_DrawCover( art, pos.x, pos.y, size.w, size.h );
 	CZM_DrawFade( "gfx/czm/fade_left.png", pos.x, pos.y, size.w * 0.58f, size.h, 200 );
 	CZM_DrawFade( "gfx/czm/fade_bottom.png", pos.x, pos.y + size.h * 0.62f, size.w, size.h * 0.38f + 1, 140 );
 	return true;
@@ -1329,6 +1365,13 @@ static void CZM_DrawCancelButton( void )
 	UI_FillRect( x0, y0, x1 - x0, y1 - y0, PackRGBA( 0, 0, 0, 110 ));
 	UI_DrawRectangleExt( x0, y0, x1 - x0, y1 - y0, PackRGBA( 255, 255, 255, 170 ), border );
 	CZM_DrawText( font, x0, y0 + ( y1 - y0 - th ) / 2, x1 - x0, CZM_T( "cancel" ), PackRGBA( 255, 255, 255, 255 ), QM_CENTER );
+#ifdef __ANDROID__
+	if(EngFuncs::GetCvarFloat("czm_loading_stage")<=3){
+		x0=ScreenWidth*.57f;x1=ScreenWidth*.795f;
+		UI_FillRect(x0,y0,x1-x0,y1-y0,PackRGBA(145,20,32,215));
+		CZM_DrawText(font,x0,y0+(y1-y0-th)/2,x1-x0,CZM_IsRussian()?"Скачать в фоне":"Download in background",PackRGBA(255,255,255,255),QM_CENTER);
+	}
+#endif
 }
 
 bool CZM_DrawLoadingScreen( void )

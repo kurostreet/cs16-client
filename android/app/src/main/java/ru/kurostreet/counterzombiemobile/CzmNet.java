@@ -61,6 +61,10 @@ public final class CzmNet {
     public static byte[] cloudEvent() { byte[] event=CzmCloud.event();return event!=null?event:CzmLayoutActivity.event(); }
     public static void layoutsShow() { Context ctx=context();if(ctx instanceof android.app.Activity)((android.app.Activity)ctx).runOnUiThread(()->ctx.startActivity(new Intent(ctx,CzmLayoutActivity.class))); }
     public static void cloudApplied(int request, boolean success) { CzmCloud.applied(request,success); }
+    public static void loadingProgress(int session,int status,int percent,byte[] label){CzmDownloads.progress(session,status,percent,new String(label,StandardCharsets.UTF_8));}
+    public static void loadingBackground(){CzmDownloads.request();}
+    public static boolean loadingWait(){return CzmDownloads.waitForForeground();}
+    public static boolean loadingCancel(){return CzmDownloads.cancelEvent();}
     private static String widgetPending="";
     public static synchronized byte[] widgetEvent() { if(widgetPending.isEmpty())return null;byte[] out=widgetPending.getBytes(StandardCharsets.UTF_8);widgetPending="";return out; }
     static void widgetConfirm(android.app.Activity a,Intent intent) {

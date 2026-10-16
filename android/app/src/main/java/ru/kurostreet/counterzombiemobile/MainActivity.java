@@ -88,6 +88,7 @@ public class MainActivity extends Activity {
                 .putExtra("basedir", installation.writable.getAbsolutePath())
                 .putExtra("package", getPackageName())
                 .putExtra("env", new String[]{
+                        "SDL_ANDROID_BLOCK_ON_PAUSE", "0",
                         "XASH3D_RODIR", installation.data.getAbsolutePath(),
                         // the game menu picks Russian or English from the phone language on the first start
                         "CZM_LOCALE", java.util.Locale.getDefault().getLanguage(),

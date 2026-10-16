@@ -56,6 +56,7 @@ struct Var { std::string value; } czm_loading_error, czm_loading, czm_loading_st
 void CZM_SetString(Var *v, const char *s) { v->value=s; }
 void CZM_SetValue(Var *, float) {}
 void Cvar_SetValue(const char *,float) {}
+void CZM_AndroidProgress(int) {}
 void UI_SetActiveMenu(bool) {}
 void Con_Printf(const char *,...) {}
 void SV_Shutdown(const char *) {}

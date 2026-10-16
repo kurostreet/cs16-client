@@ -1,0 +1,214 @@
+diff --git a/engine/client/czm_loading.c b/engine/client/czm_loading.c
+--- a/engine/client/czm_loading.c
++++ b/engine/client/czm_loading.c
+@@ -21,6 +21,10 @@
+ #include "input.h"
+ #include "net_api.h"
+ #include "voice.h"
++#ifdef __ANDROID__
++#include <jni.h>
++#include "platform/platform.h"
++#endif
+ 
+ #define CZM_INFO_CONTEXT 0x435a4d01 // 'CZM' + 1, NetAPI context for the server details query
+ #define CZM_QUERY_CONTEXT 0x435a4d10 // NetAPI contexts for the menu server tiles
+@@ -62,6 +66,8 @@
+ 	qboolean cancelled;
+ 	qboolean reopen_menu;
+ 	qboolean had_downloads;
++	qboolean files_ready;
++	double   last_notify;
+ 
+ 	double   start;
+ 	double   forced_time;
+@@ -98,6 +104,68 @@
+ 	if( var->value != value )
+ 		Cvar_DirectSetValue( var, value );
+ }
++
++static qboolean CZM_AndroidFlag( const char *name )
++{
++#ifdef __ANDROID__
++ JNIEnv *env=Android_GetNativeObject("JNIEnv");qboolean value=false;
++ if(!env)return false;
++ if((*env)->PushLocalFrame(env,4)<0){if((*env)->ExceptionCheck(env))(*env)->ExceptionClear(env);return false;}
++ jclass c=(*env)->FindClass(env,"ru/kurostreet/counterzombiemobile/CzmNet");
++ if(c&&!(*env)->ExceptionCheck(env)){jmethodID m=(*env)->GetStaticMethodID(env,c,name,"()Z");if(m&&!(*env)->ExceptionCheck(env))value=(*env)->CallStaticBooleanMethod(env,c,m);}
++ if((*env)->ExceptionCheck(env))(*env)->ExceptionClear(env);
++ (*env)->PopLocalFrame(env,NULL);return value;
++#else
++ return false;
++#endif
++}
++
++static void CZM_AndroidProgress( int status )
++{
++#ifdef __ANDROID__
++ double now=Platform_DoubleTime();if(status==0&&now-czm.last_notify<0.5)return;czm.last_notify=now;
++ JNIEnv *env=Android_GetNativeObject("JNIEnv");if(!env)return;
++ if((*env)->PushLocalFrame(env,6)<0){if((*env)->ExceptionCheck(env))(*env)->ExceptionClear(env);return;}
++ jclass c=(*env)->FindClass(env,"ru/kurostreet/counterzombiemobile/CzmNet");
++ if(c&&!(*env)->ExceptionCheck(env)){
++  jmethodID m=(*env)->GetStaticMethodID(env,c,"loadingProgress","(III[B)V");
++  if(m&&!(*env)->ExceptionCheck(env)){
++   char label[160];Q_snprintf(label,sizeof(label),"%s / %s",czm_loading_host.string,czm_loading_map.string);
++   jbyteArray bytes=(*env)->NewByteArray(env,Q_strlen(label));
++   if(bytes){(*env)->SetByteArrayRegion(env,bytes,0,Q_strlen(label),(const jbyte *)label);(*env)->CallStaticVoidMethod(env,c,m,(jint)czm_loading_session.value,(jint)status,(jint)(status==1||status==3?100:czm.percent),bytes);}
++  }
++ }
++ if((*env)->ExceptionCheck(env))(*env)->ExceptionClear(env);(*env)->PopLocalFrame(env,NULL);
++#endif
++}
++
++qboolean CZM_Loading_WaitForForeground( void )
++{
++#ifdef __ANDROID__
++ return host.status==HOST_SLEEP || CZM_AndroidFlag("loadingWait");
++#else
++ return false;
++#endif
++}
++
++void CZM_Loading_FilesReady( void )
++{
++ if(!czm.active||cl.resourcesneeded.pNext!=&cl.resourcesneeded)return;
++ czm.files_ready=true;CZM_AndroidProgress(3);
++}
++
++static void CZM_AndroidBackground( void )
++{
++#ifdef __ANDROID__
++ JNIEnv *env=Android_GetNativeObject("JNIEnv");if(!env)return;
++ if((*env)->PushLocalFrame(env,4)<0){if((*env)->ExceptionCheck(env))(*env)->ExceptionClear(env);return;}
++ jclass c=(*env)->FindClass(env,"ru/kurostreet/counterzombiemobile/CzmNet");
++ if(c&&!(*env)->ExceptionCheck(env)){jmethodID m=(*env)->GetStaticMethodID(env,c,"loadingBackground","()V");if(m&&!(*env)->ExceptionCheck(env))(*env)->CallStaticVoidMethod(env,c,m);}
++ if((*env)->ExceptionCheck(env))(*env)->ExceptionClear(env);(*env)->PopLocalFrame(env,NULL);
++#endif
++}
++
++static void CZM_Cancel( void );
+ 
+ qboolean CZM_Loading_Enabled( void )
+ {
+@@ -319,6 +387,7 @@
+ static void CZM_End( qboolean reached_game )
+ {
+ 	qboolean reopen = czm.reopen_menu;
++	CZM_AndroidProgress( reached_game ? 1 : 2 );
+ 
+ 	if( !reached_game && !czm.cancelled && czm.seen_loading && cls.state == ca_disconnected )
+ 	{
+@@ -643,6 +712,7 @@
+ 	qboolean want;
+ 
+ 	CZM_MicTest_Frame();
++	if(czm.active&&CZM_AndroidFlag("loadingCancel"))CZM_Cancel();
+ 
+ 	if( czm.forced && !czm.active && cls.state == ca_active )
+ 		loading_state = false; // changelevel on a local server, wait for the reconnect
+@@ -669,7 +739,10 @@
+ 		CZM_End( cls.state == ca_active );
+ 
+ 	if( czm.active )
++	{
+ 		CZM_Update();
++		CZM_AndroidProgress(czm.files_ready?3:0);
++	}
+ }
+ 
+ void CZM_Loading_BeginLocal( void )
+@@ -787,6 +860,8 @@
+ 		return false;
+ 
+ 	// small margin makes the button easier to hit
++	if(type==event_up&&x>=0.57f&&x<=0.795f&&y>=CZM_CANCEL_Y0-0.02f&&y<=CZM_CANCEL_Y1+0.02f&&czm_loading_stage.value<=CZM_STAGE_DOWNLOAD)
++		CZM_AndroidBackground();
+ 	if( type == event_up && x >= CZM_CANCEL_X0 - 0.01f && x <= CZM_CANCEL_X1 + 0.01f
+ 		&& y >= CZM_CANCEL_Y0 - 0.02f && y <= CZM_CANCEL_Y1 + 0.02f )
+ 		CZM_Cancel();
+diff --git a/engine/client/cl_main.c b/engine/client/cl_main.c
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -3511,9 +3511,19 @@
+ 	return retval;
+ }
+ 
++static qboolean czm_deferred_precache;
+ qboolean CL_PrecacheResources( void )
+ {
+ 	resource_t	*pRes;
++
++	// SDL releases the EGL context while paused. Download bytes now; upload textures on resume.
++	if(CZM_Loading_WaitForForeground())
++	{
++		czm_deferred_precache=true;
++		CZM_Loading_FilesReady();
++		return false;
++	}
++	czm_deferred_precache=false;
+ 
+ 	// if we downloaded new WAD files or any other archives they must be added to searchpath
+ 	if( CL_ShouldRescanFilesystem( ))
+@@ -3943,6 +3953,10 @@
+ 	// exec console commands
+ 	Cbuf_Execute ();
+ 
++#ifdef __ANDROID__
++	if(host.status==HOST_SLEEP)return;
++#endif
++
+ 	// if client is not active, do nothing
+ 	if( !cls.initialized ) return;
+ 
+@@ -3971,6 +3985,26 @@
+ {
+ 	// if client is not active, do nothing
+ 	if( !cls.initialized ) return;
++#ifdef __ANDROID__
++	if(host.status==HOST_SLEEP)
++	{
++		if(CZM_Loading_Active())
++		{
++			CL_SendCommand(); // keep acknowledgements and reliable fragments moving
++			CL_ReadPackets();
++			CL_CheckForResend();
++			while(CL_RequestMissingResources());
++			SCR_UpdateScreen();
++		}
++		else Platform_Sleep(100);
++		return;
++	}
++#endif
++	if(czm_deferred_precache)
++	{
++		czm_deferred_precache=false;
++		if(cls.state==ca_validate&&cl.resourcesneeded.pNext==&cl.resourcesneeded)CL_BatchResourceRequest(false);
++	}
+ 	if( cls.key_dest == key_game && cls.state == ca_active && !Con_Visible() )
+ 		Platform_SetTimer( cl_maxframetime.value );
+ 
+diff --git a/engine/client/client.h b/engine/client/client.h
+--- a/engine/client/client.h
++++ b/engine/client/client.h
+@@ -809,6 +809,8 @@
+ //
+ void CZM_Loading_Init( void );
+ void CZM_Loading_Frame( void );
++qboolean CZM_Loading_WaitForForeground( void );
++void CZM_Loading_FilesReady( void );
+ qboolean CZM_Loading_Enabled( void );
+ qboolean CZM_Loading_Active( void );
+ void CZM_Loading_BeginLocal( void );
+diff --git a/engine/common/host.c b/engine/common/host.c
+--- a/engine/common/host.c
++++ b/engine/common/host.c
+@@ -501,6 +501,9 @@
+ static double Host_CalcFPS( void )
+ {
+ 	double	fps = 0.0;
++#if defined(__ANDROID__) && !XASH_DEDICATED
++	if(!Host_IsDedicated()&&host.status==HOST_SLEEP)return 20.0;
++#endif
+ 
+ 	if( Host_IsDedicated( ))
+ 	{

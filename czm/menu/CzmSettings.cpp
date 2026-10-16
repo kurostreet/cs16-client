@@ -101,6 +101,8 @@ void SetGyroPower( float v )
 // graphics
 float GetBrightness( void ) { return GetCvar( "brightness" ); }
 void SetBrightness( float v ) { SetCvar( "brightness", v ); }
+float GetParallax( void ) { return GetCvar("czm_parallax")!=0.0f; }
+void SetParallax( float v ) { SetCvar("czm_parallax",v); }
 
 const int s_fpsValues[] = { 30, 60, 90, 120 };
 float GetFps( void )
@@ -385,6 +387,7 @@ const CzmRow s_graphics[] =
 	{ ROW_SWITCH, "s_shadows", NULL, GetShadows, SetShadows, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SWITCH, "s_weather", "s_weather_hint", GetWeather, SetWeather, NULL, 0, 1, 1, 0, {}, 0 },
 	{ ROW_SWITCH, "s_radar", NULL, GetRadarTrans, SetRadarTrans, NULL, 0, 1, 1, 0, {}, 0 },
+	{ ROW_SWITCH, "s_parallax", "s_parallax_hint", GetParallax, SetParallax, NULL, 0, 1, 1, 0, {}, 0 },
 };
 
 const CzmRow s_sound[] =

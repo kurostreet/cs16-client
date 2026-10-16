@@ -15,7 +15,7 @@ public final class CzmGameActivity extends XashActivity implements AudioManager.
     private final Handler ui = new Handler(Looper.getMainLooper());
     private CzmStartupView startup;
     private AudioManager audio;
-    private boolean foreground, focus, ready;
+    private boolean foreground, focus, ready,backgroundIntent;
     private final Runnable silence = new Runnable() {
         @Override public void run() {
             if (foreground && !focus) {
@@ -62,6 +62,7 @@ public final class CzmGameActivity extends XashActivity implements AudioManager.
 
     @Override protected void onResume() {
         super.onResume();
+        if(!backgroundIntent)CzmDownloads.foreground(this);
         foreground = true;
         focus = audio == null || audio.requestAudioFocus(this, AudioManager.STREAM_MUSIC,
                 AudioManager.AUDIOFOCUS_GAIN) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
@@ -80,6 +81,21 @@ public final class CzmGameActivity extends XashActivity implements AudioManager.
         focus = change == AudioManager.AUDIOFOCUS_GAIN;
         updateAudio();
     }
+
+    void prepareBackgroundDownload(){
+        backgroundIntent=true;
+        if(isFinishing()){backgroundIntent=false;CzmDownloads.declined();return;}
+        if(android.os.Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},1519);return;}
+        if(android.os.Build.VERSION.SDK_INT>=24&&!((android.app.NotificationManager)getSystemService(NOTIFICATION_SERVICE)).areNotificationsEnabled()){
+            backgroundIntent=false;CzmDownloads.declined();android.widget.Toast.makeText(this,CzmDownloads.ru()?"Разреши уведомления CZM для фоновой загрузки.":"Allow CZM notifications to download in the background.",android.widget.Toast.LENGTH_LONG).show();return;
+        }
+        CzmDownloads.start(this);
+    }
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){
+        super.onRequestPermissionsResult(request,permissions,grants);
+        if(request==1519){if(grants.length>0&&grants[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)CzmDownloads.start(this);else{backgroundIntent=false;CzmDownloads.declined();}}
+    }
+    @Override protected void onStop(){backgroundIntent=false;super.onStop();}
 
     @Override public void onDestroy() {
         ui.removeCallbacksAndMessages(null);
