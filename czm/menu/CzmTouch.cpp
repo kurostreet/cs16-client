@@ -1501,9 +1501,9 @@ void CCzmTouchEditor::Draw()
 
 	Layout();
 
-	// in the menu: the owner's screenshot from a match, in a match: the game itself
-	if( !CL_IsActive( ))
-		CZM_DrawCover( CZM_Image( UI_DIR "editor_bg.png" ), 0, 0, W, H );
+	// Always repaint the opaque preview, including while connected. Rendering the
+	// paused world is not guaranteed and leaves old HUD/buttons in the framebuffer.
+	CZM_DrawCover( CZM_Image( UI_DIR "editor_bg.png" ), 0, 0, W, H );
 
 	DrawButtons();
 
