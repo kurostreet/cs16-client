@@ -93,7 +93,10 @@ void Label( const CzmRect &r, const char *text, int font = CZMF_PANEL_TEXT, unsi
 }
 void Button( const CzmRect &r, const char *text, bool primary = false, bool pressed = false )
 {
-	CZM_DrawButton( primary ? UI_DIR "button_primary.png" : UI_DIR "button_secondary.png", r, text, CZM_White(), pressed, CZMF_LANG );
+	int font = CZMF_LANG;
+	if( CZM_TextWidth( CZM_Font( font ), text ) > r.w-r.h/2 ) font = CZMF_PANEL_TEXT;
+	if( CZM_TextWidth( CZM_Font( font ), text ) > r.w-r.h/2 ) font = CZMF_SMALL;
+	CZM_DrawButton( primary ? UI_DIR "button_primary.png" : UI_DIR "button_secondary.png", r, text, CZM_White(), pressed, font );
 }
 int Letters( const char *text ) { int n=0; for( ; *text; text++ ) if( ( *text & 0xc0 ) != 0x80 ) n++; return n; }
 }

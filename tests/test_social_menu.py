@@ -47,13 +47,13 @@ HARNESS = r'''
 #include <map>
 #include <cassert>
 int ScreenWidth=1536,ScreenHeight=716,cursorX,cursorY;Cursor uiStatic;Stack stack;
-static double now=100;static std::string key="czms1_first-account";static int me=7,ids,logins;static bool drawTrace;
+static double now=100;static std::string key="czms1_first-account";static int me=7,ids,logins,lastButtonFont;static bool drawTrace;
 static std::map<std::string,std::string> vars;static std::map<int,std::pair<int,std::string>> replies;
 struct Request{int id;std::string url,body;};static std::vector<Request> requests;
 const char*EngFuncs::GetCvarString(const char*k){return vars[k].c_str();}float EngFuncs::GetCvarFloat(const char*k){return atof(GetCvarString(k));}void EngFuncs::CvarSetString(const char*k,const char*v){vars[k]=v;}void EngFuncs::CvarSetValue(const char*k,float v){vars[k]=std::to_string(v);}double EngFuncs::DoubleTime(){return now;}
 void UI_EnableTextInput(bool){}void CZM_Init(){}bool CZM_IsRussian(){return true;}unsigned CZM_White(){return 0xffffffff;}unsigned CZM_Grey(){return PackRGBA(150,164,184,255);}
 HFont CZM_Font(int i){return i;}int CZM_FontHeight(HFont f){return (f==CZMF_PANEL_TITLE?42:f==CZMF_LANG?24:f==CZMF_SMALL?17:21)*ScreenHeight/768;}
-int CZM_TextWidth(HFont f,const char*s){int n=0;for(;*s;s++)if((*s&0xc0)!=0x80)n++;return n*CZM_FontHeight(f)/2;}
+int CZM_TextWidth(HFont f,const char*s){int n=0;for(;*s;s++)if((*s&0xc0)!=0x80)n++;return n*CZM_FontHeight(f)*62/100;}
 int CZM_WrapText(HFont f,const char*s,int w,int*starts,int max){int lines=0,i=0,last=0;starts[0]=0;for(;s[i]&&lines<max;){int from=i,n=0;while(s[i]&&(n*CZM_FontHeight(f)/2<w||!n)){i++;while((s[i]&0xc0)==0x80)i++;n++;}if(i==from)break;lines++;starts[lines]=i;last=i;}return lines;}
 void CZM_WrapLine(const char*s,const int*starts,int n,char*out,size_t size){int len=std::min((int)size-1,starts[n+1]-starts[n]);memcpy(out,s+starts[n],len);out[len]=0;}
 void CZM_DrawText(HFont f,int x,int y,int w,const char*s,unsigned c,unsigned just){if(drawTrace){printf("T\t%d\t%d\t%d\t%d\t%u\t%u\t%s\n",x,y,w,CZM_FontHeight(f),c,just,s);}}
@@ -61,7 +61,7 @@ void UI_FillRect(int x,int y,int w,int h,unsigned c){if(drawTrace)printf("R\t%d\
 void CZM_DrawImage(const char*p,int x,int y,int w,int h,unsigned c){if(drawTrace)printf("I\t%d\t%d\t%d\t%d\t%s\n",x,y,w,h,p);}
 void CZM_DrawPill(const char*,int x,int y,int w,int h,unsigned c){UI_FillRect(x,y,w,h,c);}
 void CZM_DrawPanel(const CzmRect&r){UI_FillRect(r.x,r.y,r.w,r.h,PackRGBA(10,17,26,250));}
-void CZM_DrawButton(const char*p,const CzmRect&r,const char*s,unsigned c,bool,int){UI_FillRect(r.x,r.y,r.w,r.h,strstr(p,"primary")?PackRGBA(210,34,55,255):PackRGBA(31,43,59,255));CZM_DrawText(CZMF_LANG,r.x+r.h/4,r.y+(r.h-CZM_FontHeight(CZMF_LANG))/2,r.w-r.h/2,s,c);}
+void CZM_DrawButton(const char*p,const CzmRect&r,const char*s,unsigned c,bool,int font){lastButtonFont=font;UI_FillRect(r.x,r.y,r.w,r.h,strstr(p,"primary")?PackRGBA(210,34,55,255):PackRGBA(31,43,59,255));CZM_DrawText(font,r.x+r.h/4,r.y+(r.h-CZM_FontHeight(font))/2,r.w-r.h/2,s,c);}
 bool CZM_OnlineReady(){return true;}const char*CZM_OnlineKey(){return key.c_str();}int CZM_OnlinePlayer(){return me;}const char*CZM_OnlineUrl(const char*p){return p;}const char*CZM_AvatarFor(const char*,int){return "gfx/czm/ui/avatar.png";}
 int CZM_NetRequest(const char*,const char*url,const char*,const char*body){requests.push_back({++ids,url,body});return ids;}
 bool CZM_NetPoll(int id,int*status,CUtlString&body){auto i=replies.find(id);if(i==replies.end())return false;*status=i->second.first;body.Set(i->second.second.c_str());replies.erase(i);return true;}
@@ -82,6 +82,7 @@ int main(int argc,char**argv){
  int pending=w.m_read;key="czms1_second-account";me=9;CZM_SocialFrame();assert(!w.m_open&&w.m_messages.Count()==0);
  if(pending)replies[pending]={200,"{\"messages\":[{\"id\":55,\"t\":\"private old account\"}]}"};CZM_SocialFrame();assert(w.m_messages.Count()==0);
  key="guest-legacy-key";CZM_SocialFrame();CZM_OpenFriends();w.Layout();cursorX=w.m_prev.x+1;cursorY=w.m_prev.y+1;assert(w.Hit()==w.LOGIN);w.Activate(w.LOGIN);assert(logins==1);
+ Button(CZM_Rect(0,0,ScreenHeight*.18f,ScreenHeight*.07f),"Отправить");assert(lastButtonFont!=CZMF_LANG);
  // The exact Draw methods also run at phone and narrow landscape sizes.
  key="czms1_second-account";CZM_SocialFrame();CZM_OpenFriends();
  for(auto resolution:{std::pair<int,int>{1536,716},{960,540},{1024,768}}){ScreenWidth=resolution.first;ScreenHeight=resolution.second;w.OpenProfile(8,false);w.Read(j,w.READ_PROFILE);w.Draw();assert(w.m_primary.y+w.m_primary.h<ScreenHeight);assert(w.m_copy.x+w.m_copy.w<w.m_panel.x+w.m_panel.w);}
