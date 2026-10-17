@@ -1,0 +1,23 @@
+diff --git a/engine/client/czm_loading.c b/engine/client/czm_loading.c
+--- a/engine/client/czm_loading.c
++++ b/engine/client/czm_loading.c
+@@ -853,6 +853,8 @@
+ #define CZM_CANCEL_X1 0.955f
+ #define CZM_CANCEL_Y0 0.818f
+ #define CZM_CANCEL_Y1 0.898f
++#define CZM_BACKGROUND_Y0 0.700f
++#define CZM_BACKGROUND_Y1 0.780f
+ 
+ qboolean CZM_Loading_TouchEvent( int type, float x, float y )
+ {
+@@ -860,7 +862,9 @@
+ 		return false;
+ 
+ 	// small margin makes the button easier to hit
+-	if(type==event_up&&x>=0.57f&&x<=0.795f&&y>=CZM_CANCEL_Y0-0.02f&&y<=CZM_CANCEL_Y1+0.02f&&czm_loading_stage.value<=CZM_STAGE_DOWNLOAD)
++	if( type == event_up && x >= CZM_CANCEL_X0 - 0.01f && x <= CZM_CANCEL_X1 + 0.01f
++		&& y >= CZM_BACKGROUND_Y0 - 0.01f && y <= CZM_BACKGROUND_Y1 + 0.01f
++		&& czm_loading_stage.value <= CZM_STAGE_DOWNLOAD )
+ 		CZM_AndroidBackground();
+ 	if( type == event_up && x >= CZM_CANCEL_X0 - 0.01f && x <= CZM_CANCEL_X1 + 0.01f
+ 		&& y >= CZM_CANCEL_Y0 - 0.02f && y <= CZM_CANCEL_Y1 + 0.02f )

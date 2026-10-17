@@ -1,6 +1,7 @@
 """Execute engine background branches: downloads continue, GL preparation waits."""
 from pathlib import Path
 import subprocess
+import re
 import tempfile
 import unittest
 from test_loading_errors import function
@@ -29,16 +30,13 @@ struct {resource_t resourcesneeded;}cl;
 struct {bool active,files_ready;}czm;
 struct {float value;}czm_loading_stage;
 #define CZM_STAGE_DOWNLOAD 3
-#define CZM_CANCEL_X0 0.815f
-#define CZM_CANCEL_X1 0.955f
-#define CZM_CANCEL_Y0 0.818f
-#define CZM_CANCEL_Y1 0.898f
 static bool requested,czm_deferred_precache;static int ready,rendered,acks,packets,retries,slept,registered,cancelled,background;
 static bool CZM_AndroidFlag(const char *){return requested;}
 static void CZM_AndroidProgress(int status){assert(status==3);ready++;}
 static void CZM_Cancel(){cancelled++;}
 static void CZM_AndroidBackground(){background++;}
-''' + function(loading, "qboolean CZM_Loading_WaitForForeground(") + "\n"
+''' + "\n".join(re.findall(r"^#define CZM_(?:CANCEL|BACKGROUND)_[XY][01] .+$", loading, re.M)) + "\n"
+        harness += function(loading, "qboolean CZM_Loading_WaitForForeground(") + "\n"
         harness += function(loading, "void CZM_Loading_FilesReady(") + "\n" + precache
         harness += r'''
 static bool CZM_Loading_Active(){return czm.active;}
@@ -59,9 +57,11 @@ int main(){
  requested=false;Host_ClientFrame();assert(registered==1&&rendered==2&&!czm_deferred_precache);
  resource_t missing;cl.resourcesneeded.pNext=&missing;host.status=HOST_SLEEP;int was=ready;
  assert(!CL_PrecacheResources()&&ready==was);czm.active=false;Host_ClientFrame();assert(slept==100&&packets==1);
- czm.active=true;czm_loading_stage.value=3;assert(CZM_Loading_TouchEvent(event_up,.7f,.85f)&&background==1&&cancelled==0);
+ czm.active=true;czm_loading_stage.value=3;assert(CZM_Loading_TouchEvent(event_up,.88f,.74f)&&background==1&&cancelled==0);
+ CZM_Loading_TouchEvent(event_up,.7f,.85f);assert(background==1&&cancelled==0);
+ CZM_Loading_TouchEvent(event_up,.88f,.794f);assert(background==1&&cancelled==0);
  CZM_Loading_TouchEvent(event_up,.88f,.85f);assert(cancelled==1&&background==1);
- czm_loading_stage.value=4;CZM_Loading_TouchEvent(event_up,.7f,.85f);assert(background==1);
+ czm_loading_stage.value=4;CZM_Loading_TouchEvent(event_up,.88f,.74f);assert(background==1&&cancelled==1);
 }
 '''
         with tempfile.TemporaryDirectory() as temporary:

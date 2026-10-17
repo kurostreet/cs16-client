@@ -48,6 +48,8 @@ enum
 #define CZM_CANCEL_X1 0.955f
 #define CZM_CANCEL_Y0 0.818f
 #define CZM_CANCEL_Y1 0.898f
+#define CZM_BACKGROUND_Y0 0.700f
+#define CZM_BACKGROUND_Y1 0.780f
 
 #define CZM_LOADING_IMAGES 5
 #define CZM_TIPS 10
@@ -1371,10 +1373,18 @@ static void CZM_DrawCancelButton( void )
 	UI_DrawRectangleExt( x0, y0, x1 - x0, y1 - y0, PackRGBA( 255, 255, 255, 170 ), border );
 	CZM_DrawText( font, x0, y0 + ( y1 - y0 - th ) / 2, x1 - x0, CZM_T( "cancel" ), PackRGBA( 255, 255, 255, 255 ), QM_CENTER );
 #ifdef __ANDROID__
-	if(EngFuncs::GetCvarFloat("czm_loading_stage")<=3){
-		x0=ScreenWidth*.57f;x1=ScreenWidth*.795f;
-		UI_FillRect(x0,y0,x1-x0,y1-y0,PackRGBA(145,20,32,215));
-		CZM_DrawText(font,x0,y0+(y1-y0-th)/2,x1-x0,CZM_IsRussian()?"Скачать в фоне":"Download in background",PackRGBA(255,255,255,255),QM_CENTER);
+	if( EngFuncs::GetCvarFloat( "czm_loading_stage" ) <= CZM_STAGE_DOWNLOAD )
+	{
+		y0 = ScreenHeight * CZM_BACKGROUND_Y0;
+		y1 = ScreenHeight * CZM_BACKGROUND_Y1;
+		const char *label = CZM_IsRussian() ? "Скачать в фоне" : "Download in background";
+		int padding = Q_max( 4, ( x1 - x0 ) / 24 );
+		int textWidth = CZM_TextWidth( font, label );
+		int tall = textWidth > x1 - x0 - 2 * padding
+			? Q_max( 1, th * ( x1 - x0 - 2 * padding ) / textWidth ) : th;
+		UI_FillRect( x0, y0, x1 - x0, y1 - y0, PackRGBA( 145, 20, 32, 215 ));
+		UI_DrawString( font, x0 + padding, y0 + ( y1 - y0 - tall ) / 2, x1 - x0 - 2 * padding,
+			tall, label, PackRGBA( 255, 255, 255, 255 ), tall, QM_CENTER | QM_TOP, ETF_NO_WRAP | ETF_FORCECOL );
 	}
 #endif
 }
