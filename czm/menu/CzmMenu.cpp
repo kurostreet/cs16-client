@@ -153,7 +153,7 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "reset_done", "Раскладка кнопок сброшена", "Button layout reset" },
 	{ "s_brightness", "Яркость", "Brightness" },
 	{ "s_parallax", "Живой фон меню", "Animated menu background" },
-	{ "s_parallax_hint", "Мягкое движение слоёв и света", "Gentle motion of layers and light" },
+	{ "s_parallax_hint", "Движение трёх слоёв и света", "Animated layers and light" },
 	{ "s_fps", "Лимит FPS", "FPS limit" },
 	{ "s_fps_hint", "Больше — плавнее, но телефон греется", "Higher is smoother but warms the phone" },
 	{ "s_render", "Режим отрисовки", "Rendering mode" },
@@ -1137,7 +1137,8 @@ static bool s_bGameVisible;
 static void CZM_DrawParallaxLayer( HIMAGE image, int x, int y, int w, int h, float dx, float dy, bool alpha )
 {
  int iw=EngFuncs::PIC_Width(image),ih=EngFuncs::PIC_Height(image);if(iw<=0||ih<=0)return;
- float scale=Q_max((float)w/iw,(float)h/ih)*1.045f;
+ // Extra image margin covers the full foreground travel, even on narrow screens.
+ float scale=Q_max((float)w/iw,(float)h/ih)*1.12f;
  int dw=(int)ceilf(iw*scale),dh=(int)ceilf(ih*scale);
  EngFuncs::PIC_Set(image,255,255,255,255);
  if(alpha)EngFuncs::PIC_DrawTrans(x+(w-dw)/2+(int)dx,y+(h-dh)/2+(int)dy,dw,dh);
@@ -1172,23 +1173,27 @@ bool CZM_DrawMenuBackground( Point pos, Size size )
 	}
 	if(environment&&soldier&&zombies){
 		float t=uiStatic.realTime*.001f,w=size.w,h=size.h;
-		float x=sinf(t*.17f),y=sinf(t*.13f);
+		// A ten-second sweep makes depth visible immediately; smaller independent
+		// movements keep the figures from looking like one sliding picture.
+		float x=sinf(t*.62f),y=sinf(t*.43f+.75f);
 		UI::Scissor::PushScissor(pos.x,pos.y,size.w,size.h);
-		CZM_DrawParallaxLayer(environment,pos.x,pos.y,size.w,size.h,x*w*.0025f,y*h*.002f,false);
-		CZM_DrawParallaxLayer(soldier,pos.x,pos.y,size.w,size.h,-x*w*.001f,-y*h*.001f,true);
-		CZM_DrawParallaxLayer(zombies,pos.x,pos.y,size.w,size.h,-x*w*.005f,-y*h*.003f,true);
+		CZM_DrawParallaxLayer(environment,pos.x,pos.y,size.w,size.h,x*w*.014f,y*h*.010f,false);
+		CZM_DrawParallaxLayer(soldier,pos.x,pos.y,size.w,size.h,
+			w*(-x*.028f+.004f*sinf(t*.91f)),h*(-y*.014f+.004f*sinf(t*1.2f)),true);
+		CZM_DrawParallaxLayer(zombies,pos.x,pos.y,size.w,size.h,
+			w*(-x*.048f+.006f*sinf(t*.9f+.7f)),h*(-y*.021f+.004f*sinf(t*1.4f)),true);
 		// A few low-alpha light wisps and sparks, with no moving controls or text.
 		for(int i=0;i<3;i++){
 			int px=pos.x+(int)(w*(.15f+.31f*i+.025f*sinf(t*.12f+i)));
 			int py=pos.y+(int)(h*(.72f+.03f*sinf(t*.16f+i*2)));
-			CZM_DrawImage("gfx/czm/ui/dot.png",px-(int)(w*.22f),py,(int)(w*.44f),(int)(h*.32f),i==0?PackRGBA(55,128,210,9):PackRGBA(245,86,47,8),true);
+			CZM_DrawImage("gfx/czm/ui/dot.png",px-(int)(w*.22f),py,(int)(w*.44f),(int)(h*.32f),i==0?PackRGBA(55,128,210,22):PackRGBA(245,86,47,18),true);
 		}
 		for(int i=0;i<12;i++){
-			float a=fmodf(t*(.025f+i*.0008f)+i*.073f,1.0f);
+			float a=fmodf(t*(.075f+i*.0012f)+i*.073f,1.0f);
 			int px=pos.x+(int)(w*(.12f+fmodf(i*.137f, .83f)+.008f*sinf(t*.7f+i)));
 			int py=pos.y+(int)(h*(1.02f-a*.75f));
-			int s=Q_max(2,(int)(h*.004f));
-			CZM_DrawImage("gfx/czm/ui/dot.png",px,py,s,s,PackRGBA(255,131,70,(int)(65*sinf(a*3.14159265f))),true);
+			int s=Q_max(2,(int)(h*.006f));
+			CZM_DrawImage("gfx/czm/ui/dot.png",px,py,s,s,PackRGBA(255,131,70,(int)(100*sinf(a*3.14159265f))),true);
 		}
 		UI::Scissor::PopScissor();
 	}else CZM_DrawCover( art, pos.x, pos.y, size.w, size.h );
