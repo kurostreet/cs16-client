@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <cmath>
 
 namespace {
 struct Texture { char path[64]; int handle; unsigned used; double retry; } s_textures[64];
@@ -74,8 +75,93 @@ int LoadAvatar( const char *path )
 }
 }
 
+namespace {
+struct ProfileHit { int x, y, width, height; bool self; } s_profileHits[33];
+int s_profileFinger = -1, s_profileSlot, s_profileId;
+float s_profileDownX, s_profileDownY;
+double s_profileDrawTime;
+char s_profilePrefix[120];
+
+int ProfileId( int slot, bool self, char *prefix )
+{
+	prefix[0] = 0;
+	if( self ) return std::atoi( gEngfuncs.pfnGetCvarString( "czm_profile_id" ));
+	CzmTab::State state;
+	if( !CzmTab::Parse( gEngfuncs.pfnGetCvarString( "czm_tab_state" ), state )) return 0;
+	char name[40]; std::snprintf( name, sizeof( name ), "czm_tab_profile_%d", slot );
+	CzmTab::Prefix( prefix, 120, state, slot );
+	return CzmTab::ProfileId( gEngfuncs.pfnGetCvarString( name ), state, slot );
+}
+}
+
+void CZM_TabProfilesBeginDraw()
+{
+	std::memset( s_profileHits, 0, sizeof( s_profileHits ));
+	s_profileDrawTime = gEngfuncs.GetClientTime();
+}
+
+void CZM_TabProfileRow( int slot, bool self, int x, int y, int width, int height )
+{
+	if( slot >= 1 && slot <= 32 ) s_profileHits[slot] = { x, y, width, height, self };
+}
+
+void CZM_TabConnectionFrame()
+{
+	const char *level = gEngfuncs.pfnGetLevelName();
+	const char *base = level ? std::strrchr( level, '/' ) : NULL;
+	base = base ? base + 1 : level;
+	char map[65] = "";
+	if( base && std::strlen( base ) < sizeof( map ))
+	{
+		std::strcpy( map, base );
+		char *suffix = std::strstr( map, ".bsp" ); if( suffix ) *suffix = 0;
+		if( std::strspn( map, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+.-" ) != std::strlen( map )) map[0] = 0;
+	}
+	if( std::strcmp( gEngfuncs.pfnGetCvarString( "czm_current_map" ), map )) gEngfuncs.Cvar_Set( "czm_current_map", map );
+}
+
+int CZM_TabProfileTouch( int type, int finger, float x, float y )
+{
+	float aspect = gEngfuncs.pfnGetCvarFloat( "czm_touch_profile_aspect" );
+	if( aspect < .25f ) aspect = (float)ScreenHeight / ScreenWidth;
+	float px = x * ScreenWidth, py = y * ScreenWidth * aspect;
+	if( s_profileFinger == finger )
+	{
+		if( type == 1 )
+		{
+			s_profileFinger = -1;
+			char prefix[120];
+			int player = ProfileId( s_profileSlot, s_profileHits[s_profileSlot].self, prefix );
+			if( player == s_profileId && !std::strcmp( prefix, s_profilePrefix ) && std::abs( px - s_profileDownX ) < ScreenHeight * .025f
+				&& std::abs( py - s_profileDownY ) < ScreenHeight * .025f && gHUD.m_Scoreboard.ShouldDrawScoreboard() )
+			{
+				char id[24]; std::snprintf( id, sizeof( id ), "%d", player );
+				gEngfuncs.Cvar_Set( "czm_open_profile", id );
+				gHUD.m_Scoreboard.m_bForceDraw = gHUD.m_Scoreboard.m_bShowscoresHeld = false;
+				gEngfuncs.pfnClientCmd( "menu_czmsocial\n" );
+			}
+		}
+		return 1;
+	}
+	if( s_profileFinger >= 0 ) return 0;
+	if( type != 0 || !gHUD.m_Scoreboard.ShouldDrawScoreboard() || gEngfuncs.GetClientTime() - s_profileDrawTime > .5 ) return 0;
+	for( int slot = 1; slot <= 32; slot++ )
+	{
+		const ProfileHit &h = s_profileHits[slot];
+		if( h.width <= 0 || px < h.x || px >= h.x+h.width || py < h.y || py >= h.y+h.height ) continue;
+		char prefix[120]; int player = ProfileId( slot, h.self, prefix );
+		if( player <= 0 ) return 0;
+		s_profileFinger = finger; s_profileSlot = slot; s_profileId = player;
+		s_profileDownX = px; s_profileDownY = py; std::strcpy( s_profilePrefix, prefix );
+		return 1;
+	}
+	return 0;
+}
+
+
 void CZM_TabAvatarsVidInit()
 {
+	std::memset( s_profileHits, 0, sizeof( s_profileHits )); s_profileFinger = -1;
 	if( gRenderAPI.GL_FreeTexture )
 		for( Texture &entry : s_textures ) if( entry.handle ) gRenderAPI.GL_FreeTexture( entry.handle );
 	std::memset( s_textures, 0, sizeof( s_textures )); s_used = 0;

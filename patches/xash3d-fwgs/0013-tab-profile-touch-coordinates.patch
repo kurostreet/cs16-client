@@ -1,0 +1,13 @@
+diff --git a/engine/client/input/in_touch.c b/engine/client/input/in_touch.c
+--- a/engine/client/input/in_touch.c
++++ b/engine/client/input/in_touch.c
+@@ -2366,6 +2366,9 @@ int IN_TouchEvent( touchEventType type, int fingerID, float x, float y, float dx, flo
+ 
+ 	Touch_UpdateViewport();
+ 	float screen_y = y * (float)refState.height / refState.width / Touch_ProfileAspectRatio();
++	// The client HUD converts profile-layout touch coordinates back to screen rows.
++	Cvar_SetValue( "czm_touch_profile_aspect", Touch_ProfileAspectRatio() );
++
+ 
+ 	if( clgame.dllFuncs.pfnTouchEvent && clgame.dllFuncs.pfnTouchEvent( type, fingerID, x, screen_y, dx, dy ) )
+ 		return true;

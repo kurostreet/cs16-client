@@ -110,8 +110,8 @@ private:
 		HIT_ABOUT_SITE,
 		HIT_UPDATE,
 		HIT_ABOUT_SOURCE,
-		HIT_NAV,                    // 4 navigation items
-		HIT_TILE = HIT_NAV + 4,     // one per server
+		HIT_NAV,                    // 5 navigation items
+		HIT_TILE = HIT_NAV + 5,     // one per server
 		HIT_LAST = HIT_TILE + CZM_MAX_TILES
 	};
 
@@ -142,7 +142,7 @@ private:
 	int m_iTiles;
 	int m_iPanelLineY;
 	CzmRect m_avatar, m_profile, m_bell, m_lang;
-	CzmRect m_tiles[CZM_MAX_TILES], m_nav[4];
+	CzmRect m_tiles[CZM_MAX_TILES], m_nav[5];
 	CzmRect m_panel, m_close, m_quitYes, m_quitNo, m_version;
 	CzmRect m_aboutLogo, m_aboutRows[CZM_ABOUT_ROWS];
 	CzmRect m_update, m_updateButton;
@@ -258,8 +258,8 @@ void CCzmMainMenu::Layout( void )
 	// The visible cards are also their touch targets; the gaps stay empty.
 	y = H * 0.898f;
 	int navMargin = H * 0.022f, navGap = H * 0.014f;
-	int navWidth = ( W - navMargin * 2 - navGap * 3 ) / 4;
-	for( int i = 0; i < 4; i++ )
+	int navWidth = ( W - navMargin * 2 - navGap * 4 ) / 5;
+	for( int i = 0; i < 5; i++ )
 		m_nav[i] = CZM_Rect( navMargin + i * ( navWidth + navGap ), y, navWidth, H - y - H * 0.016f );
 
 	// panels
@@ -371,7 +371,7 @@ int CCzmMainMenu::HitTest( void ) const
 			return HIT_TILE + i;
 	}
 
-	for( int i = 0; i < 4; i++ )
+	for( int i = 0; i < 5; i++ )
 	{
 		if( m_nav[i].HasCursor( ))
 			return HIT_NAV + i;
@@ -391,15 +391,18 @@ void CCzmMainMenu::Activate( int hit )
 	switch( hit )
 	{
 	case HIT_PROFILE:
-		CZM_OpenSettings( CZM_TAB_PROFILE );
+		CZM_OpenProfile( CZM_OnlinePlayer() );
 		break;
 	case HIT_NAV + 0:
 		CZM_OpenChat();
 		break;
 	case HIT_NAV + 1:
-		CZM_OpenServerList();
+		CZM_OpenFriends();
 		break;
 	case HIT_NAV + 2:
+		CZM_OpenServerList();
+		break;
+	case HIT_NAV + 3:
 		CZM_OpenSettings( CZM_TAB_LAST );
 		break;
 	case HIT_ABOUT_TELEGRAM:
@@ -424,7 +427,7 @@ void CCzmMainMenu::Activate( int hit )
 	case HIT_SETUP_GO:
 		FinishSetup();
 		break;
-	case HIT_NAV + 3:
+	case HIT_NAV + 4:
 		m_overlay = OV_ABOUT;
 		m_iVersionTaps = 0;
 		break;
@@ -839,15 +842,15 @@ static void CZM_NavCard( const CzmRect &r, int cut, unsigned int color )
 
 void CCzmMainMenu::DrawNav( void )
 {
-	static const char *icons[4] = { UI_DIR "icon_chat.png", UI_DIR "icon_globe.png", UI_DIR "icon_gear.png", UI_DIR "icon_info.png" };
-	static const char *labels[4] = { "nav_chat", "nav_servers", "nav_settings", "nav_about" };
-	static const char *hints[4] = { "nav_chat_hint", "nav_servers_hint", "nav_settings_hint", "nav_about_hint" };
+	static const char *icons[5] = { UI_DIR "icon_chat.png", UI_DIR "icon_users.png", UI_DIR "icon_globe.png", UI_DIR "icon_gear.png", UI_DIR "icon_info.png" };
+	static const char *labels[5] = { "nav_chat", "nav_friends", "nav_servers", "nav_settings", "nav_about" };
+	static const char *hints[5] = { "nav_chat_hint", "nav_friends_hint", "nav_servers_hint", "nav_settings_hint", "nav_about_hint" };
 	HFont font = CZM_Font( CZMF_LANG ), small = CZM_Font( CZMF_SMALL );
 	int edge = CZM_LineWidth(), pad = H * 0.018f, cut = Q_max( 3, (int)( H * 0.010f ));
 	int badge = H * 0.062f, iconSize = H * 0.036f, chevron = H * 0.021f;
 	int top = m_nav[0].y - H * 0.014f;
 	int widest = 0;
-	for( int i = 0; i < 4; i++ )
+	for( int i = 0; i < 5; i++ )
 	{
 		widest = Q_max( widest, CZM_TextWidth( font, CZM_T( labels[i] )));
 		widest = Q_max( widest, CZM_TextWidth( small, CZM_T( hints[i] )));
@@ -856,7 +859,7 @@ void CCzmMainMenu::DrawNav( void )
 
 	CZM_DrawImage( UI_DIR "fade_top.png", 0, top, W, H - top, PackRGBA( 4, 7, 11, 230 ));
 
-	for( int i = 0; i < 4; i++ )
+	for( int i = 0; i < 5; i++ )
 	{
 		const CzmRect &r = m_nav[i];
 		bool pressed = IsPressed( HIT_NAV + i );
@@ -888,6 +891,14 @@ void CCzmMainMenu::DrawNav( void )
 			int iconY = r.y + ( r.h - groupH ) / 2;
 			CZM_DrawImage( icons[i], r.x + ( r.w - compactIcon ) / 2, iconY, compactIcon, compactIcon, textColor );
 			CZM_DrawText( compactFont, r.x + pad, iconY + compactIcon + edge * 4, r.w - pad * 2, CZM_T( labels[i] ), textColor, QM_CENTER );
+		}
+		if( i == 1 && CZM_SocialUnread() + CZM_SocialRequests() > 0 )
+		{
+			char count[16]; int n = CZM_SocialUnread() + CZM_SocialRequests();
+			snprintf( count, sizeof( count ), n > 99 ? "99+" : "%d", n );
+			int bw = H * 0.06f, bh = H * 0.029f;
+			CZM_DrawPill( UI_DIR "button_primary.png", r.x + r.w - bw - pad, r.y + edge * 2, bw, bh );
+			CZM_DrawText( small, r.x + r.w - bw - pad, r.y + edge * 2, bw, count, CZM_White(), QM_CENTER );
 		}
 	}
 }

@@ -19,6 +19,7 @@
 //
 
 #include "hud.h"
+#include "hud/czm_avatars.h"
 #include "netadr.h"
 #include "pmtrace.h"
 
@@ -297,6 +298,7 @@ redraw the HUD.
 
 int DLLEXPORT HUD_Redraw( float time, int intermission )
 {
+	CZM_TabConnectionFrame();
 	gHUD.Redraw( time, intermission );
 
 	return 1;

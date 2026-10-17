@@ -349,6 +349,15 @@ const char *CZM_AvatarFor( const char *ref, int player );
 // chat window (czm/menu/CzmChat.cpp)
 void CZM_OpenChat( void );
 
+// Account profiles, friends and private dialogs (independent of game-server mods).
+void CZM_OpenFriends( void );
+void CZM_OpenProfile( int player );
+void CZM_SocialFrame( void );
+int CZM_SocialUnread( void );
+int CZM_SocialRequests( void );
+bool CZM_CopyText( const char *text );
+void CZM_JoinAddress( const char *address );
+
 /*
  * server list: the game's list of servers in our look (czm/menu/CzmServers.cpp)
  */

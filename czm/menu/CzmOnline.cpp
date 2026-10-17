@@ -439,6 +439,7 @@ void CZM_OnlineFrame( void )
 
 	PollAvatars();
 	CZM_TabFrame();
+	CZM_SocialFrame();
 }
 
 /*

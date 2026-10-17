@@ -86,6 +86,7 @@ int Team( int id )
 
 int CHudScoreboard::DrawCzmScoreboard( void )
 {
+	CZM_TabProfilesBeginDraw();
 	GetAllPlayersInfo();
 	int players[MAX_PLAYERS], count = 0;
 	for( int i = 1; i <= MAX_PLAYERS; i++ )
@@ -159,6 +160,7 @@ int CHudScoreboard::DrawCzmScoreboard( void )
 			if( n >= count ) break;
 			const int id = players[n], y = y0 + head + row * rh;
 			const hud_player_info_t &p = g_PlayerInfoList[id];
+			CZM_TabProfileRow( id, p.thisplayer != 0, left, y, nameW, rh );
 			const extra_player_info_t &extra = g_PlayerExtraInfo[id];
 			const int team = Team( id );
 			const int space = style == 2 ? std::max( 2, std::min( pad / 2, rh - fontH )) : 1;

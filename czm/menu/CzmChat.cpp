@@ -107,6 +107,7 @@ private:
 		HIT_POPUP_PANEL,
 		HIT_BACKDROP,
 		HIT_MESSAGE = 1000,          // + index
+		HIT_PROFILE = 2000,          // tap on a player's avatar or name
 	};
 
 	void Layout( void );
@@ -545,7 +546,11 @@ int CCzmChat::HitTest( void ) const
 			int h = ((CCzmChat *)this )->MessageHeight( ((CCzmChat *)this )->m_rooms[m_iRoom].messages[i] );
 
 			if( y >= bottom - h && y < bottom )
+			{
+				if( x < m_iTextX || y < bottom - h + CZM_FontHeight( CZM_Font( CZMF_SMALL )) + H * 0.014f )
+					return HIT_PROFILE + i;
 				return HIT_MESSAGE + i;
+			}
 			bottom -= h;
 		}
 	}
@@ -596,6 +601,14 @@ void CCzmChat::Activate( int hit )
 		m_flScroll = 0.0f;
 		m_flVelocity = 0.0f;
 		m_rooms[m_iRoom].nextPoll = 0.0;
+		return;
+	}
+
+	if( hit >= HIT_PROFILE )
+	{
+		int index = hit - HIT_PROFILE;
+		CzmChatRoom &room = m_rooms[m_iRoom];
+		if( index < room.messages.Count() ) { EndInput(); CZM_OpenProfile( room.messages[index].player ); }
 		return;
 	}
 

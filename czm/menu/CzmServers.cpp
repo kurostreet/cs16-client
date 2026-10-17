@@ -346,6 +346,7 @@ public:
 	void OnServerInfo( netadr_t adr, const char *info );
 	void OnPlayers( net_response_t *response );
 	void ResetPing( void ) { m_flPingBase = EngFuncs::DoubleTime(); }
+	void JoinAddress( const char *address );
 
 	bool m_bReturnHere; // a game started from the list: show it again after the game
 
@@ -464,6 +465,8 @@ private:
 	CzmTextEdit m_field;
 	char m_szDialogError[128];
 	char m_szPending[64];    // server waiting for its password
+	char m_szJoinAddress[64];
+	double m_flJoinStarted;
 
 	char m_szToast[128];
 	double m_flToastTime;
@@ -517,6 +520,7 @@ CCzmServers::CCzmServers() : CMenuFramework( "CzmServers" )
 	memset( &m_field, 0, sizeof( m_field ));
 	m_szDialogError[0] = 0;
 	m_szPending[0] = 0;
+	m_szJoinAddress[0] = 0; m_flJoinStarted = 0;
 	m_szToast[0] = 0;
 	m_flToastTime = 0.0;
 	m_iPressed = HIT_NONE;
@@ -703,6 +707,12 @@ void CCzmServers::OnServerInfo( netadr_t adr, const char *info )
 		e->sources |= SRC_INTERNET;
 
 	UpdateEntry( e, info );
+	if( m_szJoinAddress[0] && !strcmp( m_szJoinAddress, e->address ))
+	{
+		m_szJoinAddress[0] = 0;
+		if( e->maxPlayers > 0 && e->players >= e->maxPlayers ) Toast( CZM_IsRussian() ? "Сервер заполнен. Попробуйте позже" : "Server is full. Try later" );
+		else Connect( e, NULL );
+	}
 }
 
 bool CCzmServers::IsStale( const CzmEntry &e ) const
@@ -1158,6 +1168,7 @@ window
 void CCzmServers::Show()
 {
 	CZM_Init();
+	m_szJoinAddress[0] = 0;
 	m_iFilters = (int)EngFuncs::GetCvarFloat( "czm_srv_filters" ) & (( 1 << FILTER_COUNT ) - 1 );
 	m_iSort = bound( 0, (int)EngFuncs::GetCvarFloat( "czm_srv_sort" ), SORT_COUNT - 1 );
 	m_iPressed = HIT_NONE;
@@ -1177,6 +1188,7 @@ void CCzmServers::Show()
 
 void CCzmServers::Hide()
 {
+	m_szJoinAddress[0] = 0;
 	m_search.End();
 	m_field.End();
 	m_bReturnHere = false;
@@ -2434,6 +2446,11 @@ void CCzmServers::DrawDialog( void )
 void CCzmServers::Draw()
 {
 	double now = EngFuncs::DoubleTime();
+	if( m_szJoinAddress[0] && now - m_flJoinStarted > LIST_TIMEOUT )
+	{
+		m_szJoinAddress[0] = 0;
+		Toast( CZM_IsRussian() ? "Сервер друга не ответил. Можно повторить подключение" : "Your friend's server did not respond. Try again" );
+	}
 	float dt = (float)bound( 0.0, now - m_flLastDraw, 0.05 );
 	char query[64];
 
@@ -2509,6 +2526,26 @@ void UI_CzmServers_Menu( void )
 void CZM_OpenServerList( void )
 {
 	UI_CzmServers_Menu();
+}
+
+void CCzmServers::JoinAddress( const char *address )
+{
+	CzmEntry *e = AddAddress( address, "gs" );
+	if( !e ) { Toast( CZM_IsRussian() ? "Некорректный адрес сервера" : "Invalid server address" ); return; }
+	m_iTab = TAB_ALL; m_iFilters = 0; m_search.text[0] = m_szQuery[0] = 0;
+	e->sources |= SRC_INTERNET;
+	Select( e ); m_bForceRebuild = true;
+	Q_strncpy( m_szJoinAddress, e->address, sizeof( m_szJoinAddress ));
+	m_flJoinStarted = EngFuncs::DoubleTime();
+	RequestDetails( e );
+	Toast( CZM_IsRussian() ? "Проверяем сервер друга…" : "Checking your friend's server…" );
+}
+
+void CZM_JoinAddress( const char *address )
+{
+	if( !address || strlen( address ) >= 64 || strspn( address, "0123456789abcdefABCDEF.:[]" ) != strlen( address )) return;
+	UI_CzmServers_Menu();
+	menu_czmservers->JoinAddress( address );
 }
 
 void CZM_ServerListInfo( netadr_t adr, const char *info )

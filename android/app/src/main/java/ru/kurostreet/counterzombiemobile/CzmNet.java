@@ -85,6 +85,16 @@ public final class CzmNet {
         return SDLActivity.getContext();
     }
 
+    public static boolean copyText(String text) {
+        Context ctx = context();
+        if (!(ctx instanceof android.app.Activity) || text == null || text.length() > 64) return false;
+        ((android.app.Activity) ctx).runOnUiThread(() -> {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null) clipboard.setPrimaryClip(android.content.ClipData.newPlainText("CZM ID", text));
+        });
+        return true;
+    }
+
     /** Native menu calls this only after its first complete draw. */
     public static void startupReady() {
         Context ctx = context();

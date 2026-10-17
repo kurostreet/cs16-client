@@ -96,11 +96,13 @@ static const struct { const char *key, *ru, *en; } s_strings[] =
 	{ "err_kicked", "Сервер отключил тебя.", "The server disconnected you." },
 	{ "err_generic", "Не удалось подключиться к серверу.", "Could not connect to the server." },
 	// main screen
-	{ "nick_hint", "Нажми, чтобы сменить ник", "Tap to change your nickname" },
+	{ "nick_hint", "Нажми, чтобы открыть профиль", "Tap to open your profile" },
 	{ "in_game", "в игре", "playing" },
 	{ "querying", "Опрашиваем сервер…", "Checking the server…" },
 	{ "offline", "Сервер не отвечает", "Server is not responding" },
 	{ "full", "Сервер полон", "Server is full" },
+	{ "nav_friends", "Друзья", "Friends" },
+	{ "nav_friends_hint", "Друзья и сообщения", "Friends and messages" },
 	{ "nav_chat", "Чат", "Chat" },
 	{ "nav_servers", "Серверы", "Servers" },
 	{ "nav_settings", "Настройки", "Settings" },
@@ -374,11 +376,17 @@ void CZM_Init( void )
 		snprintf(value,sizeof(value),"%.4f",k<2?CzmHud::defaults[i][k]:1.f);
 		EngFuncs::CvarRegister(name,value,FCVAR_ARCHIVE);
 	}
+	EngFuncs::CvarRegister( "czm_open_profile", "0", 0 );
+	EngFuncs::CvarRegister( "czm_current_map", "", 0 );
+	EngFuncs::CvarRegister( "czm_profile_id", "0", FCVAR_PRIVILEGED );
+	EngFuncs::CvarRegister( "czm_touch_profile_aspect", "0", FCVAR_PRIVILEGED );
 	EngFuncs::CvarRegister( "czm_tab_style", "0", FCVAR_ARCHIVE ); // keep the current scoreboard by default
 	EngFuncs::CvarRegister( "czm_tag", "", FCVAR_USERINFO|FCVAR_PRIVILEGED ); // public connection binding, never an account token
 	for( int slot = 1; slot <= 32; slot++ )
 	{
 		char name[40]; snprintf( name, sizeof( name ), "czm_tab_avatar_%d", slot );
+		EngFuncs::CvarRegister( name, "", FCVAR_PRIVILEGED );
+		snprintf( name, sizeof( name ), "czm_tab_profile_%d", slot );
 		EngFuncs::CvarRegister( name, "", FCVAR_PRIVILEGED );
 	}
 	EngFuncs::CvarRegister( "czm_avatar", "", FCVAR_ARCHIVE );       // "", "1".."10" or "photo"

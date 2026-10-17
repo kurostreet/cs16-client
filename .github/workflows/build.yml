@@ -70,6 +70,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_avatar_restore.py -v
           python3 -m unittest discover -s tests -p test_scoreboard_styles.py -v
           python3 -m unittest discover -s tests -p test_tab_avatars.py -v
+          python3 -m unittest discover -s tests -p test_social_menu.py -v
           python3 -m unittest discover -s tests -p test_loading_errors.py -v
           python3 -m unittest discover -s tests -p test_background_downloads.py -v
           /tmp/czm-server-check/bin/python -m unittest discover -s tests -p test_sprays.py -v

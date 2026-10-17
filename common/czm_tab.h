@@ -45,6 +45,15 @@ inline void Prefix( char *out, size_t size, const State &state, int slot )
 	std::snprintf( out, size, "%s|%d|%s|", state.server, state.players[slot].userid, state.players[slot].tag );
 }
 
+inline int ProfileId( const char *value, const State &state, int slot )
+{
+	if( slot < 1 || slot > MAX_SLOTS || !state.players[slot].userid || !value ) return 0;
+	char prefix[120], tail; Prefix( prefix, sizeof( prefix ), state, slot );
+	if( std::strncmp( value, prefix, std::strlen( prefix ))) return 0;
+	int id = 0;
+	return std::sscanf( value + std::strlen( prefix ), "%d%c", &id, &tail ) == 1 && id > 0 ? id : 0;
+}
+
 inline bool AvatarPath( const char *path )
 {
 	if( !path ) return false;

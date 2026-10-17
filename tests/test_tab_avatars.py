@@ -145,9 +145,11 @@ int main(){
 #include <cstddef>
 typedef unsigned char byte;
 enum{TF_NOMIPMAP=1,TF_CLAMP=2,kRenderTransAlpha=1};
-struct Hud{float m_flScale;};extern Hud gHUD;extern int g_iXash;
+struct Board { bool m_bForceDraw=false,m_bShowscoresHeld=false; bool ShouldDrawScoreboard()const{return m_bForceDraw||m_bShowscoresHeld;} };
+struct Hud{float m_flScale;Board m_Scoreboard;};
+extern int ScreenWidth,ScreenHeight;extern Hud gHUD;extern int g_iXash;
 struct Tri{void(*RenderMode)(int);void(*Color4f)(float,float,float,float);};
-struct Engine{const char *(*pfnGetCvarString)(const char*);double(*GetClientTime)();byte*(*COM_LoadFile)(const char*,int,int*);void(*COM_FreeFile)(void*);Tri*pTriAPI;};extern Engine gEngfuncs;
+struct Engine{const char *(*pfnGetCvarString)(const char*);double(*GetClientTime)();byte*(*COM_LoadFile)(const char*,int,int*);void(*COM_FreeFile)(void*);Tri*pTriAPI;float(*pfnGetCvarFloat)(const char*);const char*(*pfnGetLevelName)();void(*Cvar_Set)(const char*,const char*);void(*pfnClientCmd)(const char*);};extern Engine gEngfuncs;
 struct Render{int(*GL_LoadTexture)(const char*,const byte*,size_t,int);void(*GL_FreeTexture)(unsigned);void(*GL_SelectTexture)(int);void(*GL_Bind)(int,int);};extern Render gRenderAPI;
 class DrawUtils{public:static void Draw2DQuad(float,float,float,float);};
 '''
@@ -160,11 +162,12 @@ class DrawUtils{public:static void Draw2DQuad(float,float,float,float);};
 #include <cassert>
 #include <cstring>
 #include <cstdlib>
-Hud gHUD={2};int g_iXash=1;static std::map<std::string,std::string> vars;static std::vector<std::string> loaded;static int freed,quads;
-const char *Get(const char *k){return vars[k].c_str();}double Clock(){return 100;}
+Hud gHUD={2};int g_iXash=1;int ScreenWidth=1600,ScreenHeight=900;static int commands;static double testTime=100;static std::map<std::string,std::string> vars;static std::vector<std::string> loaded;static int freed,quads;
+const char *Get(const char *k){return vars[k].c_str();}double Clock(){return testTime;}
+float Float(const char *k){return atof(Get(k));}const char *Level(){return "maps/zm_test.bsp";}void Set(const char*k,const char*v){vars[k]=v;}void Command(const char*k){assert(!strcmp(k,"menu_czmsocial\n"));commands++;}
 byte *File(const char *p,int,int *n){assert(CzmTab::AvatarPath(p));loaded.push_back(p);*n=4;return (byte*)malloc(4);}
 void Free(void*p){free(p);}void Mode(int){}void Color(float,float,float,float){}
-Tri tri={Mode,Color};Engine gEngfuncs={Get,Clock,File,Free,&tri};
+Tri tri={Mode,Color};Engine gEngfuncs={Get,Clock,File,Free,&tri,Float,Level,Set,Command};
 int Load(const char *p,const byte *,size_t,int){assert(!strncmp(p,"czm_tab/",8));return loaded.size();}
 void Release(unsigned){freed++;}void Select(int){}void Bind(int,int){}Render gRenderAPI={Load,Release,Select,Bind};
 void DrawUtils::Draw2DQuad(float x,float y,float x2,float y2){assert(x==20&&y==40&&x2==68&&y2==88);quads++;}
@@ -182,7 +185,31 @@ int main(){
  vars["czm_tab_avatar_2"]="203.0.113.10:27015|43|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|czm_cache/av_99_1.png";
  CZM_DrawTabAvatar(2,false,10,20,24);assert(loaded.size()==count);
  assert(!CzmTab::AvatarPath("gfx/czm/avatars/avatar_01.png/evil"));assert(!CzmTab::AvatarPath("czm_cache/av_../evil.png"));
+
  assert(quads==6);CZM_TabAvatarsVidInit();assert(freed==4);
+ CZM_TabConnectionFrame();assert(vars["czm_current_map"]=="zm_test");
+ vars["czm_tab_profile_2"]="203.0.113.10:27015|42|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|8";
+ vars["czm_touch_profile_aspect"]="0.5625";
+ gHUD.m_Scoreboard.m_bForceDraw=true;CZM_TabProfilesBeginDraw();CZM_TabProfileRow(2,false,100,100,300,40);
+ float x=150.0f/ScreenWidth,y=110.0f/(ScreenWidth*.5625f);
+ assert(CZM_TabProfileTouch(0,7,x,y)==1);assert(CZM_TabProfileTouch(1,7,x,y)==1);
+ assert(commands==1&&vars["czm_open_profile"]=="8"&&!gHUD.m_Scoreboard.m_bForceDraw);
+ // A recycled game slot must not open the previous player's account.
+ gHUD.m_Scoreboard.m_bForceDraw=true;CZM_TabProfilesBeginDraw();CZM_TabProfileRow(2,false,100,100,300,40);
+ assert(CZM_TabProfileTouch(0,7,x,y)==1);
+ vars["czm_tab_state"]="203.0.113.10:27015 41\n1 41 -\n2 43 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n";
+ assert(CZM_TabProfileTouch(1,7,x,y)==1&&commands==1);
+ vars["czm_tab_state"]="203.0.113.10:27015 41\n1 41 -\n2 42 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n";
+ assert(CZM_TabProfileTouch(0,7,x,y)==1);CZM_TabProfileTouch(2,7,x+.2f,y);CZM_TabProfileTouch(1,7,x+.2f,y);assert(commands==1);
+ // Profile aspect is independent from the current screen aspect.
+ ScreenWidth=2000;ScreenHeight=900;x=150.0f/ScreenWidth;y=110.0f/(ScreenWidth*.5625f);
+ CZM_TabProfilesBeginDraw();CZM_TabProfileRow(2,false,100,100,300,40);
+ assert(CZM_TabProfileTouch(0,7,x,y)==1);assert(CZM_TabProfileTouch(1,7,x,y)==1&&commands==2);
+ gHUD.m_Scoreboard.m_bForceDraw=true;testTime+=2;
+ assert(CZM_TabProfileTouch(0,7,x,y)==0);
+ vars["czm_tab_profile_2"]="";CZM_TabProfilesBeginDraw();CZM_TabProfileRow(2,false,100,100,300,40);
+ assert(CZM_TabProfileTouch(0,7,x,y)==0);
+
 }
 '''
         with tempfile.TemporaryDirectory() as folder:

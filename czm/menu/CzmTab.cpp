@@ -21,6 +21,12 @@ void Publish( int slot, const char *value )
 	if( strcmp( EngFuncs::GetCvarString( name ), value )) EngFuncs::CvarSetString( name, value );
 }
 
+void PublishProfile( int slot, const char *value )
+{
+	char name[40]; snprintf( name, sizeof( name ), "czm_tab_profile_%d", slot );
+	if( strcmp( EngFuncs::GetCvarString( name ), value )) EngFuncs::CvarSetString( name, value );
+}
+
 void Discard( Pending &request )
 {
 	int status; CUtlString body;
@@ -35,7 +41,7 @@ void CZM_TabReset( void )
 	s_nextBind = s_nextResolve = s_tagUntil = 0;
 	memset( s_slots, 0, sizeof( s_slots )); memset( &s_seen, 0, sizeof( s_seen ));
 	EngFuncs::CvarSetString( "czm_tag", "" );
-	for( int slot = 1; slot <= 32; slot++ ) Publish( slot, "" );
+	for( int slot = 1; slot <= 32; slot++ ) { Publish( slot, "" ); PublishProfile( slot, "" ); }
 	// In-flight HTTPS results are still polled, then discarded by generation.
 }
 
@@ -118,14 +124,16 @@ void CZM_TabFrame( void )
 	}
 	for( int slot = 1; slot <= 32; slot++ )
 	{
-		char prefix[120], value[192] = ""; CzmTab::Prefix( prefix, sizeof( prefix ), state, slot );
+		char prefix[120], value[192] = "", profile[160] = ""; CzmTab::Prefix( prefix, sizeof( prefix ), state, slot );
 		Avatar &a = s_slots[slot];
 		if( a.until > now && !strcmp( prefix, a.prefix ))
 		{
+			snprintf( profile, sizeof( profile ), "%s%d", prefix, a.player );
 			const char *path = CZM_AvatarFor( a.ref, a.player );
 			if( CzmTab::AvatarPath( path )) snprintf( value, sizeof( value ), "%s%s", prefix, path );
 		}
 		else memset( &a, 0, sizeof( a ));
 		Publish( slot, value );
+		PublishProfile( slot, profile );
 	}
 }

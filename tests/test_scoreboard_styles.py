@@ -53,6 +53,8 @@ void Color(float r,float g,float b) { cr=r*255;cg=g*255;cb=b*255; }
 int Text(int x,int y,const char *s) { int w,h;Len(s,&w,&h);printf("T\t%d\t%d\t%d\t%d\t%d\t%d\t%s\n",x,y,w,cr,cg,cb,s);return x+w; }
 const char *Bot(int i,const char *) { return i==3?"1":"0"; }
 bool CZM_DrawTabAvatar(int,bool,int,int,int) { return true; }
+void CZM_TabProfilesBeginDraw() {}
+void CZM_TabProfileRow(int,bool,int,int,int,int) {}
 Engine gEngfuncs={String,Float,Len,Color,Text,Bot};
 void FillRGBA(int x,int y,int w,int h,int r,int g,int b,int a) { printf("R\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",x,y,w,h,r,g,b,a); }
 void FillRGBABlend(int x,int y,int w,int h,int r,int g,int b,int a) { FillRGBA(x,y,w,h,r,g,b,a); }

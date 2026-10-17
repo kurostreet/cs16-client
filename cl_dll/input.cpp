@@ -26,6 +26,7 @@
 
 #include "vgui_parser.h"
 #include "com_weapons.h"
+#include "hud/czm_avatars.h"
 
 extern int g_weaponselect;
 extern cl_enginefunc_t gEngfuncs;
@@ -372,6 +373,11 @@ int DLLEXPORT HUD_Key_Event( int down, int keynum, const char *pszCurrentBinding
 		g_pMenu->Key( keynum, down );
 
 	return 1;
+}
+
+extern "C" int DLLEXPORT IN_ClientTouchEvent( int type, int finger, float x, float y, float, float )
+{
+	return CZM_TabProfileTouch( type, finger, x, y );
 }
 
 void IN_BreakDown( void ) { KeyDown( &in_break );}

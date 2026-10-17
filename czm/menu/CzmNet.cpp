@@ -138,6 +138,15 @@ bool CZM_NetAvailable( void )
 	return env && CZM_NetClass( env );
 }
 
+bool CZM_CopyText( const char *text )
+{
+	JNIEnv *env; jclass cls;
+	if( !CZM_Begin( &env, &cls )) return false;
+	jmethodID m = CZM_Method( env, cls, "copyText", "(Ljava/lang/String;)Z" );
+	bool copied = m && env->CallStaticBooleanMethod( cls, m, env->NewStringUTF( text ? text : "" ));
+	CZM_End( env ); return copied;
+}
+
 void CZM_ServerAuthShow( const char *address, const char *name )
 {
 	JNIEnv *env;
@@ -520,6 +529,7 @@ void CZM_UpdateState( int *state, double *done, double *total, char *error, size
 #else // not Android: no network for the menu
 
 bool CZM_NetAvailable( void ) { return false; }
+bool CZM_CopyText( const char * ) { return false; }
 void CZM_ServerAuthShow( const char *, const char * ) {}
 void CZM_AccountShow( const char *, const char * ) {}
 bool CZM_AccountEvent( CUtlString & ) { return false; }
