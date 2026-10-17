@@ -255,10 +255,12 @@ void CCzmMainMenu::Layout( void )
 	for( int i = 0; i < m_iTiles; i++ )
 		m_tiles[i] = CZM_Rect( W - m_iMargin - tileW, y + i * ( tileH + gap ), tileW, tileH );
 
-	// bottom navigation
-	y = H * 0.885f;
+	// The visible cards are also their touch targets; the gaps stay empty.
+	y = H * 0.898f;
+	int navMargin = H * 0.022f, navGap = H * 0.014f;
+	int navWidth = ( W - navMargin * 2 - navGap * 3 ) / 4;
 	for( int i = 0; i < 4; i++ )
-		m_nav[i] = CZM_Rect( W * i / 4, y, W * ( i + 1 ) / 4 - W * i / 4, H - y );
+		m_nav[i] = CZM_Rect( navMargin + i * ( navWidth + navGap ), y, navWidth, H - y - H * 0.016f );
 
 	// panels
 	if( m_overlay == OV_SETUP )
@@ -824,34 +826,69 @@ void CCzmMainMenu::DrawTile( int index, CzmRect r )
 	CZM_TileLightning( r, index );
 }
 
+// Two clipped corners give the dock a clear silhouette without a stretched bitmap.
+static void CZM_NavCard( const CzmRect &r, int cut, unsigned int color )
+{
+	UI_FillRect( r.x, r.y + cut, r.w, r.h - cut * 2, color );
+	for( int n = 0; n < cut; n++ )
+	{
+		UI_FillRect( r.x, r.y + n, r.w - cut + n, 1, color );
+		UI_FillRect( r.x + cut - n, r.y + r.h - n - 1, r.w - cut + n, 1, color );
+	}
+}
+
 void CCzmMainMenu::DrawNav( void )
 {
 	static const char *icons[4] = { UI_DIR "icon_chat.png", UI_DIR "icon_globe.png", UI_DIR "icon_gear.png", UI_DIR "icon_info.png" };
 	static const char *labels[4] = { "nav_chat", "nav_servers", "nav_settings", "nav_about" };
-	HFont font = CZM_Font( CZMF_NAV );
-	int top = m_nav[0].y;
-	int iconSize = H * 0.042f;
+	static const char *hints[4] = { "nav_chat_hint", "nav_servers_hint", "nav_settings_hint", "nav_about_hint" };
+	HFont font = CZM_Font( CZMF_LANG ), small = CZM_Font( CZMF_SMALL );
+	int edge = CZM_LineWidth(), pad = H * 0.018f, cut = Q_max( 3, (int)( H * 0.010f ));
+	int badge = H * 0.062f, iconSize = H * 0.036f, chevron = H * 0.021f;
+	int top = m_nav[0].y - H * 0.014f;
+	int widest = 0;
+	for( int i = 0; i < 4; i++ )
+	{
+		widest = Q_max( widest, CZM_TextWidth( font, CZM_T( labels[i] )));
+		widest = Q_max( widest, CZM_TextWidth( small, CZM_T( hints[i] )));
+	}
+	bool horizontal = m_nav[0].w >= pad * 4 + badge + chevron + widest;
 
-	UI_FillRect( 0, top, W, H - top, PackRGBA( 8, 10, 14, 190 ));
-	UI_FillRect( 0, top, W, CZM_LineWidth(), CZM_White( 40 ));
+	CZM_DrawImage( UI_DIR "fade_top.png", 0, top, W, H - top, PackRGBA( 4, 7, 11, 230 ));
 
 	for( int i = 0; i < 4; i++ )
 	{
 		const CzmRect &r = m_nav[i];
 		bool pressed = IsPressed( HIT_NAV + i );
-		unsigned int color = pressed ? CZM_White() : PackRGBA( 225, 228, 235, 255 );
+		unsigned int accent = PackRGBA( 239, 52, 67, 255 );
+		unsigned int textColor = pressed ? CZM_White() : PackRGBA( 235, 239, 246, 255 );
+		CZM_NavCard( CZM_Rect( r.x, r.y + edge * 3, r.w, r.h ), cut, PackRGBA( 0, 0, 0, 110 ));
+		CZM_NavCard( r, cut, pressed ? accent : PackRGBA( 66, 76, 90, 230 ));
+		CZM_NavCard( CZM_Rect( r.x + edge, r.y + edge, r.w - edge * 2, r.h - edge * 2 ), cut - edge,
+			pressed ? PackRGBA( 47, 27, 35, 250 ) : PackRGBA( 15, 23, 33, 245 ));
+		UI_FillRect( r.x + pad, r.y, r.w * 0.28f, edge * 2, accent );
 
-		CzmRect button = CZM_Rect( r.x + H * 0.016f, r.y + H * 0.009f,
-			r.w - H * 0.032f, r.h - H * 0.018f );
-		float pulse = 0.5f + 0.5f * sinf((float)EngFuncs::DoubleTime() * 1.1f - i * 0.6f );
-		CZM_DrawSliced( UI_DIR "button_secondary.png", button.x, button.y, button.w, button.h, 30, (int)( H * 0.02f ),
-			pressed ? PackRGBA( 255, 155, 165, 255 ) : PackRGBA( 255, (int)( 190 + 50 * pulse ), (int)( 195 + 45 * pulse ), 230 ));
-		CZM_DrawImage( UI_DIR "dot.png", r.x + r.w / 2 - iconSize, top, iconSize * 2, iconSize * 2,
-			PackRGBA( 239, 45, 62, pressed ? 80 : (int)( 12 + 17 * pulse )));
-
-		CZM_DrawImage( icons[i], r.x + ( r.w - iconSize ) / 2, top + H * 0.014f, iconSize, iconSize, color );
-		CZM_DrawText( font, r.x, top + H * 0.072f - CZM_FontHeight( font ) / 2, r.w, CZM_T( labels[i] ), color, QM_CENTER );
-
+		if( horizontal )
+		{
+			int badgeX = r.x + pad, badgeY = r.y + ( r.h - badge ) / 2;
+			int textX = badgeX + badge + pad, textW = r.x + r.w - pad * 2 - chevron - textX;
+			int textY = r.y + ( r.h - CZM_FontHeight( font ) - CZM_FontHeight( small ) - edge * 3 ) / 2;
+			UI_FillRect( badgeX, badgeY, badge, badge, pressed ? PackRGBA( 144, 34, 49, 180 ) : PackRGBA( 38, 49, 64, 225 ));
+			CZM_DrawImage( icons[i], badgeX + ( badge - iconSize ) / 2, badgeY + ( badge - iconSize ) / 2, iconSize, iconSize, textColor );
+			CZM_DrawText( font, textX, textY, textW, CZM_T( labels[i] ), textColor );
+			CZM_DrawText( small, textX, textY + CZM_FontHeight( font ) + edge * 3, textW, CZM_T( hints[i] ), PackRGBA( 147, 160, 180, 255 ));
+			CZM_DrawImage( UI_DIR "icon_chevron.png", r.x + r.w - pad - chevron, r.y + ( r.h - chevron ) / 2,
+				chevron, chevron, pressed ? accent : PackRGBA( 113, 128, 148, 255 ));
+		}
+		else
+		{
+			int compactIcon = H * 0.028f;
+			HFont compactFont = CZM_Font( CZMF_NAV );
+			int groupH = compactIcon + edge * 4 + CZM_FontHeight( compactFont );
+			int iconY = r.y + ( r.h - groupH ) / 2;
+			CZM_DrawImage( icons[i], r.x + ( r.w - compactIcon ) / 2, iconY, compactIcon, compactIcon, textColor );
+			CZM_DrawText( compactFont, r.x + pad, iconY + compactIcon + edge * 4, r.w - pad * 2, CZM_T( labels[i] ), textColor, QM_CENTER );
+		}
 	}
 }
 
