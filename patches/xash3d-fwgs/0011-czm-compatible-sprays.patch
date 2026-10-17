@@ -1,0 +1,91 @@
+diff --git a/engine/client/cl_spray.c b/engine/client/cl_spray.c
+--- a/engine/client/cl_spray.c
++++ b/engine/client/cl_spray.c
+@@ -17,7 +17,7 @@
+ #include "client.h"
+ #include "imagelib.h"
+ 
+-#define SPRAY_MAX_SURFACE     12228
++#define SPRAY_MAX_DIMENSION   64 // accepted by GoldSrc/ReHLDS without large-spray extensions
+ #define SPRAY_PALETTE_SIZE    256
+ #define SPRAY_PALETTE_BYTES   ( SPRAY_PALETTE_SIZE * 3 )
+ #define SPRAY_ALPHA_THRESHOLD ( SPRAY_PALETTE_SIZE / 2 )
+@@ -26,24 +26,12 @@
+ // adjusts spray dimensions
+ static void CL_AdjustSprayDimensions( int *width, int *height )
+ {
+-	float aspect = (float)( *width ) / (float)( *height );
+-
+-	for( int h = (( *height ) / 16 ) * 16; h >= 16; h -= 16 )
+-	{
+-		int w = ((int)( h * aspect ) / 16 ) * 16;
+-		if( w < 16 || w > *width )
+-			continue;
+-
+-		if( w * h < SPRAY_MAX_SURFACE )
+-		{
+-			*width = w;
+-			*height = h;
+-			return;
+-		}
+-	}
+-	// fallback: minimal size
+-	*width = 16;
+-	*height = 16;
++	// ReHLDS defaults to a 64px maximum per side, regardless of WAD byte size.
++	// Keep the aspect ratio before rounding to GoldSrc's 16-pixel blocks.
++	float scale = Q_min( 1.0f, Q_min( (float)SPRAY_MAX_DIMENSION / *width,
++		(float)SPRAY_MAX_DIMENSION / *height ));
++	*width = Q_max( 16, ( (int)( *width * scale ) / 16 ) * 16 );
++	*height = Q_max( 16, ( (int)( *height * scale ) / 16 ) * 16 );
+ }
+ 
+ // loads and prepares the image
+@@ -106,6 +94,7 @@
+ qboolean CL_ConvertImageToWAD3( const char *filename )
+ {
+ 	qboolean	is_indexed_img;
++	qboolean	saved = false;
+ 	int			width = 0, height = 0;
+ 	byte		palette[SPRAY_PALETTE_BYTES];
+ 	byte		*indexed = NULL;
+@@ -132,6 +121,8 @@
+ 	else
+ 	{
+ 		quant = FS_CopyImage( image );
++		if( !quant )
++			goto cleanup;
+ 		Image_Quantize( quant ); // it's so weird, it writes result to same structure as used for input data
+ 
+ 		if( !quant || !quant->buffer || !quant->palette )
+@@ -164,12 +155,12 @@
+ 	if( is_indexed_img )
+ 		temp_image.flags |= IMAGE_GRADIENT_DECAL;
+ 
+-	return FS_SaveImage( SPRAY_FILENAME, &temp_image );
++	saved = FS_SaveImage( SPRAY_FILENAME, &temp_image );
+ 
+ cleanup:
+ 	if( image )
+ 		FS_FreeImage( image );
+ 	if( quant )
+ 		FS_FreeImage( quant );
+-	return false;
++	return saved;
+ }
+diff --git a/engine/client/cl_main.c b/engine/client/cl_main.c
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -242,7 +242,11 @@
+ 	Q_snprintf( szFileName, sizeof( szFileName ), "logos/remapped.%s", cl_logoext.string );
+ 	if( cls.net_protocol == PROTO_GOLDSRC )
+ 	{
+-		CL_ConvertImageToWAD3( szFileName );
++		if( !CL_ConvertImageToWAD3( szFileName ))
++		{
++			Con_Printf( "Unable to convert selected spray\n" );
++			return; // never send a stale/default tempdecal.wad for a different image
++		}
+ 		Q_strncpy( szFileName, "tempdecal.wad", sizeof( szFileName ));
+ 	}
+ 	file_t		*fp = FS_Open( szFileName, "rb", true );

@@ -71,6 +71,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_scoreboard_styles.py -v
           python3 -m unittest discover -s tests -p test_loading_errors.py -v
           python3 -m unittest discover -s tests -p test_background_downloads.py -v
+          python3 -m unittest discover -s tests -p test_sprays.py -v
           python3 -m unittest discover -s tests -p test_game_hud.py -v
           python3 -m unittest discover -s tests -p test_settings_apply.py -v
       - name: Build engine and client from source

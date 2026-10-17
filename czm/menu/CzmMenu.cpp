@@ -1742,9 +1742,11 @@ void CZM_SetSpray( int index )
 	if( !data || length <= 0 )
 		return;
 
-	EngFuncs::DeleteFile( "logos/remapped.bmp" );
-	EngFuncs::COM_SaveFile( "logos/remapped.png", data, length );
+	int saved = EngFuncs::COM_SaveFile( "logos/remapped.png", data, length );
 	EngFuncs::COM_FreeFile( data );
+	if( !saved )
+		return;
+	EngFuncs::DeleteFile( "logos/remapped.bmp" );
 
 	EngFuncs::CvarSetString( "cl_logoext", "png" );
 	EngFuncs::CvarSetString( "cl_logofile", s_sprays[index] );
