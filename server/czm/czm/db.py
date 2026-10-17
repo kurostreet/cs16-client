@@ -39,6 +39,17 @@ CREATE TABLE IF NOT EXISTS account_sessions (
     expires INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS account_sessions_player ON account_sessions(player);
+CREATE TABLE IF NOT EXISTS tab_bindings (
+    tag TEXT PRIMARY KEY,
+    owner TEXT NOT NULL,
+    player INTEGER NOT NULL REFERENCES players(id),
+    guest INTEGER NOT NULL,
+    server TEXT NOT NULL,
+    userid INTEGER NOT NULL,
+    expires INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS tab_bindings_owner ON tab_bindings(owner);
+CREATE INDEX IF NOT EXISTS tab_bindings_expires ON tab_bindings(expires);
 CREATE TABLE IF NOT EXISTS auth_limits (
     bucket TEXT PRIMARY KEY,
     count INTEGER NOT NULL,

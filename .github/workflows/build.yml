@@ -69,6 +69,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_map_capture.py -v
           python3 -m unittest discover -s tests -p test_avatar_restore.py -v
           python3 -m unittest discover -s tests -p test_scoreboard_styles.py -v
+          python3 -m unittest discover -s tests -p test_tab_avatars.py -v
           python3 -m unittest discover -s tests -p test_loading_errors.py -v
           python3 -m unittest discover -s tests -p test_background_downloads.py -v
           python3 -m unittest discover -s tests -p test_sprays.py -v
@@ -130,13 +131,16 @@ jobs:
                   assert b"czm/tapscroll.wav" in menu and b"https://counter-zombie.ru%s" in menu, abi
                   assert b"serverAuthShow" in menu and b"accountShow" in menu and b"accountEvent" in menu, abi
                   assert b"colorShow" in menu and b"colorEvent" in menu and b"czm_tab_style" in menu, abi
+                  assert b"/api/v1/tab/bind" in menu and b"/api/v1/tab/resolve" in menu, abi
                   engine = apk.read("lib/" + abi + "/libxash.so")
                   assert b"serverUserinfo" in engine, abi
                   assert b"czm_loading_enable" in engine and b"czm_loading_error" in engine, abi
                   assert b"czm_queryserver" in engine and b"czm_mictest" in engine, abi
+                  assert b"czm_tab_state" in engine and b"czm_tag" in engine, abi
                   client = apk.read("lib/" + abi + "/libclient_android_" + suffix + ".so")
                   assert b"czm_autorun" in client and b"czm_buy_state" in client and b"czm_menu" in client, abi
                   assert b"czm_tab_style" in client, abi
+                  assert b"czm_tab/%s" in client and b"czm_tab_avatar_%d" in client, abi
               for name in ["engine-resources", "client-resources"]:
                   metadata = json.loads(apk.read("assets/bundled/" + name + ".json"))
                   assert hashlib.sha256(apk.read("assets/bundled/" + name + ".zip")).hexdigest() == metadata["sha256"]

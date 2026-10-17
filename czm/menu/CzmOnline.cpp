@@ -73,6 +73,7 @@ static struct
 	int rev;
 	int state;            // 0 nothing, 1 downloading, 2 ready, 3 failed
 	int request;
+	double retry;
 	char path[64];
 } s_avatars[MAX_AVATARS];
 static int s_numAvatars;
@@ -268,6 +269,7 @@ static void PollAvatars( void )
 		if( s_avatars[i].state != 1 || !CZM_NetPoll( s_avatars[i].request, &status, body ))
 			continue;
 		s_avatars[i].state = status == 200 ? 2 : 3;
+		s_avatars[i].retry = EngFuncs::DoubleTime() + RETRY_AFTER;
 	}
 }
 
@@ -300,6 +302,7 @@ void CZM_OnlineFrame( void )
 		CzmJson j;
 		if( j.Parse( body.Get() ))
 		{
+			CZM_TabReset();
 			s_online.ready = false;
 			s_online.player = 0;
 			s_online.nextHello = now;
@@ -435,6 +438,7 @@ void CZM_OnlineFrame( void )
 	}
 
 	PollAvatars();
+	CZM_TabFrame();
 }
 
 /*
@@ -519,7 +523,16 @@ const char *CZM_AvatarFor( const char *ref, int player )
 	for( int i = 0; i < s_numAvatars; i++ )
 	{
 		if( s_avatars[i].player == player && s_avatars[i].rev == rev )
+		{
+			if( s_avatars[i].state == 3 && EngFuncs::DoubleTime() >= s_avatars[i].retry )
+			{
+				char url[160]; snprintf( url, sizeof( url ), "/avatars/%d.png?v=%d", player, rev );
+				s_avatars[i].request = CZM_NetDownload( CZM_OnlineUrl( url ), s_avatars[i].path );
+				s_avatars[i].state = s_avatars[i].request ? 1 : 3;
+				s_avatars[i].retry = EngFuncs::DoubleTime() + RETRY_AFTER;
+			}
 			return s_avatars[i].state == 2 ? s_avatars[i].path : CZM_AvatarImage( CZM_AVATAR_LOGO );
+		}
 	}
 
 	// a new photo: download it once
@@ -540,6 +553,7 @@ const char *CZM_AvatarFor( const char *ref, int player )
 		snprintf( url, sizeof( url ), "/avatars/%d.png?v=%d", player, rev );
 		s_avatars[slot].request = CZM_NetDownload( CZM_OnlineUrl( url ), s_avatars[slot].path );
 		s_avatars[slot].state = s_avatars[slot].request ? 1 : 3;
+		s_avatars[slot].retry = EngFuncs::DoubleTime() + RETRY_AFTER;
 	}
 
 	return CZM_AvatarImage( CZM_AVATAR_LOGO );

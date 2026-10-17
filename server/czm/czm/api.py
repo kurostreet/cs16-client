@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from PIL import Image
 from pydantic import BaseModel, Field
 
-from . import service, mappics, accounts, settings
+from . import service, mappics, accounts, settings, tab
 from .config import get_settings
 from .db import db
 
@@ -52,6 +52,7 @@ class _Limiter:
 _hello_limit = _Limiter(20, 60)
 _read_limit = _Limiter(120, 60)
 _upload_limit = _Limiter(6, 600)
+_tab_limit = _Limiter(240, 60)
 
 
 def client_ip(request: Request) -> str:
@@ -103,6 +104,42 @@ async def hello(body: HelloIn, request: Request):
 
     try:
         return await in_db(run)
+    except accounts.AuthError as error:
+        return JSONResponse({"error": error.code}, status_code=error.status)
+
+
+class TabPlayer(BaseModel):
+    userid: int = Field(gt=0, le=2147483647)
+    tag: str = Field(pattern=r"^[0-9a-f]{32}$")
+
+
+class TabBindIn(BaseModel):
+    server: str = Field(min_length=7, max_length=64)
+    userid: int = Field(gt=0, le=2147483647)
+    tag: str = Field(default="", pattern=r"^([0-9a-f]{32})?$")
+
+
+class TabResolveIn(BaseModel):
+    server: str = Field(min_length=7, max_length=64)
+    players: list[TabPlayer] = Field(max_length=32)
+
+
+@router.post("/tab/bind")
+async def tab_bind(body: TabBindIn, request: Request, x_czm_key: str | None = Header(default=None)):
+    _tab_limit.check(client_ip(request))
+    try:
+        result = await in_db(tab.bind, x_czm_key or "", body.server, body.userid, body.tag)
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
+    except accounts.AuthError as error:
+        return JSONResponse({"error": error.code}, status_code=error.status)
+
+
+@router.post("/tab/resolve")
+async def tab_resolve(body: TabResolveIn, request: Request, x_czm_key: str | None = Header(default=None)):
+    _tab_limit.check(client_ip(request))
+    try:
+        result = await in_db(tab.resolve, x_czm_key or "", body.server, [p.model_dump() for p in body.players])
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
     except accounts.AuthError as error:
         return JSONResponse({"error": error.code}, status_code=error.status)
 

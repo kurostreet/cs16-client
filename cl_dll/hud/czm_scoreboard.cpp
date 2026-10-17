@@ -2,6 +2,7 @@
 #include "hud.h"
 #include "cl_util.h"
 #include "draw_util.h"
+#include "czm_avatars.h"
 #include <algorithm>
 #include <stdio.h>
 #include <stdlib.h>
@@ -164,8 +165,9 @@ int CHudScoreboard::DrawCzmScoreboard( void )
 			FillRGBABlend( left, y, cw, std::max( 1, rh - space ), p.thisplayer ? 90 : 24, p.thisplayer ? 24 : 28, p.thisplayer ? 34 : 38, p.thisplayer ? 220 : ( row % 2 ? 145 : 205 ));
 			FillRGBA( left, y, std::max( 2, pad / 3 ), std::max( 1, rh - space ), team == 1 ? 233 : 75, team == 2 ? 167 : 84, team == 2 ? 245 : 101, 240 );
 			int ty = y + std::max( 0, ( rh - fontH ) / 2 );
-			const int icon = style == 1 ? 0 : std::max( 0, std::min( rh - 2, pad * 3 ));
-			if( style != 1 ) Text( left + pad, ty, icon, "?", 130, 144, 162 );
+			const int icon = std::max( 0, std::min( rh - 2, pad * 3 ));
+			if( icon > 0 && !CZM_DrawTabAvatar( id, p.thisplayer != 0, left + pad, y + ( rh - icon ) / 2, icon ))
+				Text( left + pad, ty, icon, "?", 130, 144, 162 );
 			const int nx = left + pad + icon;
 			Text( nx, ty, std::max( 0, nameW - pad - icon - pad ), p.name, p.thisplayer ? 255 : 225, p.thisplayer ? 238 : 230, p.thisplayer ? 240 : 238 );
 			// Status is conveyed by the stripe and a small live/dead indicator.

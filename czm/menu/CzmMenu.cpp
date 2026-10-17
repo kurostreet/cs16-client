@@ -375,6 +375,12 @@ void CZM_Init( void )
 		EngFuncs::CvarRegister(name,value,FCVAR_ARCHIVE);
 	}
 	EngFuncs::CvarRegister( "czm_tab_style", "0", FCVAR_ARCHIVE ); // keep the current scoreboard by default
+	EngFuncs::CvarRegister( "czm_tag", "", FCVAR_USERINFO|FCVAR_PRIVILEGED ); // public connection binding, never an account token
+	for( int slot = 1; slot <= 32; slot++ )
+	{
+		char name[40]; snprintf( name, sizeof( name ), "czm_tab_avatar_%d", slot );
+		EngFuncs::CvarRegister( name, "", FCVAR_PRIVILEGED );
+	}
 	EngFuncs::CvarRegister( "czm_avatar", "", FCVAR_ARCHIVE );       // "", "1".."10" or "photo"
 	EngFuncs::CvarRegister( "czm_avatar_photo", "", FCVAR_ARCHIVE ); // the player's own photo file
 	EngFuncs::CvarRegister( "czm_avatar_sent", "", FCVAR_ARCHIVE );  // the photo the service already has

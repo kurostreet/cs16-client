@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "hud.h"
+#include "czm_avatars.h"
 #include "cl_util.h"
 #include "parsemsg.h"
 #include "triangleapi.h"
@@ -114,6 +115,7 @@ int CHudScoreboard :: Init( void )
 
 int CHudScoreboard :: VidInit( void )
 {
+	CZM_TabAvatarsVidInit();
 	xstart = ScreenWidth * 0.125f;
 	xend = ScreenWidth - xstart;
 	ystart = 100;

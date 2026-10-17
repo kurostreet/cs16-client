@@ -270,6 +270,8 @@ void CZM_CloudApplied( int request, bool success );
 void CZM_CloudFrame( void );
 bool CZM_ColorPickerEvent( int &r, int &g, int &b );
 void CZM_OnlineAvatarChanged( void );
+void CZM_TabFrame( void );
+void CZM_TabReset( void );
 void CZM_StartupReady( void );
 // a request number, 0 if there is no network layer; body is UTF-8 JSON or ""
 int CZM_NetRequest( const char *method, const char *url, const char *key, const char *body );

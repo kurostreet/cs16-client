@@ -1,0 +1,65 @@
+diff --git a/engine/client/cl_main.c b/engine/client/cl_main.c
+--- a/engine/client/cl_main.c
++++ b/engine/client/cl_main.c
+@@ -102,6 +102,7 @@
+ CVAR_DEFINE_AUTO( rate, "25000", FCVAR_USERINFO|FCVAR_ARCHIVE|FCVAR_FILTERABLE, "player network rate" );
+ 
+ CVAR_DEFINE_AUTO( cl_ticket_generator, "revemu2013", FCVAR_ARCHIVE|FCVAR_PRIVILEGED, "you wouldn't steal a car" );
++static CVAR_DEFINE_AUTO( czm_tab_state, "", FCVAR_READ_ONLY|FCVAR_PRIVILEGED, "public TAB connection snapshot" );
+ static CVAR_DEFINE_AUTO( cl_advertise_engine_in_name, "1", FCVAR_ARCHIVE|FCVAR_PRIVILEGED, "add [Xash3D] to the nickname when connecting to GoldSrc servers" );
+ static CVAR_DEFINE_AUTO( cl_log_outofband, "0", FCVAR_ARCHIVE, "log out of band messages, can be useful for server admins and for engine debugging" );
+ static CVAR_DEFINE_AUTO( cl_autorecord, "0", 0, "automatically start recording a demo after joining the server" );
+@@ -174,6 +175,29 @@
+ 	return 0;
+ }
+ 
++// Publish only server-assigned IDs and public avatar tags. No nicknames or credentials.
++static void CL_CzmTabState( void )
++{
++ char state[2048] = "";
++ if( cls.state == ca_active && !cls.demoplayback && cl.maxclients > 1
++  && cl.playernum >= 0 && cl.playernum < cl.maxclients && cl.players[cl.playernum].userid > 0 )
++ {
++  Q_snprintf( state, sizeof( state ), "%s %d\n", NET_AdrToString( cls.netchan.remote_address ), cl.players[cl.playernum].userid );
++  for( int i = 0; i < Q_min( cl.maxclients, 32 ); i++ )
++  {
++   const player_info_t *p = &cl.players[i];
++   if( !p->name[0] || p->userid <= 0 ) continue;
++   const char *tag = Info_ValueForKey( p->userinfo, "czm_tag" );
++   qboolean valid = Q_strlen( tag ) == 32;
++   for( int n = 0; valid && n < 32; n++ )
++    if( !( tag[n] >= '0' && tag[n] <= '9' ) && !( tag[n] >= 'a' && tag[n] <= 'f' )) valid = false;
++   size_t used = Q_strlen( state );
++   Q_snprintf( state + used, sizeof( state ) - used, "%d %d %s\n", i + 1, p->userid, valid ? tag : "-" );
++  }
++ }
++ if( Q_strcmp( czm_tab_state.string, state )) Cvar_DirectFullSet( &czm_tab_state, state, FCVAR_READ_ONLY|FCVAR_PRIVILEGED );
++}
++
+ connprotocol_t CL_Protocol( void )
+ {
+ 	return cls.net_protocol;
+@@ -1666,6 +1690,7 @@
+ */
+ void CL_ClearState( void )
+ {
++	Cvar_DirectFullSet( &czm_tab_state, "", FCVAR_READ_ONLY|FCVAR_PRIVILEGED );
+ 	CL_ClearResourceLists();
+ 
+ 	for( int i = 0; i < MAX_CLIENTS; i++ )
+@@ -3757,6 +3782,7 @@
+ 
+ 	Cvar_RegisterVariable( &cl_ticket_generator );
+ 	Cvar_RegisterVariable( &cl_advertise_engine_in_name );
++	Cvar_RegisterVariable( &czm_tab_state );
+ 	Cvar_RegisterVariable( &cl_log_outofband );
+ 	Cvar_RegisterVariable( &cl_autorecord );
+ 
+@@ -4023,6 +4049,7 @@
+ 
+ 	// read updates from server
+ 	CL_ReadPackets ();
++	CL_CzmTabState();
+ 
+ 	// do prediction again in case we got
+ 	// a new portion updates from server
