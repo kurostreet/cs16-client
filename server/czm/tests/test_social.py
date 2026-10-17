@@ -1,0 +1,147 @@
+import os
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from czm import accounts, api, db, service, social
+from czm.config import get_settings
+
+
+class SocialTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(); self.addCleanup(temp.cleanup)
+        env = patch.dict(os.environ, {"CZM_DATA_DIR": temp.name}); env.start(); self.addCleanup(env.stop)
+        get_settings.cache_clear(); self.addCleanup(get_settings.cache_clear); db.init()
+        app = FastAPI(); app.include_router(api.router)
+        self.client = TestClient(app); self.addCleanup(self.client.close)
+        self.keys, self.ids = [], []
+        with db.db() as c:
+            for i in range(3):
+                legacy = "social-player-legacy-key-%d" % i
+                service.hello(c, legacy, "social-device-%d" % i, "Same nickname", str(i+1), "ru", "test")
+                result = accounts.register(c, legacy, "SocialPlayer%d" % i, "Password123", "Password123", "ip%d" % i)
+                self.keys.append(result["token"]); self.ids.append(result["profile"]["id"])
+            self.guest = "social-guest-legacy-key-123"
+            self.guest_id = service.hello(c, self.guest, "guest", "Guest", "", "en", "test")["id"]
+
+    def request(self, method, path, actor=0, **kwargs):
+        return self.client.request(method, "/api/v1/"+path, headers={"X-CZM-Key": self.keys[actor]}, **kwargs)
+
+    def follow(self, actor=0, target=1, action="follow"):
+        return self.request("POST", "social/action", actor, json={"target": self.ids[target], "action": action})
+
+    def friends(self):
+        self.assertEqual(self.follow().status_code, 200)
+        self.assertEqual(self.follow(1, 0).status_code, 200)
+
+    def send(self, actor=0, target=1, nonce="message-unique-0001", text="Hello friend"):
+        return self.request("POST", "social/dialog/%d" % self.ids[target], actor, json={"text": text, "nonce": nonce})
+
+    def test_directional_links_friend_removal_and_unsubscribe(self):
+        self.assertEqual(self.follow().json()["profile"]["relation"], "following")
+        c = self.request("GET", "social/summary", 1).json()["counts"]
+        self.assertEqual((c["friends"], c["followers"], c["requests"]), (0, 1, 1))
+        self.follow(1, 0)
+        c = self.request("GET", "social/summary").json()["counts"]
+        self.assertEqual((c["friends"], c["followers"], c["following"]), (1, 0, 0))
+        self.follow(0, 1, "unfollow")
+        self.assertEqual(self.request("GET", "social/people/followers").json()["people"][0]["id"], self.ids[1])
+        self.follow(1, 0, "unfollow")
+        self.assertEqual(self.request("GET", "social/summary").json()["counts"]["followers"], 0)
+
+    def test_private_messages_require_mutual_friendship_and_are_idempotent(self):
+        self.assertEqual(self.send().status_code, 403)
+        self.follow()
+        self.assertEqual(self.send().status_code, 403)
+        self.follow(1, 0)
+        sent = self.send(); self.assertEqual(sent.status_code, 200, sent.text)
+        self.assertEqual(sent.json(), self.send().json())
+        self.assertEqual(self.send(text="different").status_code, 409)
+        self.assertEqual(self.request("GET", "social/summary", 1).json()["counts"]["unread"], 1)
+        mid = sent.json()["message"]["id"]
+        self.request("POST", "social/dialog/%d/read" % self.ids[0], 1, json={"through": mid})
+        self.assertEqual(self.request("GET", "social/summary", 1).json()["counts"]["unread"], 0)
+
+    def test_history_survives_unfriending_but_cannot_be_read_by_other_accounts(self):
+        self.friends(); self.send()
+        self.follow(0, 1, "unfollow")
+        history = self.request("GET", "social/dialog/%d" % self.ids[0], 1).json()
+        self.assertEqual(history["messages"][0]["t"], "Hello friend")
+        self.assertFalse(history["can_send"])
+        self.assertEqual(self.send(nonce="message-unique-0002").status_code, 403)
+        other = self.request("GET", "social/dialog/%d" % self.ids[0], 2).json()
+        self.assertEqual(other["messages"], [])
+        self.assertEqual(self.request("GET", "social/dialogs", 2).json()["people"], [])
+
+    def test_block_removes_both_links_and_prevents_messages_and_server_disclosure(self):
+        self.friends(); self.send()
+        self.request("POST", "social/presence", 1, json={"server": "203.0.113.5:27015", "map": "zm_test"})
+        profile = self.request("GET", "social/profile/%d" % self.ids[1]).json()["profile"]
+        self.assertEqual(profile["server"], "203.0.113.5:27015")
+        self.follow(0, 1, "block")
+        self.assertEqual(self.send(nonce="message-unique-0002").status_code, 403)
+        self.assertEqual(self.follow(1, 0).status_code, 403)
+        profile = self.request("GET", "social/profile/%d" % self.ids[0], 1).json()["profile"]
+        self.assertEqual((profile["online"], profile["server"], profile["last_seen"]), (False, "", 0))
+        self.follow(0, 1, "unblock")
+        self.assertEqual(self.request("GET", "social/summary").json()["counts"]["friends"], 0)
+
+    def test_presence_expires_and_logout_invalidates_it_immediately(self):
+        sent = self.request("POST", "social/presence", 1, json={})
+        self.assertEqual(sent.status_code, 200)
+        with db.db() as c:
+            viewer = social.actor(c, self.keys[0])
+            self.assertTrue(social.profile(c, viewer, self.ids[1])["online"])
+            with patch("czm.social.now", return_value=db.now()+social.PRESENCE_TTL+1):
+                p = social.profile(c, viewer, self.ids[1])
+                self.assertFalse(p["online"]); self.assertGreater(p["last_seen"], 0)
+            accounts.logout(c, self.keys[1])
+            self.assertFalse(social.profile(c, viewer, self.ids[1])["online"])
+
+    def test_guest_can_view_profiles_but_cannot_create_persistent_social_links(self):
+        headers = {"X-CZM-Key": self.guest}
+        response = self.client.get("/api/v1/social/profile/%d" % self.ids[0], headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        response = self.client.post("/api/v1/social/action", headers=headers, json={"target": self.ids[0], "action": "follow"})
+        self.assertEqual(response.json()["error"], "account_required")
+        self.assertEqual(self.client.get("/api/v1/social/summary").status_code, 401)
+        self.assertEqual(self.follow(0, 0).status_code, 400)
+        guest_target = self.request("POST", "social/action", json={"target": self.guest_id, "action": "follow"})
+        self.assertEqual(guest_target.status_code, 404)
+
+    def test_profile_exposes_only_actual_public_data_and_status_survives_new_session(self):
+        self.request("POST", "social/status", json={"text": "Ready for zombie escape"})
+        with db.db() as c:
+            token = accounts.login(c, "SocialPlayer0", "Password123", "new-ip")["token"]
+            result = social.summary(c, token)["profile"]
+        self.assertEqual(result["status"], "Ready for zombie escape")
+        self.assertEqual(result["id"], self.ids[0])
+        for field in ("email", "password_hash", "token", "device_hash", "key_hash", "kills", "wins", "level"):
+            self.assertNotIn(field, result)
+
+    def test_dm_reports_require_participation_and_moderator_deletion_does_not_touch_public_chat(self):
+        self.friends(); message = self.send().json()["message"]["id"]
+        with db.db() as c:
+            stranger = social.actor(c, self.keys[2]); recipient = social.actor(c, self.keys[1])
+            self.assertIsNone(service.report(c, stranger, None, None, message))
+            info = service.report(c, recipient, None, None, message)
+            self.assertEqual(info["message"], "Hello friend")
+            self.assertEqual(info["room"], "Личное сообщение")
+            self.assertIsNone(info["message_id"])
+            service.delete_report_message(c, info)
+        history = self.request("GET", "social/dialog/%d" % self.ids[0], 1).json()
+        self.assertTrue(history["messages"][0]["deleted"])
+        self.assertEqual(history["messages"][0]["t"], "")
+
+    def test_invalid_addresses_and_repeated_init_are_safe(self):
+        self.assertEqual(self.request("POST", "social/presence", json={"server": "https://site/path"}).status_code, 400)
+        self.assertEqual(self.request("POST", "social/presence", json={"map": "x\nconnect evil"}).status_code, 400)
+        self.assertEqual(self.send(nonce="short").status_code, 422)
+        self.friends(); self.send(); db.init()
+        self.assertEqual(len(self.request("GET", "social/dialogs").json()["people"]), 1)
+
+
+if __name__ == "__main__": unittest.main()

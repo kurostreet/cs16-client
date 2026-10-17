@@ -169,14 +169,21 @@ def post_message(conn: sqlite3.Connection, player: sqlite3.Row, room: str, text:
 
 # complaints and bans ---------------------------------------------------------
 
-def report(conn: sqlite3.Connection, reporter: sqlite3.Row, message_id: int | None, player_id: int | None) -> dict | None:
+def report(conn: sqlite3.Connection, reporter: sqlite3.Row, message_id: int | None, player_id: int | None, private_message_id: int | None = None) -> dict | None:
     """A new complaint, or None if it repeats one or makes no sense."""
     t = now()
     if conn.execute("SELECT COUNT(*) FROM reports WHERE reporter = ? AND created > ?", (reporter["id"], t - 3600)).fetchone()[0] >= 10:
         raise ChatError("slow", 429, wait=600)
 
     message = None
-    if message_id:
+    if private_message_id:
+        message = conn.execute(
+            "SELECT m.*,d.low,d.high FROM private_messages m JOIN private_dialogs d ON d.id=m.dialog WHERE m.id=? AND m.deleted=0",
+            (private_message_id,)).fetchone()
+        if message is None or reporter["id"] not in (message["low"], message["high"]) or message["sender"] == reporter["id"]:
+            return None
+        player_id, message_id = message["sender"], None
+    elif message_id:
         message = conn.execute("SELECT * FROM messages WHERE id = ? AND deleted = 0", (message_id,)).fetchone()
         if message is None:
             return None
@@ -187,14 +194,14 @@ def report(conn: sqlite3.Connection, reporter: sqlite3.Row, message_id: int | No
         return None
 
     if conn.execute(
-        "SELECT 1 FROM reports WHERE reporter = ? AND target = ? AND message IS ? AND created > ?",
-        (reporter["id"], player_id, message_id or None, t - 86400),
+        "SELECT 1 FROM reports WHERE reporter = ? AND target = ? AND message IS ? AND private_message IS ? AND created > ?",
+        (reporter["id"], player_id, message_id or None, private_message_id or None, t - 86400),
     ).fetchone():
         return None
 
     cur = conn.execute(
-        "INSERT INTO reports (reporter, target, message, created) VALUES (?, ?, ?, ?)",
-        (reporter["id"], player_id, message_id or None, t),
+        "INSERT INTO reports (reporter, target, message, private_message, created) VALUES (?, ?, ?, ?, ?)",
+        (reporter["id"], player_id, message_id or None, private_message_id or None, t),
     )
     return report_info(conn, cur.lastrowid)
 
@@ -206,6 +213,7 @@ def report_info(conn: sqlite3.Connection, report_id: int) -> dict | None:
     target = conn.execute("SELECT * FROM players WHERE id = ?", (r["target"],)).fetchone()
     reporter = conn.execute("SELECT nick FROM players WHERE id = ?", (r["reporter"],)).fetchone()
     message = conn.execute("SELECT * FROM messages WHERE id = ?", (r["message"],)).fetchone() if r["message"] else None
+    private = conn.execute("SELECT * FROM private_messages WHERE id=?", (r["private_message"],)).fetchone() if r["private_message"] else None
     count = conn.execute("SELECT COUNT(*) FROM reports WHERE target = ? AND created > ?", (r["target"], now() - 7 * 86400)).fetchone()[0]
     return {
         "id": r["id"],
@@ -216,9 +224,10 @@ def report_info(conn: sqlite3.Connection, report_id: int) -> dict | None:
         "avatar_rev": target["avatar_rev"],
         "reporter": r["reporter"],
         "reporter_nick": reporter["nick"] if reporter else "",
-        "message": message["text"] if message else None,
-        "room": message["room"] if message else None,
+        "message": private["text"] if private else message["text"] if message else None,
+        "room": "Личное сообщение" if private else message["room"] if message else None,
         "message_id": r["message"],
+        "private_message_id": r["private_message"],
         "reports_week": count,
     }
 
@@ -268,6 +277,13 @@ def resolve_report(conn: sqlite3.Connection, report_id: int, status: str) -> Non
 
 def delete_message(conn: sqlite3.Connection, message_id: int) -> None:
     conn.execute("UPDATE messages SET deleted = 1 WHERE id = ?", (message_id,))
+
+
+def delete_report_message(conn, info):
+    if info.get("private_message_id"):
+        conn.execute("UPDATE private_messages SET deleted=1 WHERE id=?", (info["private_message_id"],))
+    elif info.get("message_id"):
+        delete_message(conn, info["message_id"])
 
 
 # news and releases -----------------------------------------------------------

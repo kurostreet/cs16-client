@@ -314,16 +314,16 @@ class OwnerBot:
             if parts[0] == "b" and len(parts) == 3 and parts[2] in LENGTHS:
                 length = LENGTHS[parts[2]]
                 service.ban(conn, info["target"], length, f"жалоба #{report_id}")
-                if info["message_id"]:
-                    service.delete_message(conn, info["message_id"])
+                if info["message_id"] or info.get("private_message_id"):
+                    service.delete_report_message(conn, info)
                 else:
                     service.reset_avatar(conn, info["target"])
                 # the other complaints about this player are answered too
                 conn.execute("UPDATE reports SET status = 'banned', resolved = strftime('%s','now') WHERE target = ? AND status = 'open'",
                              (info["target"],))
-                return info, f"🚫 Забанен {LENGTH_NAMES[length]}" + (", сообщение удалено." if info["message_id"] else ", аватар сброшен.")
-            if parts[0] == "d" and info["message_id"]:
-                service.delete_message(conn, info["message_id"])
+                return info, f"🚫 Забанен {LENGTH_NAMES[length]}" + (", сообщение удалено." if info["message_id"] or info.get("private_message_id") else ", аватар сброшен.")
+            if parts[0] == "d" and (info["message_id"] or info.get("private_message_id")):
+                service.delete_report_message(conn, info)
                 service.resolve_report(conn, report_id, "deleted")
                 return info, "🗑 Сообщение удалено."
             if parts[0] == "k":

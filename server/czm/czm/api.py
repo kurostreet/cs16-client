@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from PIL import Image
 from pydantic import BaseModel, Field
 
-from . import service, mappics, accounts, settings, tab
+from . import service, mappics, accounts, settings, tab, social
 from .config import get_settings
 from .db import db
 
@@ -53,6 +53,7 @@ _hello_limit = _Limiter(20, 60)
 _read_limit = _Limiter(120, 60)
 _upload_limit = _Limiter(6, 600)
 _tab_limit = _Limiter(240, 60)
+_social_limit = _Limiter(240, 60)
 
 
 def client_ip(request: Request) -> str:
@@ -213,18 +214,107 @@ async def post(room: str, body: MessageIn, x_czm_key: str | None = Header(defaul
 class ReportIn(BaseModel):
     message: int | None = None
     player: int | None = None
+    private_message: int | None = None
 
 
 @router.post("/report")
 async def report(body: ReportIn, x_czm_key: str | None = Header(default=None)):
     reporter = await current_player(x_czm_key)
     try:
-        info = await in_db(service.report, reporter, body.message, body.player)
+        info = await in_db(service.report, reporter, body.message, body.player, body.private_message)
     except service.ChatError as e:
         return JSONResponse({"error": e.code, **e.extra}, status_code=e.status)
     if info and notify_report:
         asyncio.create_task(notify_report(info))
     return {"ok": True}
+
+
+# Social data is private to the authenticated viewer; never cache these responses.
+async def social_result(request, operation):
+    _social_limit.check(client_ip(request))
+
+    def run(conn):
+        try:
+            return 200, operation(conn)
+        except accounts.AuthError as error:
+            # Rate counters are committed even when an operation is rejected.
+            return error.status, {"error": error.code}
+
+    status, result = await in_db(run)
+    return JSONResponse(result, status_code=status, headers={"Cache-Control": "no-store"})
+
+
+class PresenceIn(BaseModel):
+    server: str = Field(default="", max_length=64)
+    map: str = Field(default="", max_length=64)
+
+
+class SocialStatusIn(BaseModel):
+    text: str = Field(max_length=400)
+
+
+class SocialActionIn(BaseModel):
+    target: int = Field(default=0, ge=0, le=2147483647)
+    action: str = Field(pattern=r"^(follow|unfollow|block|unblock|seen)$")
+
+
+class PrivateMessageIn(BaseModel):
+    text: str = Field(max_length=1600)
+    nonce: str = Field(pattern=r"^[A-Za-z0-9_-]{16,64}$")
+
+
+class PrivateReadIn(BaseModel):
+    through: int = Field(ge=0, le=2147483647)
+
+
+@router.post("/social/presence")
+async def social_presence(body: PresenceIn, request: Request, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.heartbeat(c, x_czm_key or "", body.server, body.map))
+
+
+@router.get("/social/summary")
+async def social_summary(request: Request, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.summary(c, x_czm_key or ""))
+
+
+@router.get("/social/profile/{target}")
+async def social_profile(target: int, request: Request, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: {"profile": social.profile(c, social.actor(c, x_czm_key or "", False), target)})
+
+
+@router.post("/social/status")
+async def social_status(body: SocialStatusIn, request: Request, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.update_status(c, x_czm_key or "", body.text))
+
+
+@router.post("/social/action")
+async def social_action(body: SocialActionIn, request: Request, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.action(c, x_czm_key or "", body.target, body.action))
+
+
+@router.get("/social/people/{kind}")
+async def social_people(kind: str, request: Request, offset: int = 0, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.people(c, x_czm_key or "", kind, max(0, min(1000000, offset))))
+
+
+@router.get("/social/dialogs")
+async def social_dialogs(request: Request, offset: int = 0, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.dialogs(c, x_czm_key or "", max(0, min(1000000, offset))))
+
+
+@router.get("/social/dialog/{target}")
+async def social_history(target: int, request: Request, before: int = 0, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.history(c, x_czm_key or "", target, max(0, before)))
+
+
+@router.post("/social/dialog/{target}")
+async def social_send(target: int, body: PrivateMessageIn, request: Request, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.send(c, x_czm_key or "", target, body.text, body.nonce))
+
+
+@router.post("/social/dialog/{target}/read")
+async def social_read(target: int, body: PrivateReadIn, request: Request, x_czm_key: str | None = Header(default=None)):
+    return await social_result(request, lambda c: social.mark_read(c, x_czm_key or "", target, body.through))
 
 
 @router.post("/mappic/{name}")

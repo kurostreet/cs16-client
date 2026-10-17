@@ -50,6 +50,55 @@ CREATE TABLE IF NOT EXISTS tab_bindings (
 );
 CREATE INDEX IF NOT EXISTS tab_bindings_owner ON tab_bindings(owner);
 CREATE INDEX IF NOT EXISTS tab_bindings_expires ON tab_bindings(expires);
+CREATE TABLE IF NOT EXISTS social_profiles (
+    player INTEGER PRIMARY KEY REFERENCES players(id),
+    status TEXT NOT NULL DEFAULT '',
+    last_seen INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS social_presence (
+    owner TEXT PRIMARY KEY,
+    player INTEGER NOT NULL REFERENCES players(id),
+    seen INTEGER NOT NULL,
+    server TEXT NOT NULL DEFAULT '',
+    map TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS social_presence_player ON social_presence(player, seen);
+CREATE TABLE IF NOT EXISTS social_follows (
+    source INTEGER NOT NULL REFERENCES accounts(player),
+    target INTEGER NOT NULL REFERENCES accounts(player),
+    created INTEGER NOT NULL,
+    seen INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(source, target),
+    CHECK(source != target)
+);
+CREATE INDEX IF NOT EXISTS social_follows_target ON social_follows(target, source);
+CREATE TABLE IF NOT EXISTS social_blocks (
+    source INTEGER NOT NULL REFERENCES accounts(player),
+    target INTEGER NOT NULL REFERENCES accounts(player),
+    PRIMARY KEY(source, target),
+    CHECK(source != target)
+);
+CREATE TABLE IF NOT EXISTS private_dialogs (
+    id INTEGER PRIMARY KEY,
+    low INTEGER NOT NULL REFERENCES accounts(player),
+    high INTEGER NOT NULL REFERENCES accounts(player),
+    read_low INTEGER NOT NULL DEFAULT 0,
+    read_high INTEGER NOT NULL DEFAULT 0,
+    last_message INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(low, high),
+    CHECK(low < high)
+);
+CREATE TABLE IF NOT EXISTS private_messages (
+    id INTEGER PRIMARY KEY,
+    dialog INTEGER NOT NULL REFERENCES private_dialogs(id),
+    sender INTEGER NOT NULL REFERENCES accounts(player),
+    text TEXT NOT NULL,
+    created INTEGER NOT NULL,
+    nonce TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(sender, nonce)
+);
+CREATE INDEX IF NOT EXISTS private_messages_dialog ON private_messages(dialog, id);
 CREATE TABLE IF NOT EXISTS auth_limits (
     bucket TEXT PRIMARY KEY,
     count INTEGER NOT NULL,
@@ -161,6 +210,7 @@ CREATE TABLE IF NOT EXISTS builds (
 # columns added after the first version of a table
 COLUMNS = {
     "releases": {"news_id": "INTEGER", "auto": "INTEGER NOT NULL DEFAULT 0"},
+    "reports": {"private_message": "INTEGER"},
 }
 
 _lock = threading.Lock()
