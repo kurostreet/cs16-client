@@ -224,7 +224,7 @@ void CCzmSocial::Read( const CzmJson &j,int kind )
 		m_people.RemoveAll(); int list=j.Get(0,"people");
 		for(int i=0;i<j.Count(list)&&i<40;i++){ Person p;ReadPerson(p,j,j.At(list,i));m_people.AddToTail(p); }
 		m_nextOffset=j.Int(j.Get(0,"next"),-1);
-		if(m_tab==2 && !m_write) Write(WRITE_ACTION,"/api/v1/social/action","{\"action\":\"seen\"}");
+		if(m_tab==2 && s_requests>0 && !m_write) Write(WRITE_ACTION,"/api/v1/social/action","{\"action\":\"seen\"}");
 	}
 	else
 	{

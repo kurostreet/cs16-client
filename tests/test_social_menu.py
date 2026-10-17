@@ -75,6 +75,9 @@ int main(int argc,char**argv){
  w.m_target=8;w.Navigate(w.DIALOG);w.Read(j,w.READ_DIALOG);assert(w.m_canSend&&w.m_messages.Count()==1);
  strcpy(w.m_input,"Hello friend");w.Send();int send=w.m_write;auto payload=requests.back().body;replies[send]={0,""};w.Frame();assert(!w.m_write&&!strcmp(w.m_input,"Hello friend"));
  w.Send();assert(requests.back().body==payload);replies[w.m_write]={200,"{\"message\":{\"id\":2}}"};w.Frame();assert(!*w.m_input);
+ // A read follower list must not start a mark-seen/refetch request loop.
+ w.m_tab=2;w.Navigate(w.LIST);CzmJson followers;assert(followers.Parse("{\"people\":[],\"counts\":{\"requests\":0},\"next\":-1}"));
+ w.Read(followers,w.READ_LIST);assert(w.m_write==0);
  // A reply sent before logout cannot populate another account's window.
  int pending=w.m_read;key="czms1_second-account";me=9;CZM_SocialFrame();assert(!w.m_open&&w.m_messages.Count()==0);
  if(pending)replies[pending]={200,"{\"messages\":[{\"id\":55,\"t\":\"private old account\"}]}"};CZM_SocialFrame();assert(w.m_messages.Count()==0);
