@@ -555,10 +555,13 @@ int CCzmChat::HitTest( void ) const
 
 void CCzmChat::Activate( int hit )
 {
-	if( hit == HIT_NONE || hit == HIT_POPUP_PANEL )
+	if( m_bClosing || hit == HIT_NONE || hit == HIT_POPUP_PANEL )
 		return;
 
-	if( hit < HIT_MESSAGE )
+	// The base window plays its closing sound when the slide finishes.
+	bool closes = hit == HIT_BACK || hit == HIT_HANDLE
+		|| (( hit == HIT_POPUP_CANCEL || hit == HIT_BACKDROP ) && m_iPopup < 0 );
+	if( hit < HIT_MESSAGE && !closes )
 		CZM_PlayClick();
 
 	switch( hit )
@@ -663,12 +666,17 @@ bool CCzmChat::KeyDown( int key )
 	if( UI::Key::IsEscape( key ))
 	{
 		if( m_iPopup >= 0 )
+		{
 			m_iPopup = -1;
+			CZM_PlayClick();
+		}
 		else if( m_bTyping )
+		{
 			EndInput();
+			CZM_PlayClick();
+		}
 		else
 			Hide();
-		EngFuncs::PlayLocalSound( uiStatic.sounds[SND_OUT] );
 		return true;
 	}
 
